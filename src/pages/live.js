@@ -1,10 +1,14 @@
-import React, {useState, useEffect} from "react";
-import {db} from "../index"
-import {waypoints_muse} from "../utils/vectors";
-import {dot, getRelativeVector, pca, runModel} from "../utils/analysis";
-import { centroid } from "../utils/functions";
-import {getData} from "../utils/database"
-import {updateChartWaypoints, updateChartUser} from "../utils/charts"
+import React, { useState, useEffect } from "react";
+import * as firebaseui from "firebaseui"
+import "firebaseui/dist/firebaseui.css"
+import firebase from "firebase/compat/app"
+import { getData, auth, login } from "../utils/database"
+import {onAuthStateChanged } from "firebase/auth"
+import { waypoints_muse } from "../utils/vectors";
+import { dot, getRelativeVector, pca, runModel } from "../utils/analysis";
+import { updateChartWaypoints, updateChartUser } from "../utils/charts"
+import { signInWithEmailAndPassword } from "firebase/auth";
+
 
 const d3 = require("d3");
 
@@ -32,11 +36,45 @@ export var state =
 
 }
 
+var user, email = null
+onAuthStateChanged(auth, (user) => {
+    if (user)
+    {
+        console.log("Auth user: " + user.email)
+        d3.select("#user").text("Logged in as: " + user.email)
+        d3.select("#signin").text("Sign Out")
+        d3.select("#firebase-auth-container").style("display", "none")
+        user = user.uid
+
+        d3.select("#signin").on("click", function()
+        {
+            console.log("Signing out...")
+            auth.signOut()
+            d3.select("#user").text("Not Signed In")
+            d3.select("#signin").text("Sign In")
+        })
+
+    }
+    else{
+        console.log("No user!")
+        user = null
+        email = null
+        d3.select("#signin").on("click", function()
+        {
+            
+          })
+        login()
+    }
+})
+
+
 
 function buildPage() {
     console.log(dot([1, 1, 1], [2, 3, 10]))
     //getData(db)
     setup()
+
+
 }
 
 function buildModel(vectors) {
@@ -60,13 +98,32 @@ function buildModel(vectors) {
 }
 
 
-function setup()
-{
+function setup() {
     d3.select("#main-container").style("display", "flex")
-    .style("flex-direction", "row")
+        .style("flex-direction", "row")
 
     d3.selectAll(".sidebar").style("width", sidebarWidth + "px")
-    .style("background", "grey")
+        .style("background", "grey")
+
+    d3.select("#firebase-auth-container").style("position", "absolute")
+        
+        .style("left", 0)
+        .style("top", 0)
+        .style("bottom", 0)
+        .style("right", 0)
+        .style("margin", "auto auto auto auto")
+        .style("width", "400px")
+        .style("height", "400px")
+        .style("opacity", 0.9)
+
+    // Sign-Out button
+    d3.select("#signout").on("click", function()
+    {
+
+        auth.signOut()
+        d3.select("#user").text("Not Signed In")
+        d3.select("#signin").text("Sign In")
+    })
 
     d3.select("#popup")
         .style("border-radius", "5px")
@@ -76,7 +133,7 @@ function setup()
         .style("z-index", 10)
         .style("color", "white")
         .style("margin-right", "20px")
-    
+
 
     // SVG
     d3.select("#chartsvg")
@@ -105,10 +162,10 @@ function setup()
         }
 
     })
-    
+
     updateChartWaypoints(waypoints)
 
-    
+
 }
 
 
@@ -124,7 +181,10 @@ export default function Live() {
         <main id="main-container">
             <div id="sidebar-left" className="sidebar">
                 <h2>The Mapping Meditation Project</h2>
+                <div id="user">(Logged Out)</div>
+                <button id="signin">Sign In</button>
             </div>
+            <div id="firebase-auth-container"></div>
             <svg id="chartsvg"></svg>
             <div id="popup"></div>
             <div id="sidebar-right" className="sidebar"></div>
