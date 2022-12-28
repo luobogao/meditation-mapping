@@ -264,9 +264,9 @@ export function updateChartWaypoints(selected_waypoints) {
     buildLinks(svg, waypointCircles)
     addWaypoints(svg, waypointCircles)
     
-    //rotate(Math.random(), 0, Math.random())
+    rotate(Math.random(), 0, Math.random())
     rotateOpening = setInterval(function () {
-        //rotate(0.001, 0, 0.001)
+        rotate(0.001, 0, 0.001)
     }, 10)
 
 }

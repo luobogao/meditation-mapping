@@ -3,7 +3,7 @@ import * as firebaseui from "firebaseui"
 import "firebaseui/dist/firebaseui.css"
 import firebase from "firebase/compat/app"
 import { getData, auth, login } from "../utils/database"
-import {onAuthStateChanged } from "firebase/auth"
+import { onAuthStateChanged } from "firebase/auth"
 import { waypoints_muse } from "../utils/vectors";
 import { dot, getRelativeVector, pca, runModel } from "../utils/analysis";
 import { updateChartWaypoints, updateChartUser } from "../utils/charts"
@@ -38,16 +38,14 @@ export var state =
 
 var user, email = null
 onAuthStateChanged(auth, (user) => {
-    if (user)
-    {
+    if (user) {
         console.log("Auth user: " + user.email)
         d3.select("#user").text("Logged in as: " + user.email)
         d3.select("#signin").text("Sign Out")
         d3.select("#firebase-auth-container").style("display", "none")
         user = user.uid
 
-        d3.select("#signin").on("click", function()
-        {
+        d3.select("#signin").on("click", function () {
             console.log("Signing out...")
             auth.signOut()
             d3.select("#user").text("Not Signed In")
@@ -55,14 +53,13 @@ onAuthStateChanged(auth, (user) => {
         })
 
     }
-    else{
+    else {
         console.log("No user!")
         user = null
         email = null
-        d3.select("#signin").on("click", function()
-        {
-            
-          })
+        d3.select("#signin").on("click", function () {
+
+        })
         login()
     }
 })
@@ -106,7 +103,7 @@ function setup() {
         .style("background", "grey")
 
     d3.select("#firebase-auth-container").style("position", "absolute")
-        
+
         .style("left", 0)
         .style("top", 0)
         .style("bottom", 0)
@@ -116,14 +113,13 @@ function setup() {
         .style("height", "400px")
         .style("opacity", 0.9)
 
-    // Sign-Out button
-    d3.select("#signout").on("click", function()
-    {
 
-        auth.signOut()
-        d3.select("#user").text("Not Signed In")
-        d3.select("#signin").text("Sign In")
-    })
+    // Auth data
+    d3.select("#auth-container")
+        .style("width", (sidebarWidth - 20) + "px")
+        .style("position", "absolute")
+        .style("bottom", "10px")
+        .style("left", "10px")
 
     d3.select("#popup")
         .style("border-radius", "5px")
@@ -181,8 +177,12 @@ export default function Live() {
         <main id="main-container">
             <div id="sidebar-left" className="sidebar">
                 <h2>The Mapping Meditation Project</h2>
-                <div id="user">(Logged Out)</div>
-                <button id="signin">Sign In</button>
+
+                <div id="auth-container">
+                    <div id="user"></div>
+                    <button id="signin">Sign In</button>
+                </div>
+
             </div>
             <div id="firebase-auth-container"></div>
             <svg id="chartsvg"></svg>
