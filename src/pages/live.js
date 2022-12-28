@@ -2,8 +2,8 @@ import React, { useState, useEffect } from "react";
 import * as firebaseui from "firebaseui"
 import "firebaseui/dist/firebaseui.css"
 import firebase from "firebase/compat/app"
-import { getData, auth, login } from "../utils/database"
-import { onAuthStateChanged } from "firebase/auth"
+import { getData, auth, login, updateUsername } from "../utils/database"
+import { onAuthStateChanged} from "firebase/auth"
 import { waypoints_muse } from "../utils/vectors";
 import { dot, getRelativeVector, pca, runModel } from "../utils/analysis";
 import { updateChartWaypoints, updateChartUser } from "../utils/charts"
@@ -36,21 +36,47 @@ export var state =
 
 }
 
-var user, email = null
+var email = null
 onAuthStateChanged(auth, (user) => {
     if (user) {
-        console.log("Auth user: " + user.email)
+        console.log("Authenticated user:")
+        console.log(user.displayName)
         d3.select("#user").text("Logged in as: " + user.email)
         d3.select("#signin").text("Sign Out")
-        d3.select("#firebase-auth-container").style("display", "none")
-        user = user.uid
+        
+        if (user.displayName == null)
+        {
+            console.log("No user name yet")
+            var container = d3.select("#firebase-auth-container")
+            container.selectAll("*").remove()
+            container.style("background", "grey").style("border-radius", "5px").style("height", "220px")
+            var div = container.append("div").style("margin", "20px").style("display","flex").style("flex-direction","column")
+            div.append("text").text("Please choose a Username:").style("color", "white").style("margin-bottom", "10px")
+            div.append("input").attr("type", "text").attr("id", "username-input").on("change", function(d)
+            {
+                updateUsername()
 
-        d3.select("#signin").on("click", function () {
-            console.log("Signing out...")
-            auth.signOut()
-            d3.select("#user").text("Not Signed In")
-            d3.select("#signin").text("Sign In")
-        })
+            })
+            div.append("text").text("Should be just your first name, or any one-word username. This will be the name other users see if you submit a meditation 'waypoint'").style("color", "white").style("margin-top", "10px")
+            div.append("button").style("position", "absolute").style("bottom", "10px").style("right", "10px").text("OK")
+            .on("click", function()
+            {
+                updateUsername()
+            })
+        }
+        else
+        {
+            d3.select("#user").text("Logged in: " + user.displayName)
+            d3.select("#firebase-auth-container").style("display", "none")
+            d3.select("#signin").on("click", function () {
+                console.log("Signing out...")
+                auth.signOut()
+                d3.select("#user").text("Not Signed In")
+                d3.select("#signin").text("Sign In")
+            })
+        }
+
+        
 
     }
     else {
@@ -102,6 +128,7 @@ function setup() {
     d3.selectAll(".sidebar").style("width", sidebarWidth + "px")
         .style("background", "grey")
 
+    
     d3.select("#firebase-auth-container").style("position", "absolute")
 
         .style("left", 0)
@@ -119,7 +146,10 @@ function setup() {
         .style("width", (sidebarWidth - 20) + "px")
         .style("position", "absolute")
         .style("bottom", "10px")
-        .style("left", "10px")
+        .style("left", "20px")
+
+    d3.select("#signin").style("width", "150px")
+
 
     d3.select("#popup")
         .style("border-radius", "5px")
@@ -176,12 +206,17 @@ export default function Live() {
 
         <main id="main-container">
             <div id="sidebar-left" className="sidebar">
-                <h2>The Mapping Meditation Project</h2>
+                <div style={{margin: 10}}>
+                    <h2>The Mapping Meditation Project</h2>
 
-                <div id="auth-container">
-                    <div id="user"></div>
-                    <button id="signin">Sign In</button>
+                    <div id="auth-container">
+                        <div id="user"></div>
+                        <button id="signin">Sign In</button>
+                    </div>
                 </div>
+
+
+
 
             </div>
             <div id="firebase-auth-container"></div>

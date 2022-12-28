@@ -21,9 +21,9 @@ export function dot(a, b)
 var means = []
 var maxes = []
 var principals = []
-var modelType = "covariance" // How to measure variances
+var modelType = "cosine" // cosine or covariance
 var standardizeType = "ratio" // Method to standardize a vector
-var distanceType = "euclidean"
+var distanceType = "cosine"
 
 
 export function measureDistance(a, b)

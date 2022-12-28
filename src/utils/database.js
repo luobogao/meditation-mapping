@@ -1,6 +1,6 @@
 import { getFirestore, collection, getDocs } from 'firebase/firestore/lite';
 import { initializeApp } from "firebase/app";
-import { getAuth, onAuthStateChanged } from "firebase/auth"
+import { getAuth, onAuthStateChanged, updateProfile } from "firebase/auth"
 import * as firebaseui from "firebaseui"
 import "firebaseui/dist/firebaseui.css"
 import firebase from "firebase/compat/app"
@@ -38,10 +38,9 @@ export function login() {
     const ui = firebaseui.auth.AuthUI.getInstance() || new firebaseui.auth.AuthUI(auth)
     ui.start("#firebase-auth-container", {
         callbacks: {
-            signInSuccessWithAuthResult: function(authResult, redirectUrl)
-            {
+            signInSuccessWithAuthResult: function (authResult, redirectUrl) {
                 console.log("---> Successful sign in")
-                
+
                 return false
             }
         },
@@ -54,6 +53,26 @@ export function login() {
         privacyPolicyUrl: "<privacy url>"
     }, [])
 
+
+}
+export function updateUsername() {
+    var newUsername = d3.select("#username-input").node().value
+    var dialog = d3.select("#firebase-auth-container")
+    if (newUsername.length > 2) {
+        console.log("changed: " + newUsername)
+        updateProfile(auth.currentUser, { displayName: newUsername }).then(() => {
+            console.log("Profile updated!")
+            d3.select("#user").text("Logged in: " + newUsername)
+            dialog.selectAll('*').remove()
+            dialog.style("display", "none")
+        })
+            .catch((error) => {
+                console.error("Error updating!")
+                d3.select("#user").text("FAILED TO UPDATE")
+                dialog.append("text").text("FAILED TO UPDATE")
+
+            })
+    }
 
 }
 
