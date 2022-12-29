@@ -1,5 +1,6 @@
 import {ratio, clone} from "../utils/functions";
 import {state} from "../pages/live"
+
 const d3 = require("d3");
 const math = require("mathjs");
 
@@ -252,9 +253,6 @@ export function covarianceMeans(matrix) {
 
 export function covarianceCosine(matrix) {
     var unit_scaled_matrix = unit_scaling(matrix)
-
-
-    //var unit_scaled_matrix = subtract_means(matrix)
     var cosineSimilarity_matrix = []
     for (var a = 0; a < matrix[0].length; a++) {
         var new_row = []

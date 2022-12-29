@@ -21,8 +21,6 @@ root.render(<BrowserRouter>
       <Route index element={<Home />} />
       <Route path="about" element={<About />} />
       <Route path="live" element={<Live />} />
-      
-      
     </Route>
   </Routes>
 </BrowserRouter>)

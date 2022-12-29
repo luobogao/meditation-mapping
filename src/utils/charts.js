@@ -1,11 +1,15 @@
-import {chartWidth, chartHeight, mode3d} from "../pages/live"
-import { popUp, popUpremove } from "./ui";
-import {getRelativeVector, runModel} from "../utils/analysis";
+import { chartWidth, chartHeight, mode3d } from "../pages/live"
+import { popUp, popUpremove, addMenu, menuRemove } from "./ui";
+import { getRelativeVector, runModel } from "../utils/analysis";
+import { addWaypoint, getAllWaypoints } from "../utils/database"
 import { centroid } from "./functions";
 import { node_links } from "./vectors";
 import { x_mini } from "./minichart";
 import { state } from "../pages/live";
+
 const d3 = require("d3");
+
+
 const math = require("mathjs");
 
 var waypoints;
@@ -16,7 +20,8 @@ var line = d3.line()
     .y(function (d, i) { return y(d[1]) })
 //.curve(d3.curveMonotoneX) // apply smoothing to the line
 
-var rotateOpening // an 'interval' which rotates the chart when user starts
+var rotateStart = false
+var rotateOpening = false // an 'interval' which rotates the chart when user starts
 var waypointCircles = []
 var waypointLinks = []
 var userCircles = []
@@ -26,16 +31,15 @@ var label_array = []
 var anchor_array = []
 var labels, links
 var linkSize = 1
-var labelSize = "20px"
+var labelSize = "14px"
 var labelColor = "black"
-var userSize = 20
-var waypointSize = 10     // Size of waypoint circles
-var userOpacity = 0.4
+var userSize = 10
+var waypointSize = 5     // Size of waypoint circles
+var userOpacity = 0.2
 var waypointOpacity = 0.9
 var userPointColor = "grey"
 var waypointColor = "blue"
-var labelOffset = 10 // The distance of labels from points
-
+var labelOffset = 15 // The distance of labels from points
 
 // Modes
 var link_mode = "center"  // "center" or "between" - center links all nodes to origin 0,0
@@ -61,6 +65,8 @@ export function updateChartWaypoints(selected_waypoints) {
     waypointLinks = []
     d3.select("#chart").selectAll("*").remove() // Clear everything
 
+    clearInterval(rotateOpening)
+
 
     zooming = false // set to true when using is moving/zooming, to prevent popups
     let zoom = d3.zoom()
@@ -68,8 +74,6 @@ export function updateChartWaypoints(selected_waypoints) {
         .on("start", function () {
             zooming = true
             clearInterval(rotateOpening)
-
-
 
         })
         .on("end", function () {
@@ -138,7 +142,7 @@ export function updateChartWaypoints(selected_waypoints) {
 
     // Get min/max only from the selected waypoints
     var standardCoordinates = waypoints.filter(e => e.exclude != true).filter(e => e.match == true).map(e => e.coordinates)
-    
+
 
     // Find the minimum and maxiumum range of the model, set the chart size a bit larger than those bounds
     minx = d3.min(standardCoordinates.map(e => e[0]))
@@ -263,15 +267,28 @@ export function updateChartWaypoints(selected_waypoints) {
 
     buildLinks(svg, waypointCircles)
     addWaypoints(svg, waypointCircles)
-    
-    rotate(Math.random(), 0, Math.random())
-    rotateOpening = setInterval(function () {
-        rotate(0.001, 0, 0.001)
-    }, 10)
+
+
+    if (rotateStart == true) {
+
+        rotate(Math.random(), 0, Math.random())
+        rotateOpening = setInterval(function () {
+            rotate(0.001, 0, 0.001)
+        }, 10)
+
+    }
+
+
 
 }
 function addWaypoints(svg, data) {
     // ADD WAYPOINTS
+
+    d3.select("#chartsvg")
+        .on("click", function () {
+            menuRemove()
+            popUpremove()
+        })
 
     svg.selectAll(".waypoints")
         .data(data)
@@ -329,6 +346,13 @@ function addWaypoints(svg, data) {
             if (d.fullentry.match) return waypointColor
             else return "red"
         })
+        .on("contextmenu", function (event, d) {
+            event.preventDefault()
+            var menu = addMenu(event, "test")
+            menu.append("div").text("Waypoint Menu")
+            menu.append("button").text("hide")
+        }
+        )
         .on("click", function (i, d) {
             // Toggle red/blue for selected waypoint
             var waypoint = d3.select(this)
@@ -342,9 +366,9 @@ function addWaypoints(svg, data) {
                     .attr("selected", true)
             }
 
+
             waypoint.raise()
             recenter(d, 1000)
-
         }
         )
         .on("mouseover", function (event, d) {
@@ -390,7 +414,7 @@ function buildLinks(svg, waypointData) {
         all_nodes.forEach(waypoint_id => {
             var w1 = getWaypoint(waypoint_id)
             if (w1 != null) {
-                waypointLinks.push([w1, {x: 0, y:0, z: 0}])
+                waypointLinks.push([w1, { x: 0, y: 0, z: 0 }])
             }
 
         })
@@ -527,19 +551,17 @@ function adjustLabels() {
     }
 
 }
-export function updateChartUser(data, type) {
+export function updateChartUser(data, selected_waypoints) {
 
-    if (type == "large") {
-        userSize = 5
-        userOpacity = 0.9
-    }
+    clearInterval(rotateOpening)
+    waypoints = selected_waypoints
 
 
     var svg = d3.select("#chart_user")
     svg.selectAll("*").remove() // Clear last chart, if any
 
     var vectors = data.map(e => getRelativeVector(e.vector))
-    
+
     // FOR TESTING: use the waypoints as user point, they should match PERFECTLY with waypoinst
     //var vectors = waypoints.filter(e => e.match == true).map(e => getRelativeVector(e.vector))
 
@@ -573,6 +595,13 @@ export function updateChartUser(data, type) {
     //     .attr("opacity", 0.3)
     //     .attr("d", line(lineData))
 
+    var menu = [
+        {
+            title: "Delete",
+            action: function (d) {
+                console.log("deleting...")
+            }
+        }]
 
     // USER'S POINTS
     svg
@@ -610,8 +639,8 @@ export function updateChartUser(data, type) {
                     var match = marker_y_matches[0]
 
                     var marker_y = 50
-                    var marker_x = x_mini(match.seconds)
-                    
+                    var marker_x = 10 //x_mini(match.seconds)
+
 
                     d3.select("#mini-marker")
                         .attr("cx", marker_x)
@@ -628,6 +657,11 @@ export function updateChartUser(data, type) {
 
 
         })
+        .on("contextmenu", function (event, d) {
+            event.preventDefault()
+
+        }
+        )
         .on("click", function (i, d) {
             // Click on a user point
 
@@ -690,7 +724,7 @@ function rotate(pitch, yaw, roll) {
     var transform = [[Axx, Axy, Axz], [Ayx, Ayy, Ayz], [Azx, Azy, Azz]]
 
     rotatethis(waypointCircles, "list", "waypoints")
-    
+
     if (userCircles.length > 0) {
         rotatethis(userCircles, "list", "test")
     }
@@ -701,14 +735,14 @@ function rotate(pitch, yaw, roll) {
             var m2 = math.multiply(m, transform)
             for (let e = 0; e < m2.length; e++) {
 
-              
+
                 matrix[e].x = m2[e][0]
                 matrix[e].y = m2[e][1]
                 matrix[e].z = m2[e][2]
             }
-            
-            
-            
+
+
+
 
 
         }
@@ -771,7 +805,7 @@ function recenter(node, duration) {
     var z = node.z
     // Centers the view around the user's data center of gravity instead of the model origin
 
-    
+
 
     var updates = [userCircles, waypointCircles]
     updates.forEach(arr => {

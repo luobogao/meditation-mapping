@@ -1,4 +1,4 @@
-import { getFirestore, collection, getDocs } from 'firebase/firestore/lite';
+import { getFirestore, collection, getDocs, setDoc, doc } from 'firebase/firestore/lite';
 import { initializeApp } from "firebase/app";
 import { getAuth, onAuthStateChanged, updateProfile } from "firebase/auth"
 import * as firebaseui from "firebaseui"
@@ -74,6 +74,23 @@ export function updateUsername() {
             })
     }
 
+}
+export function addWaypoint(waypointName, waypointData)
+{
+    setDoc(doc(db, "waypoints", waypointName), waypointData).then(() =>
+    {
+        console.log("Added waypoint")
+    })
+    .catch((error) =>
+    {
+        console.error("Failed to add waypoint")
+    })
+}
+
+export function getAllWaypoints()
+{
+    var promise = getDocs(collection(db, "waypoints"))
+    return promise
 }
 
 
