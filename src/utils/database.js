@@ -1,4 +1,4 @@
-import { getFirestore, collection, getDocs, setDoc, doc } from 'firebase/firestore/lite';
+import { getFirestore, collection, getDocs, setDoc, doc, deleteDoc, updateDoc } from 'firebase/firestore/lite';
 import { initializeApp } from "firebase/app";
 import { getAuth, onAuthStateChanged, updateProfile } from "firebase/auth"
 import * as firebaseui from "firebaseui"
@@ -58,8 +58,9 @@ export function login() {
 export function updateUsername() {
     var newUsername = d3.select("#username-input").node().value
     var dialog = d3.select("#firebase-auth-container")
-    if (newUsername.length > 2) {
+    if (newUsername.length > 2) {   
         console.log("changed: " + newUsername)
+        
         updateProfile(auth.currentUser, { displayName: newUsername }).then(() => {
             console.log("Profile updated!")
             d3.select("#user").text("Logged in: " + newUsername)
@@ -75,16 +76,18 @@ export function updateUsername() {
     }
 
 }
-export function addWaypoint(waypointName, waypointData)
+export function addWaypoint(waypoint)
 {
-    setDoc(doc(db, "waypoints", waypointName), waypointData).then(() =>
-    {
-        console.log("Added waypoint")
-    })
-    .catch((error) =>
-    {
-        console.error("Failed to add waypoint")
-    })
+    var id = waypoint.user + " - " + waypoint.label
+    var entry = {user: waypoint.user, label: waypoint.label, vector: waypoint.vector, notes: waypoint.notes}
+    var promise = setDoc(doc(db, "waypoints", id), entry)
+    return promise
+}
+export function deleteWaypoint(waypoint)
+{
+    console.log("Deleting: " + waypoint.id)
+    var promise = deleteDoc(doc(db, "waypoints", waypoint.id))
+    return promise
 }
 
 export function getAllWaypoints()
@@ -92,6 +95,12 @@ export function getAllWaypoints()
     var promise = getDocs(collection(db, "waypoints"))
     return promise
 }
+export function updateWaypointNotes(waypoint, notes)
+{
+    var promise = updateDoc(doc(db, "waypoints", waypoint.id), {notes: notes})
+    return promise
+}
+
 
 
 

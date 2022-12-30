@@ -1,19 +1,16 @@
-import { chartWidth, chartHeight, mode3d } from "../pages/live"
+import { chartWidth, chartHeight, mode3d, waypoints } from "../pages/live"
 import { popUp, popUpremove, addMenu, menuRemove } from "./ui";
 import { getRelativeVector, runModel } from "../utils/analysis";
-import { addWaypoint, getAllWaypoints } from "../utils/database"
-import { centroid } from "./functions";
+import { addWaypoint, deleteWaypoint, updateWaypointNotes } from "../utils/database"
+import { centroid, uid } from "./functions";
 import { node_links } from "./vectors";
 import { x_mini } from "./minichart";
-import { state } from "../pages/live";
+import { state, rebuildChart } from "../pages/live";
 
 const d3 = require("d3");
 
 
 const math = require("mathjs");
-
-var waypoints;
-
 var line = d3.line()
     // Basic line function - takes a list of points and plots them x-y, x-y one at a time
     .x(function (d, i) { return x(d[0]); })
@@ -33,13 +30,13 @@ var labels, links
 var linkSize = 1
 var labelSize = "14px"
 var labelColor = "black"
-var userSize = 10
-var waypointSize = 5     // Size of waypoint circles
+var userSize = 20
+var waypointSize = 10    // Size of waypoint circles
 var userOpacity = 0.2
 var waypointOpacity = 0.9
 var userPointColor = "grey"
 var waypointColor = "blue"
-var labelOffset = 15 // The distance of labels from points
+var labelOffset = 11 // The distance of labels from points
 
 // Modes
 var link_mode = "center"  // "center" or "between" - center links all nodes to origin 0,0
@@ -57,8 +54,8 @@ var minx, maxx, miny, maxy, minz, maxz
 
 var cube;
 
-export function updateChartWaypoints(selected_waypoints) {
-    waypoints = selected_waypoints
+export function updateChartWaypoints() {
+
     label_array = []
     anchor_array = []
     waypointCircles = []
@@ -212,19 +209,15 @@ export function updateChartWaypoints(selected_waypoints) {
         .range([0.4, 1])
 
     waypoints.forEach(entry => {
+
         var xi = entry.coordinates[0]
         var yi = entry.coordinates[1]
         var zi = entry.coordinates[2]
 
         var label = entry.user + " " + entry.label
-        if (entry.match == true) {
-            waypointCircles.push({ x: xi, y: yi, z: zi, fullentry: entry, id: entry.id, label: label })
-
-
-        }
+        waypointCircles.push({ match: entry.match, x: xi, y: yi, z: zi, fullentry: entry, id: entry.id, label: label })
 
     })
-    console.log("--> Adding waypoints: " + waypointCircles.length)
 
     cameraProject(waypointCircles)
 
@@ -234,6 +227,11 @@ export function updateChartWaypoints(selected_waypoints) {
         .enter()
         .append("text")
         .attr("class", "label")
+        .style("display", function (d) {
+            // Option: don't display a waypoint if 'match' is false
+            if (state.showAllWaypoints == false && d.match == false) return "none"
+            else return "flex"
+        })
         .attr("id", function (d, i) { return "label_" + i })
         .style("fill", labelColor)
         .attr("x", function (d, i) { return x(d.xp) + labelOffset })
@@ -245,21 +243,6 @@ export function updateChartWaypoints(selected_waypoints) {
         })
 
         .text(function (d) { return d.label })
-
-    links = svg.selectAll(".link")
-        .data(label_array)
-        .enter()
-        .append("line")
-        .attr("class", "link")
-        .attr("opacity", 0.2)
-        .attr("x1", function (d) { return d.x; })
-        .attr("y1", function (d) { return d.y; })
-        .attr("x2", function (d) { return d.x; })
-        .attr("y2", function (d) { return d.y; })
-        .attr("stroke-width", linkSize)
-        .attr("stroke", "black");
-
-
 
     if (mode3d != true) {
         //adjustLabels()
@@ -283,6 +266,8 @@ export function updateChartWaypoints(selected_waypoints) {
 }
 function addWaypoints(svg, data) {
     // ADD WAYPOINTS
+    console.log("state")
+    console.log(state)
 
     d3.select("#chartsvg")
         .on("click", function () {
@@ -294,6 +279,7 @@ function addWaypoints(svg, data) {
         .data(data)
         .enter()
         .append("circle")
+        .style("cursor", "pointer")
         .attr("class", "waypoints")
         .attr("cx", function (d, i) {
 
@@ -319,8 +305,8 @@ function addWaypoints(svg, data) {
         })
         .style("display", function (d) {
             // Option: don't display a waypoint if 'match' is false
-            if (d.fullentry.match) return "flex"
-            else return "none"
+            if (state.showAllWaypoints == false && d.match == false) return "none"
+            else return "flex"
         })
 
         .style("stroke", function (d) {
@@ -343,14 +329,73 @@ function addWaypoints(svg, data) {
 
         .attr("fill", function (d) {
             // Option: don't display a waypoint if 'match' is false
-            if (d.fullentry.match) return waypointColor
+            var entry = d3.select(this)
+
+            // New waypoint added by user - flash to show where it is
+            if (d.fullentry.new) {
+                d.fullentry.new = null
+                setTimeout(function () {
+                    entry
+                        .attr("r", 50)
+                        .transition()
+                        .attr("r", waypointSize)
+                        .duration(1000)
+
+                }, 100)
+            }
+
+            if (d.match) return waypointColor
             else return "red"
         })
         .on("contextmenu", function (event, d) {
             event.preventDefault()
             var menu = addMenu(event, "test")
-            menu.append("div").text("Waypoint Menu")
-            menu.append("button").text("hide")
+            menu.append("div").text("Waypoint Options")
+
+            // Edit Notes
+            menu.append("button")
+                .style("margin-top", "20px")
+                .text("Edit Notes")
+                .on("click", function () 
+                {
+                    
+                    menu.selectAll("*").remove()
+                    menu.append("text").text("Edit Notes")
+                    var currentNote = ""
+                    if (d.fullentry.notes != undefined)
+                    {
+                        currentNote = d.fullentry.notes
+                    }
+                    menu.append("input").attr("type", "text").value(currentNote)
+                    .on("change", function()
+                    {
+                        var newNotes = d3.select(this).node().value
+                        console.log("Setting new notes: " + newNotes)
+                        d.fullentry.notes = newNotes
+                        updateWaypointNotes(d.fullentry, newNotes).then(() =>
+                        {
+                            console.log("Notes Upated!")
+                            menuRemove()
+                        })
+                    })
+                })
+
+            // Delete
+            menu.append("button")
+                .style("margin-top", "20px")
+                .text("Delete")
+                .on("click", function () {
+                    menuRemove()
+                    var response = window.confirm("Are you sure you want to DELETE this point for all users?")
+                    if (response) {
+                        deleteWaypoint(d.fullentry).then(() => {
+                            console.log("waypoints: " + waypoints.length)
+                            waypoints.forEach(waypoint => { if (waypoint.id == d.fullentry.id) waypoint.remove = true })
+                            console.log("waypoints2: " + waypoints.length)
+                            rebuildChart()
+                        })
+                    }
+                })
         }
         )
         .on("click", function (i, d) {
@@ -372,14 +417,18 @@ function addWaypoints(svg, data) {
         }
         )
         .on("mouseover", function (event, d) {
-
+            console.log(d)
             if (zooming == false) {
-                var note = d.fullentry.popup
+                var note = d.fullentry.notes
                 d3.select(this).style("fill", "red")
 
                 const user = d.fullentry.user
-                if (note == undefined) { note = "(No Notes)" }
-                var html = "<h2>" + user + "</h2>" + note + "<br><br>" + d.fullentry.cosineSimiarity
+                var html = "<h2>" + user + "</h2>"
+                if (note != undefined) 
+                {
+                    html = html + "<br><br>" + note 
+                }
+                
                 popUp(event, html)
             }
 
@@ -410,7 +459,7 @@ function buildLinks(svg, waypointData) {
         }
     }
     if (link_mode == "center") {
-        var all_nodes = waypoints.map(e => [e.id]) // Use ALL waypoints 
+        var all_nodes = waypoints.filter(e => e.match == true).map(e => [e.id]) // Use ALL waypoints 
         all_nodes.forEach(waypoint_id => {
             var w1 = getWaypoint(waypoint_id)
             if (w1 != null) {
@@ -551,11 +600,9 @@ function adjustLabels() {
     }
 
 }
-export function updateChartUser(data, selected_waypoints) {
+export function updateChartUser(data) {
 
     clearInterval(rotateOpening)
-    waypoints = selected_waypoints
-
 
     var svg = d3.select("#chart_user")
     svg.selectAll("*").remove() // Clear last chart, if any
@@ -610,6 +657,7 @@ export function updateChartUser(data, selected_waypoints) {
         .enter()
         .append("circle")
         .attr("class", "userpoints")
+        .style("cursor", "pointer")
         .attr("cx", function (d, i) {
 
             return x(d.xp)
@@ -624,6 +672,20 @@ export function updateChartUser(data, selected_waypoints) {
 
         .attr("opacity", userOpacity)
         .attr("fill", userPointColor)
+        .on("contextmenu", function (event, d) {
+            event.preventDefault()
+
+            var menu = addMenu(event, "test")
+            menu.append("div").text("Options")
+            menu.append("button")
+                .style("margin-top", "20px")
+                .text("Add this Waypoint")
+                .on("click", function () {
+                    addUserWaypoint(d.moment, menu)
+
+                })
+        }
+        )
         .on("mouseover", function (i, d) {
 
             if (zooming != true) {
@@ -657,11 +719,7 @@ export function updateChartUser(data, selected_waypoints) {
 
 
         })
-        .on("contextmenu", function (event, d) {
-            event.preventDefault()
 
-        }
-        )
         .on("click", function (i, d) {
             // Click on a user point
 
@@ -695,6 +753,48 @@ export function updateChartUser(data, selected_waypoints) {
 
     var center = centroid(userCircles) // get the center of a point cloud
     recenter(center)
+
+}
+function addUserWaypoint(user_point, menu) {
+    menu.selectAll("*").remove()
+    menu.append("div").text("User: " + state.userName)
+    menu.append("div").text("Label:").style("margin-top", "20px")
+    var label = menu.append("input").attr("type", "text").on("change", function (d) {
+        var label = d3.select(this).node().value
+        console.log(label)
+    })
+    menu.append("div").text("Notes:").style("margin-top", "20px")
+    var notes = menu.append("input").attr("type", "text").on("change", function (d) {
+        var notes = d3.select(this).node().value
+        console.log(label)
+    })
+    menu.append("div").style("margin-top", "30px")
+        .append("button").text("Submit")
+        .on("click", function () {
+            var l = label.node().value
+            var n = notes.node().value
+
+            if (l.length > 1) {
+                var newWaypoint = { id: state.userName + " - " + l, user: state.userName, label: l, vector: user_point.vector, notes: n }
+                addWaypoint(newWaypoint)
+                    .then(() => {
+                        console.log("Added waypoint")
+                        menuRemove()
+                        newWaypoint.new = true // setting this to true flags it to "flash" when next loaded
+                        waypoints.push(newWaypoint)
+                        rebuildChart()
+                    })
+                    .catch((error) => {
+                        console.error("Failed to add waypoint")
+                        alert("Failed to add!")
+                    })
+            }
+            else {
+                alert("Please include a label (notes are optional)")
+            }
+
+
+        })
 
 }
 

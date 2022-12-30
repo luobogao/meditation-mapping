@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
 import * as firebaseui from "firebaseui"
 import "firebaseui/dist/firebaseui.css"
-import firebase from "firebase/compat/app"
+import { addCheckbox } from "../utils/ui";
 import { unique } from "../utils/functions";
-import { getData, auth, login, updateUsername } from "../utils/database"
+import { auth, login, updateUsername } from "../utils/database"
 import { onAuthStateChanged } from "firebase/auth"
 import { waypoints_muse, waypoints_mindlink } from "../utils/vectors";
 import { dot, getRelativeVector, pca, runModel, measureDistance } from "../utils/analysis";
@@ -12,6 +12,7 @@ import { signInWithEmailAndPassword } from "firebase/auth";
 import { getAllWaypoints } from "../utils/database"
 
 
+var userDataLoaded = false
 const channels = ["TP9", "TP10", "AF7", "AF8"]
 const bands = ["Delta", "Theta", "Alpha", "Beta", "Gamma"]
 const band_channels = []
@@ -22,15 +23,14 @@ bands.forEach(band => {
 })
 
 const d3 = require("d3");
-
-var defaultSelectedUsers = ["Steffan", "Kaio", "Nii", "Soshant", "Stephen", "Don"]
 const sidebarWidth = 300
 const chartMargin = 10
 export const chartWidth = window.innerWidth - sidebarWidth - 250
 export const chartHeight = window.innerHeight
 export var mode3d = true
 const backgroundColor = "#d9d9d9"
-var waypoints, users;
+export var waypoints
+var users;
 var fr;
 
 
@@ -38,11 +38,12 @@ export var state =
 {
     "filename": "<filename>",
     "device": "Muse",
-
+    "selected_users": [],
+    "showAllWaypoints": true, // Shows all waypoints (as red) even when not matching
     "model":
     {
         "mapped": null, // Mapped x-y coordinates of each standard vector
-        "selected_users": defaultSelectedUsers,
+
     },
     "avg10": []
 
@@ -56,6 +57,7 @@ onAuthStateChanged(auth, (user) => {
         d3.select("#user").text("Logged in as: " + user.email)
         d3.select("#signin").text("Sign Out")
 
+        // No display name - prompt user to choose one
         if (user.displayName == null) {
             console.log("No user name yet")
             var container = d3.select("#firebase-auth-container")
@@ -73,7 +75,10 @@ onAuthStateChanged(auth, (user) => {
                     updateUsername()
                 })
         }
+
+        // Found disaply name, good to go
         else {
+            state.userName = user.displayName
             d3.select("#user").text("Logged in: " + user.displayName)
             d3.select("#firebase-auth-container").style("display", "none")
             d3.select("#signin").on("click", function () {
@@ -82,12 +87,14 @@ onAuthStateChanged(auth, (user) => {
                 d3.select("#user").text("Not Signed In")
                 d3.select("#signin").text("Sign In")
             })
+            // Download all waypoints
             downloadWaypoints()
         }
 
 
 
     }
+    // Not authenticated yet - launch login
     else {
         console.log("No user!")
         user = null
@@ -101,6 +108,7 @@ onAuthStateChanged(auth, (user) => {
 
 function downloadWaypoints() {
 
+    // Reset waypoints
     waypoints = []
     users = []
     getAllWaypoints().then((snapshot) => {
@@ -109,30 +117,69 @@ function downloadWaypoints() {
         snapshot.forEach((doc) => {
             var waypoint = doc.data()
             waypoint.id = doc.id
-            waypoints.push(waypoint)
-            users.push(waypoint.user)
             
+            if (waypoint.id != undefined && waypoint.vector != undefined && waypoint.label != undefined && waypoint.user != undefined)
+            {
+                waypoints.push(waypoint)
+                users.push(waypoint.user)
+            }
+            
+
         })
-        users = unique(users)
-        console.log(users)
+        if (waypoints.length == 0 || users.length == 0)
+        {
+            alert("Could not download data from server...")
+            return
+        }
+        users = unique(users).sort()
+        state.selected_users = users
 
-
-        
         // Build model of meditation states using the "vectors.js" file
         // This first time, include ALL the waypoints
         let vectors = waypoints.filter(e => e.exclude != true)
-            .filter(e => state.model.selected_users.includes(e.user))
+            .filter(e => state.selected_users.includes(e.user))
             .map(e => getRelativeVector(e.vector))
 
         buildModel(vectors)
 
         waypoints.forEach(e => {
-            if (state.model.selected_users.includes(e.user)) {
+            if (state.selected_users.includes(e.user)) {
                 e.match = true
             }
 
         })
-        updateChartWaypoints(waypoints)
+        updateChartWaypoints()
+
+        // Build the checkboxes for the users
+        var userDiv = d3.select('#user-selectors')
+        users.forEach(name => {
+
+            var checked = false
+            if (state.selected_users.includes(name)) checked = true
+
+            var checkbox = addCheckbox(userDiv, name, checked, "30px")
+            checkbox.on("click", function () {
+                const newState = this.checked
+
+                // Add or remove a name from the "Selected Users" list
+                // This action should prompt a rebuild of the model and a redrawing of the graph
+                if (newState == true) {
+                    state.selected_users.push(name)
+                }
+                else {
+                    var i = state.selected_users.indexOf(name)
+                    if (i != -1) {
+                        state.selected_users.splice(i, 1)
+                    }
+
+                }
+
+                rebuildChart()
+
+            })
+
+        })
+
 
     })
 
@@ -148,15 +195,15 @@ function receivedFile() {
     console.log("--> Loaded file")
 
     d3.select("#loader").style("display", "flex")
-    
+
 
     if (string.substring(0, 30).includes("timestampMs")) {
         state.device = "MindLink"
-        
+
     }
     else {
         state.device = "Muse"
-        
+
     }
 
     var worker = new Worker("/workers/load_worker.js")
@@ -173,6 +220,7 @@ function receivedFile() {
         state.seconds_low = data.seconds_low
         state.seconds_high = data.seconds_high
         state.filename = data.filename
+        userDataLoaded = true
         rebuildChart()
     })
 
@@ -242,132 +290,137 @@ function buildBrowseFile(div, label, id) {
 
 }
 
-function rebuildChart() {
-    var waypoints_include = waypoints
-    
-    if (waypoints_include.length == 0) return
-    // Critical variables
-    const minimumMatch = 80
+export function rebuildChart() {
+    waypoints = waypoints.filter(waypoint => waypoint.remove != true)
+    console.log("total waypoints: " + waypoints.length)
 
-    //d3.select("#loader").style("display", "none")
-    //d3.select("#browse-div").style("display", "flex")
+    // Remove waypoints from users de-selected by user
+    waypoints.forEach(waypoint => {
+        waypoint.match = state.selected_users.includes(waypoint.user)
+    })
+    var filtered_waypoints_user = waypoints.filter(e => e.match == true)
 
-
-    var filtered_waypoints_match = waypoints_include
-
-    // If user data has been uploaded, use it to find waypoints that don't have a good match, and remove them
-    if (state.avg10.length > 0) {
-        // re-build the Model using a few points from the user's data
-        // Including user data like this helps to orient the chart 
-
-        var variances = band_channels.map(key => d3.variance(state.avg10.map(e => e[key])))
-        if (!variances.every(e => e != 0)) {
-            alert("Bad data! Electrodes not attached right")
-            return
-
-        }
-
-        var userVectors = state.avg10.map(e => getRelativeVector(e.vector))
-
-
-        // Filter the waypoints by minimum distance from any of these test user vectors
-        var distanceIds = {}
-        userVectors.forEach(uservector => {
-
-            waypoints.forEach(waypoint => {
-                var waypoint_vector = getRelativeVector(waypoint.vector)
-                var id = waypoint.id
-                var distance = measureDistance(uservector, waypoint_vector)
-
-
-                if (id in distanceIds) {
-                    // This is the best match so far
-                    if (distanceIds[id] < distance) {
-                        distanceIds[id] = distance
-                        waypoint.cosineSimilarity = distance
-                    }
-
-                }
-                else {
-                    distanceIds[id] = distance
-                }
-
-            })
-        })
-        var maxd = Object.entries(distanceIds)
-        maxd.sort(function (a, b) {
-            return b[1] - a[1]
-        })
-        //console.log("Best Match:")
-        var bestMatch = maxd[0]
-        //console.log(bestMatch)
-        var bestFullMatch = waypoints.filter(e => e.id == bestMatch[0])[0]
-        var filtered_waypoint_ids = maxd.filter(e => e[1] > minimumMatch).map(e => e[0])
-
-
-        // Remove waypoints that have been selected for removal by the "removeN" standard
-        filtered_waypoints_match = waypoints_include.filter(e => filtered_waypoint_ids.includes(e.id))
-    }
-    console.log("waypoint with distance:")
-    console.log(filtered_waypoints_match)
-
-    // Remove waypoints that have been de-selected by the user
-    var filtered_waypoints = filtered_waypoints_match.filter(e => state.model.selected_users.includes(e.user))
-
-    if (filtered_waypoints.length == 0) {
-        alert("zero waypoints selected!")
+    if (userDataLoaded == false) {
+        let vectors = waypoints.filter(w => w.match == true).map(e => getRelativeVector(e.vector))
+        buildModel(vectors)
+        updateChartWaypoints()
         return
     }
 
-    // Tag each waypoint (included filtered waypoints) as 'true' or 'false' match so that graph can remove filtered ones dynamically
-    var ids = filtered_waypoints.map(e => e.id)
-    waypoints.map(waypoint => {
-        if (ids.includes(waypoint.id)) {
+    // Critical variables
+    const minimumMatch = 80 // minimum distance for waypoints to match
+    const maxWaypoints = 3  // Take top N waypoints sorted by cosine distance to user's data
+
+    if (filtered_waypoints_user.length == 0) {
+        alert("No Wayopints?")
+        return
+    }
+
+    if (state.avg10.length < 8) {
+        alert("Averaged data is too short: " + state.avg10.length)
+        return
+    }
+
+    var variances = band_channels.map(key => d3.variance(state.avg10.map(e => e[key])))
+    if (!variances.every(e => e != 0)) {
+        alert("Bad data! Electrodes not attached right")
+        return
+
+    }
+
+    // Find nearby waypoints to user's data
+    var userVectors = state.avg10.map(e => getRelativeVector(e.vector))
+    var distanceIds = {}
+    userVectors.forEach(uservector => {
+
+        filtered_waypoints_user.forEach(waypoint => {
+            var waypoint_vector = getRelativeVector(waypoint.vector)
+            var id = waypoint.id
+            var distance = measureDistance(uservector, waypoint_vector)
+
+
+            if (id in distanceIds) {
+                // This is the best match so far
+                if (distanceIds[id] < distance) {
+                    distanceIds[id] = distance
+                    waypoint.cosineSimilarity = distance
+                }
+
+            }
+            else {
+                distanceIds[id] = distance
+            }
+
+        })
+    })
+
+    // Sort the waypoint matches by distance
+    var distances = Object.entries(distanceIds)
+    distances.sort(function (a, b) {
+        return b[1] - a[1]
+    })
+
+    // Take top N waypoints by distance
+    var filtered_waypoint_ids = distances.slice(0, maxWaypoints).map(e => e[0]) //.filter(e => e[1] > minimumMatch).map(e => e[0])
+    if (filtered_waypoint_ids.length == 0) {
+        alert("zero waypoints selected!")
+        return
+    }
+    // Update ALL waypoints with match=true if their ids match
+    waypoints.forEach(waypoint => {
+        waypoint.relative_vector = getRelativeVector(waypoint.vector) // compute the relative vector for each waypoint
+        if (filtered_waypoint_ids.includes(waypoint.id)) {
             waypoint.match = true
+
         }
         else waypoint.match = false
     })
+    var filtered_waypoints = waypoints.filter(e => e.match == true)
 
-    // Add distance to each user's rows
-    state.modelRows = state.avg10 // Use a highly averaged dataset to check for matches
-    state.modelRows.forEach(userRow => {
-        var userVector = getRelativeVector(userRow.vector)
-        var distances = []
-        filtered_waypoints.forEach(waypoint => {
+    // Re-build the PCA using only the top-N waypoints
+    let vectors = waypoints.filter(w => w.match == true).map(e => getRelativeVector(e.vector))
+    buildModel(vectors)
 
-            var waypointVector = getRelativeVector(waypoint.vector)
+    function addWaypointDistances(rows) {
+        rows.forEach(row => {
+            var relativeVector = getRelativeVector(row.vector)
+            row.relative_vector = relativeVector
+            var distances = []
+            filtered_waypoints.forEach(waypoint => {
 
-            var distance = measureDistance(userVector, waypointVector)
+                var distance = measureDistance(relativeVector, waypoint.relative_vector)
 
 
-            var label = waypoint.label + " (" + waypoint.user + ")"
+                var label = waypoint.label + " (" + waypoint.user + ")"
 
-            distances.push({ label: label, distance: distance, waypoint: waypoint })
+                distances.push({ label: label, distance: distance, waypoint: waypoint })
+
+            })
+            distances.sort(function (a, b) {
+                return b.distance - a.distance
+            })
+
+            row.distances = distances
 
         })
-        distances.sort(function (a, b) {
-            return b.distance - a.distance
-        })
 
-        userRow.distances = distances
 
-    })
-
+    }
+    addWaypointDistances(state.lowRes)
+    addWaypointDistances(state.highRes)
+    addWaypointDistances(state.avg10)
+    addWaypointDistances(state.averageMax)
 
     // Charts
 
     var type = "map"
     if (type == "map") {
-        updateChartWaypoints(waypoints)
+        updateChartWaypoints()
+        updateChartUser(state.highRes)
+        //buildBandChart(state.highRes)
+        //buildSimilarityChart(state.modelRows)
 
-        // Update user data if loaded
-        if (state.avg10.length > 5) {
 
-            updateChartUser(state.lowRes, waypoints)
-            //buildBandChart(state.highRes)
-            //buildSimilarityChart(state.modelRows)
-
-        }
 
 
     }
@@ -416,6 +469,12 @@ function setup() {
         .style("flex-direction", "row")
         .style("font-family", "Cabin")
 
+    d3.selectAll(".subtitle")
+        .style("text-align", "center")
+        .style("font-style", "italic")
+        .style("opacity", 0.7)
+
+
     d3.selectAll(".sidebar").style("width", sidebarWidth + "px")
         .style("background", "grey")
 
@@ -451,9 +510,6 @@ function setup() {
         .style("color", "white")
         .style("margin-right", "20px")
 
-
-
-
     // SVG
     d3.select("#chartsvg")
         .attr("width", chartWidth)
@@ -465,14 +521,46 @@ function setup() {
         .attr("height", chartHeight - (2 * chartMargin))
         .attr("transform", "translate(" + chartMargin + "," + chartMargin + ")")
 
-    buildBrowseFile(d3.select("#browse-div"), "UPLOAD", "t1")
 
+    // Browse button
+    var browse_btn = d3.select("#browse-div")
+    browse_btn
+        .style("margin-top", "20px")
+        .style("display", "flex")
+        .style("justify-content", "center")
 
-
+    buildBrowseFile(browse_btn, "UPLOAD", "t1")
+    buildRightSidebar()
 
 
 }
+function buildRightSidebar() {
+    var sidebar = d3.select("#sidebar-right")
 
+    // User selections
+    sidebar.append("div").style("margin", "10px")
+        .attr("id", "user-selectors")
+
+    var otherSelectors = sidebar.append("div").style("margin", "10px").style("margin-top", "50px")
+        .attr("id", "other-selectors")
+        
+
+    var showAll_box = addCheckbox(otherSelectors, "Show All Waypoints", state.showAllWaypoints, "20px")
+    showAll_box.on("click", function () {
+        const active = this.checked
+        if (active == true) {
+            console.log("box: true")
+            state.showAllWaypoints = true
+            rebuildChart()
+        }
+        else {
+            console.log("box: false")
+            state.showAllWaypoints = false
+            rebuildChart()
+        }
+    })
+    
+}
 
 export default function Live() {
     useEffect(() => {
@@ -486,23 +574,21 @@ export default function Live() {
 
         <main id="main-container">
             <link href="https://fonts.googleapis.com/css?family=Cabin" rel="stylesheet"></link>
-
+       
             <div id="sidebar-left" className="sidebar">
-                <div id="browse-div"></div>
+
                 <div style={{ margin: 10 }}>
                     <h3>The</h3>
-                    <h2 style={{ marginTop: "-10px", marginBottom: "-10px" }}>Mapping Meditation</h2>
+                    <h1 style={{ marginLeft: "20px", marginTop: "-10px", marginBottom: "-10px" }}>Mapping Meditation</h1>
                     <h3 style={{ textAlign: "right" }}>Project</h3>
-
+                    <div className="subtitle">100% Free and Open-Source</div>
+                    <div className="subtitle">Dedicated to All Sentient Beings</div>
                     <div id="auth-container">
                         <div id="user"></div>
                         <button id="signin">Sign In</button>
                     </div>
                 </div>
-
-
-
-
+                <div id="browse-div"></div>
             </div>
             <div id="firebase-auth-container"></div>
             <svg id="chartsvg"></svg>

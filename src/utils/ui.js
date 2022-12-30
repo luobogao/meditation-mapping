@@ -17,6 +17,28 @@ export function popUp(event, html) {
     else return popup
 
 }
+export function addCheckbox(div, name, checked, textSize) {
+    var checkboxDiv = div.append("div")
+        .style("font-size", "30px")
+        .style("margin", "8px")
+
+    
+    var checkbox = checkboxDiv.append("input")
+        .attr("type", "checkbox")
+        .style("width", "20px")
+        .style("height", "20px")
+        .style("accent-color", "lightgreen")
+        .style("opacity", 0.7)
+        .property("checked", checked)
+        
+
+    checkboxDiv.append("label")
+    .style("font-size", textSize)
+        .text(name)
+
+    return checkbox
+
+}
 export function addMenu(event, title) {
     var x = event.pageX
     var y = event.pageY

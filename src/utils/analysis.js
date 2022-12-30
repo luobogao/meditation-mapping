@@ -4,9 +4,14 @@ import {state} from "../pages/live"
 const d3 = require("d3");
 const math = require("mathjs");
 
-
 const channels = ["TP9", "TP10", "AF7", "AF8"]
 const bands = ["Delta", "Theta", "Alpha", "Beta", "Gamma"]
+const band_channels = []
+bands.forEach(band => {
+    channels.forEach(channel => {
+        band_channels.push(band + "_" + channel)
+    })
+})
 
 export function dot(a, b)
 // Dot product
@@ -22,7 +27,7 @@ export function dot(a, b)
 var means = []
 var maxes = []
 var principals = []
-var modelType = "cosine" // cosine or covariance
+var modelType = "cosine" // How to measure variances
 var standardizeType = "ratio" // Method to standardize a vector
 var distanceType = "cosine"
 
@@ -130,6 +135,7 @@ export function vectorRatio(row) {
 
         let bands = ["Delta", "Theta", "Alpha", "Beta", "Gamma"]
         var ratios = [["TP10", "TP9"], ["AF8", "AF7"], ["TP10", "AF8"], ["TP9", "AF7"]]
+        //var ratios = [["TP10", "TP9"], ["AF8", "AF7"]]
         bands.forEach(band => {
             ratios.forEach(ratio_keys => {
                 var value = ratio(row[band + "_" + ratio_keys[0]], row[band + "_" + ratio_keys[1]])
@@ -216,6 +222,7 @@ export function subtract_means(matrix)
         mean_subtracted_matrix.push(new_row)
     }
     return mean_subtracted_matrix
+    
 
  
 
@@ -253,6 +260,9 @@ export function covarianceMeans(matrix) {
 
 export function covarianceCosine(matrix) {
     var unit_scaled_matrix = unit_scaling(matrix)
+
+
+    //var unit_scaled_matrix = subtract_means(matrix)
     var cosineSimilarity_matrix = []
     for (var a = 0; a < matrix[0].length; a++) {
         var new_row = []
