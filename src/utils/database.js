@@ -101,6 +101,12 @@ export function updateWaypointNotes(waypoint, notes)
     return promise
 }
 
+export function updateWaypoint(waypoint)
+{
+    var promise = updateDoc(doc(db, "waypoints", waypoint.id), waypoint)
+    return promise
+}
+
 
 
 

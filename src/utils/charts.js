@@ -1,7 +1,7 @@
 import { chartWidth, chartHeight, mode3d, waypoints } from "../pages/live"
 import { popUp, popUpremove, addMenu, menuRemove } from "./ui";
 import { getRelativeVector, runModel } from "../utils/analysis";
-import { addWaypoint, deleteWaypoint, updateWaypointNotes } from "../utils/database"
+import { addWaypoint, deleteWaypoint, updateWaypointNotes, updateWaypoint } from "../utils/database"
 import { centroid, uid } from "./functions";
 import { node_links } from "./vectors";
 import { x_mini } from "./minichart";
@@ -16,6 +16,10 @@ var line = d3.line()
     .x(function (d, i) { return x(d[0]); })
     .y(function (d, i) { return y(d[1]) })
 //.curve(d3.curveMonotoneX) // apply smoothing to the line
+
+var accPitch = 0
+var accRoll = 0
+var accYaw = 0
 
 var rotateStart = false
 var rotateOpening = false // an 'interval' which rotates the chart when user starts
@@ -251,7 +255,7 @@ export function updateChartWaypoints() {
     buildLinks(svg, waypointCircles)
     addWaypoints(svg, waypointCircles)
 
-
+    rotate(accPitch, accYaw, accRoll)
     if (rotateStart == true) {
 
         rotate(Math.random(), 0, Math.random())
@@ -266,8 +270,7 @@ export function updateChartWaypoints() {
 }
 function addWaypoints(svg, data) {
     // ADD WAYPOINTS
-    console.log("state")
-    console.log(state)
+    
 
     d3.select("#chartsvg")
         .on("click", function () {
@@ -352,32 +355,15 @@ function addWaypoints(svg, data) {
             var menu = addMenu(event, "test")
             menu.append("div").text("Waypoint Options")
 
-            // Edit Notes
+            // Edit
             menu.append("button")
                 .style("margin-top", "20px")
-                .text("Edit Notes")
+                .text("Edit")
                 .on("click", function () 
                 {
                     
-                    menu.selectAll("*").remove()
-                    menu.append("text").text("Edit Notes")
-                    var currentNote = ""
-                    if (d.fullentry.notes != undefined)
-                    {
-                        currentNote = d.fullentry.notes
-                    }
-                    menu.append("input").attr("type", "text").value(currentNote)
-                    .on("change", function()
-                    {
-                        var newNotes = d3.select(this).node().value
-                        console.log("Setting new notes: " + newNotes)
-                        d.fullentry.notes = newNotes
-                        updateWaypointNotes(d.fullentry, newNotes).then(() =>
-                        {
-                            console.log("Notes Upated!")
-                            menuRemove()
-                        })
-                    })
+                    editWaypoint(d.fullentry, menu)
+
                 })
 
             // Delete
@@ -417,7 +403,7 @@ function addWaypoints(svg, data) {
         }
         )
         .on("mouseover", function (event, d) {
-            console.log(d)
+            
             if (zooming == false) {
                 var note = d.fullentry.notes
                 d3.select(this).style("fill", "red")
@@ -755,6 +741,49 @@ export function updateChartUser(data) {
     recenter(center)
 
 }
+function editWaypoint(waypoint, menu)
+{
+    menu.selectAll("*").remove()
+    menu.append("div").text("User: " + state.userName)
+    menu.append("div").text("Label:").style("margin-top", "20px")
+    var label = menu.append("input").attr("type", "text").attr("value", waypoint.label)
+    .on("change", function (d) {
+        var label = d3.select(this).node().value
+        console.log(label)
+    })
+    menu.append("div").text("Notes:").style("margin-top", "20px")
+    var notes = menu.append("input").attr("type", "text").attr("value", waypoint.notes)
+    .on("change", function (d) {
+        var notes = d3.select(this).node().value
+        console.log(label)
+    })
+    menu.append("div").style("margin-top", "30px")
+        .append("button").text("Submit")
+        .on("click", function()
+        {
+            var l = label.node().value
+            var n = notes.node().value
+
+            if (l.length > 1)
+            {
+                waypoint.label = l
+                waypoint.notes = n
+                
+                updateWaypoint(waypoint)
+                    .then(() => {
+                        console.log("updated waypoint")
+                        menuRemove()
+                        rebuildChart()
+                        
+                    })
+                    .catch((error) => {
+                        console.error("Failed to update waypoint")
+                        alert("Update failed")
+                    })
+            }
+        })
+
+}
 function addUserWaypoint(user_point, menu) {
     menu.selectAll("*").remove()
     menu.append("div").text("User: " + state.userName)
@@ -799,6 +828,11 @@ function addUserWaypoint(user_point, menu) {
 }
 
 function rotate(pitch, yaw, roll) {
+
+    
+    accPitch += pitch
+    accYaw += yaw
+    accRoll += roll
 
     var cosa = Math.cos(yaw);
     var sina = Math.sin(yaw);

@@ -152,6 +152,7 @@ function downloadWaypoints() {
 
         // Build the checkboxes for the users
         var userDiv = d3.select('#user-selectors')
+        userDiv.selectAll("*").remove()
         users.forEach(name => {
 
             var checked = false
