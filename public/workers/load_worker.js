@@ -218,6 +218,7 @@ function processDataMuse(rows) {
     }
 
     // Perform two different rounding operations with different average N
+    let raw = averageRows(clone(standardRows), 1)
     let averageHighRes = averageRows(clone(standardRows), highResolution)
     let averageLowRes = averageRows(clone(standardRows), lowResolution)
     let average10 = averageRows(clone(standardRows), standardRows.length / 10)
@@ -233,6 +234,7 @@ function processDataMuse(rows) {
     returnObj.highRes = averageHighRes
     returnObj.avg10 = average10
     returnObj.averageMax = averageMax
+    returnObj.raw = raw
 
     // Find the first and last timestamp for timeseries chart x-axis
     const first_seconds = standardRows[0].seconds
@@ -256,7 +258,7 @@ function averageRows(rows, roundN) {
     console.log("----> Rounding with " + roundN + " in " + rows.length + " rows")
     roundN = Math.round(roundN)
     if (roundN <= 2) {
-        console.log("ERROR: rounding is too low, using raw rows")
+        
         rows.map(row => row.vector = getRootVector(row))
         return rows
     }

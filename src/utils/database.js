@@ -8,7 +8,7 @@ import { ZoomTransform } from 'd3';
 
 const d3 = require("d3");
 
-console.log(process.env)
+
 const firebaseConfig = {
 
     apiKey: process.env.REACT_APP_API_KEY,

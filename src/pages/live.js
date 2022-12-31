@@ -3,10 +3,11 @@ import * as firebaseui from "firebaseui"
 import "firebaseui/dist/firebaseui.css"
 import { addCheckbox } from "../utils/ui";
 import { unique } from "../utils/functions";
+import { buildSimilarityChart, updateSimilarityChart } from "../utils/minicharts";
 import { auth, login, updateUsername } from "../utils/database"
 import { onAuthStateChanged } from "firebase/auth"
 import { waypoints_muse, waypoints_mindlink } from "../utils/vectors";
-import { dot, getRelativeVector, pca, runModel, measureDistance } from "../utils/analysis";
+import { dot, getRelativeVector, pca, runModel, measureDistance, cosineSimilarity } from "../utils/analysis";
 import { updateChartWaypoints, updateChartUser } from "../utils/charts"
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { getAllWaypoints } from "../utils/database"
@@ -33,6 +34,8 @@ export var waypoints
 var users;
 export var user;  // Firebase user
 var fr;
+export const miniChartSize = 200
+const miniChartMargin = 10
 
 
 export var state =
@@ -150,6 +153,7 @@ function downloadWaypoints() {
             }
 
         })
+        buildSimilarityChart()
         updateChartWaypoints()
 
         // Build the checkboxes for the users
@@ -420,12 +424,23 @@ export function rebuildChart() {
     addWaypointDistances(state.avg10)
     addWaypointDistances(state.averageMax)
 
+    // Add distances to each waypoint
+    waypoints.forEach(waypoint =>
+        {
+            const waypointVector = getRelativeVector(waypoint.vector)
+            const distances = state.averageMax.map(row =>
+                ({seconds: row.seconds, cosineDistance: cosineSimilarity(getRelativeVector(row.vector), waypointVector)}))
+            waypoint.similarityTimeseries = distances
+        })
+    
+
     // Charts
 
     var type = "map"
     if (type == "map") {
         updateChartWaypoints()
         updateChartUser(state.highRes)
+        updateSimilarityChart("miniSimilarityChart", 200, 200)
         //buildBandChart(state.highRes)
         //buildSimilarityChart(state.modelRows)
 
@@ -585,18 +600,17 @@ function buildRightSidebar() {
 
 }
 function buildMiniCharts(div) {
-    var chartSize = 200
-    var chartMargin = 10
+    
     // Similarity chart
-    var chart = div.append("svg")
-        .attr("width", (chartSize + (2 * chartMargin)) + "px")
-        .attr("height", (chartSize + (2 * chartMargin)) + "px")
-        .append("g")
-        .attr("width", chartSize + "px")
-        .attr("height", chartSize + "px")
-        .attr("transform", "translate(" + chartMargin + "," + chartMargin + ")")
-        .attr("id", "similarityChart")
-
+    div.append("svg")
+        .attr("width", (miniChartSize + (2 * miniChartMargin)) + "px")
+        .attr("height", (miniChartSize + (2 * miniChartMargin)) + "px")
+        .append("svg")
+        .attr("width", miniChartSize + "px")
+        .attr("height", miniChartSize + "px")
+        .attr("transform", "translate(" + miniChartMargin + "," + miniChartMargin + ")")
+        .attr("id", "miniSimilarityChart")
+    
 }
 
 export default function Live() {
