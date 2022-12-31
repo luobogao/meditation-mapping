@@ -5,7 +5,8 @@ const d3 = require("d3");
 const math = require("mathjs");
 
 const channels = ["TP9", "TP10", "AF7", "AF8"]
-const bands = ["Delta", "Theta", "Alpha", "Beta", "Gamma"]
+const bands = ["Delta", "Theta", "Alpha", //"Beta", "Gamma"
+]
 const band_channels = []
 bands.forEach(band => {
     channels.forEach(channel => {
@@ -133,7 +134,6 @@ export function vectorRatio(row) {
 
     function ratioMuse() {
 
-        let bands = ["Delta", "Theta", "Alpha", "Beta", "Gamma"]
         var ratios = [["TP10", "TP9"], ["AF8", "AF7"], ["TP10", "AF8"], ["TP9", "AF7"]]
         //var ratios = [["TP10", "TP9"], ["AF8", "AF7"]]
         bands.forEach(band => {

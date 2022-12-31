@@ -2,7 +2,9 @@ const d3 = require("d3");
 export function popUp(event, html) {
     var x = event.pageX
     var y = event.pageY
+    if (y > (window.innerHeight - 400)) y = y - 400
     var popup = d3.select("#popup")
+    popup.selectAll("*").remove()
 
     if (html != null) {
         popup
@@ -11,7 +13,11 @@ export function popUp(event, html) {
             //.style("height", "100px")
             .style("left", (x + 10) + "px")
             .style("top", (y + 10) + "px")
+            .style("max-width", "300px")
+            .style("max-height", "300px")
+            
             .append("div").style("margin", "10px")
+            .style("overflow", "scroll")
             .html(html)
     }
     else return popup

@@ -31,6 +31,7 @@ export var mode3d = true
 const backgroundColor = "#d9d9d9"
 export var waypoints
 var users;
+export var user;  // Firebase user
 var fr;
 
 
@@ -40,6 +41,7 @@ export var state =
     "device": "Muse",
     "selected_users": [],
     "showAllWaypoints": true, // Shows all waypoints (as red) even when not matching
+    "limitMatches": true,
     "model":
     {
         "mapped": null, // Mapped x-y coordinates of each standard vector
@@ -50,8 +52,9 @@ export var state =
 }
 
 var email = null
-onAuthStateChanged(auth, (user) => {
-    if (user) {
+onAuthStateChanged(auth, (fbuser) => {
+    if (fbuser) {
+        user = fbuser
         console.log("Authenticated user:")
         console.log(user.displayName)
         d3.select("#user").text("Logged in as: " + user.email)
@@ -112,22 +115,21 @@ function downloadWaypoints() {
     waypoints = []
     users = []
     getAllWaypoints().then((snapshot) => {
-        console.log("----> Got waypoints!")
+        console.log("----> Got waypoints: ")
+        console.log(snapshot)
 
         snapshot.forEach((doc) => {
             var waypoint = doc.data()
             waypoint.id = doc.id
-            
-            if (waypoint.id != undefined && waypoint.vector != undefined && waypoint.label != undefined && waypoint.user != undefined)
-            {
+
+            if (waypoint.id != undefined && waypoint.vector != undefined && waypoint.label != undefined && waypoint.user != undefined) {
                 waypoints.push(waypoint)
                 users.push(waypoint.user)
             }
-            
+
 
         })
-        if (waypoints.length == 0 || users.length == 0)
-        {
+        if (waypoints.length == 0 || users.length == 0) {
             alert("Could not download data from server...")
             return
         }
@@ -310,7 +312,7 @@ export function rebuildChart() {
 
     // Critical variables
     const minimumMatch = 80 // minimum distance for waypoints to match
-    const maxWaypoints = 3  // Take top N waypoints sorted by cosine distance to user's data
+    const maxWaypoints = 5  // Take top N waypoints sorted by cosine distance to user's data
 
     if (filtered_waypoints_user.length == 0) {
         alert("No Wayopints?")
@@ -362,7 +364,13 @@ export function rebuildChart() {
     })
 
     // Take top N waypoints by distance
-    var filtered_waypoint_ids = distances.slice(0, maxWaypoints).map(e => e[0]) //.filter(e => e[1] > minimumMatch).map(e => e[0])
+    var filtered_waypoint_ids = filtered_waypoints_user.map(e => e.id)
+    if (state.limitMatches) {
+        filtered_waypoint_ids = distances.slice(0, maxWaypoints).map(e => e[0]) //.filter(e => e[1] > minimumMatch).map(e => e[0])
+    }
+    console.log("filtered: ")
+    console.log(filtered_waypoint_ids)
+
     if (filtered_waypoint_ids.length == 0) {
         alert("zero waypoints selected!")
         return
@@ -544,23 +552,51 @@ function buildRightSidebar() {
 
     var otherSelectors = sidebar.append("div").style("margin", "10px").style("margin-top", "50px")
         .attr("id", "other-selectors")
-        
 
-    var showAll_box = addCheckbox(otherSelectors, "Show All Waypoints", state.showAllWaypoints, "20px")
+
+    var showAll_box = addCheckbox(otherSelectors, "Show Hidden Waypoints", state.showAllWaypoints, "20px")
     showAll_box.on("click", function () {
         const active = this.checked
         if (active == true) {
-            console.log("box: true")
             state.showAllWaypoints = true
-            rebuildChart()
         }
         else {
-            console.log("box: false")
             state.showAllWaypoints = false
-            rebuildChart()
         }
+        rebuildChart()
     })
-    
+
+    // Checkbox: Limit to N waypoints
+    var limitWaypoints_box = addCheckbox(otherSelectors, "Limit to 5 Waypoints", state.limitMatches, "20px")
+    limitWaypoints_box.on("click", function () {
+        const active = this.checked
+        if (active == true) {
+            state.limitMatches = true
+        }
+        else {
+            state.limitMatches = false
+        }
+        rebuildChart()
+    })
+
+    buildMiniCharts(sidebar)
+
+
+
+}
+function buildMiniCharts(div) {
+    var chartSize = 200
+    var chartMargin = 10
+    // Similarity chart
+    var chart = div.append("svg")
+        .attr("width", (chartSize + (2 * chartMargin)) + "px")
+        .attr("height", (chartSize + (2 * chartMargin)) + "px")
+        .append("g")
+        .attr("width", chartSize + "px")
+        .attr("height", chartSize + "px")
+        .attr("transform", "translate(" + chartMargin + "," + chartMargin + ")")
+        .attr("id", "similarityChart")
+
 }
 
 export default function Live() {
@@ -575,7 +611,7 @@ export default function Live() {
 
         <main id="main-container">
             <link href="https://fonts.googleapis.com/css?family=Cabin" rel="stylesheet"></link>
-       
+
             <div id="sidebar-left" className="sidebar">
 
                 <div style={{ margin: 10 }}>

@@ -1,21 +1,23 @@
-import { getFirestore, collection, getDocs, setDoc, doc, deleteDoc, updateDoc } from 'firebase/firestore/lite';
+import { getFirestore, collection, getDocs, setDoc, doc, deleteDoc, updateDoc, query, where, addDoc} from 'firebase/firestore/lite';
 import { initializeApp } from "firebase/app";
 import { getAuth, onAuthStateChanged, updateProfile } from "firebase/auth"
 import * as firebaseui from "firebaseui"
 import "firebaseui/dist/firebaseui.css"
 import firebase from "firebase/compat/app"
 import { ZoomTransform } from 'd3';
+
 const d3 = require("d3");
 
+console.log(process.env)
 const firebaseConfig = {
 
-    apiKey: "AIzaSyABdGdf_fn2dLH_qUumFqx5I6Xdqv30elk",
-    authDomain: "mapping-meditation.firebaseapp.com",
-    projectId: "mapping-meditation",
-    storageBucket: "mapping-meditation.appspot.com",
-    messagingSenderId: "584243021105",
-    appId: "1:584243021105:web:bb972d7fe085041b45dc10",
-    measurementId: "G-TDBK5SCNZK"
+    apiKey: process.env.REACT_APP_API_KEY,
+    authDomain: process.env.REACT_APP_AUTH_DOMAIN,
+    projectId: process.env.REACT_APP_PROJECT_ID,
+    storageBucket: process.env.REACT_APP_STORAGE_BUCKET,
+    messagingSenderId: process.env.REACT_APP_MESSAGING_SENDER_ID,
+    appId: process.env.REACT_APP_APP_ID,
+    measurementId: process.env.REACT_APP_MEASUREMENT_ID
 };
 
 
@@ -79,20 +81,26 @@ export function updateUsername() {
 export function addWaypoint(waypoint)
 {
     var id = waypoint.user + " - " + waypoint.label
-    var entry = {user: waypoint.user, label: waypoint.label, vector: waypoint.vector, notes: waypoint.notes}
-    var promise = setDoc(doc(db, "waypoints", id), entry)
+    var date = new Date()
+    var millis = date.getMilliseconds()
+    var entry = {user: waypoint.user, label: waypoint.label, vector: waypoint.vector, notes: waypoint.notes, delete: false, addedTime: millis}
+    
+    var promise = addDoc(collection(db, "waypoints"), entry)
     return promise
 }
 export function deleteWaypoint(waypoint)
 {
+    // Warning: does NOT delete the firebase entry, it just sets "delete = true"
     console.log("Deleting: " + waypoint.id)
-    var promise = deleteDoc(doc(db, "waypoints", waypoint.id))
+    //var promise = deleteDoc(doc(db, "waypoints", waypoint.id))
+    var promise = updateDoc(doc(db, "waypoints", waypoint.id), {delete: true})
     return promise
 }
 
 export function getAllWaypoints()
 {
-    var promise = getDocs(collection(db, "waypoints"))
+    var q = query(collection(db, "waypoints"), where("delete", "!=", "Kaio"))
+    var promise = getDocs(q)
     return promise
 }
 export function updateWaypointNotes(waypoint, notes)
@@ -103,6 +111,9 @@ export function updateWaypointNotes(waypoint, notes)
 
 export function updateWaypoint(waypoint)
 {
+    var date = new Date()
+    var millis = date.getMilliseconds
+    waypoint.updatedTime = millis
     var promise = updateDoc(doc(db, "waypoints", waypoint.id), waypoint)
     return promise
 }
