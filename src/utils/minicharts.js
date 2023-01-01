@@ -1,8 +1,10 @@
 import { miniChartSize, waypoints, state } from "../pages/live"
 import { parsePx } from "./functions";
 import { addMenu, menuRemove } from "./ui";
+import { zoom } from "./charts";
 const d3 = require("d3");
 var similarityLine, miniX, miniY, similaritySVG
+
 
 export function buildSimilarityChart() {
 
@@ -23,22 +25,23 @@ export function buildSimilarityChart() {
 var defaultSettings = { lineColor: "black", highlightID: null, key: "cosine", lineSize: 3 }
 export function updateSimilarityChart(svgid, settings = defaultSettings) {
 
+    console.log("updating mini")
     const opacity = 0.7
-    var margin = 20
+    var marginY = 80
+    var marginXleft = 100
+    var marginXright = 150
     if (waypoints[0].similarityTimeseries == null) {
         return
     }
     var container = d3.select("#" + svgid)
-    var width = parsePx(container.attr("width")) - margin
-    var height = parsePx(container.attr("height")) - margin
+    var width = parsePx(container.attr("width")) - marginXleft - marginXright
+    var height = parsePx(container.attr("height")) - (2 * marginY)
 
     container.selectAll("*").remove()
     var svg = container.append("g")
         .attr("width", (width - 100) + "px")
-        .attr("transform", "translate(" + "0" + "," + margin + ")")
-    if (svg == null) {
-        return
-    }
+        .attr("transform", "translate(" + marginXleft + "," + marginY + ")")
+
 
     var key = ""
     switch (settings.key) {
@@ -52,51 +55,8 @@ export function updateSimilarityChart(svgid, settings = defaultSettings) {
             key = "combinedDistance"
             break;
     }
-    var globalYmin = d3.min(waypoints.map(waypoint => d3.min(waypoint.similarityTimeseries.map(e => e[key]))))
-    var globalYmax = d3.max(waypoints.map(waypoint => d3.max(waypoint.similarityTimeseries.map(e => e[key]))))
 
-    var firstSeries = waypoints[0].similarityTimeseries.map(e => e.seconds)
-    var min_x = firstSeries[0]
-    var max_x = firstSeries.slice(-1)[0]
-
-    var miniX = d3.scaleLinear()
-        .domain([min_x, max_x])
-        .range([0, width])
-
-        
-    var minY = globalYmin - state.zoom
-    if (minY > 98)
-    {
-        minY = 98
-        state.zoom = state.zoom + 1
-    } 
-    
-    if (minY < 10)
-    {
-        minY = 10
-        state.zoom = state.zoom - 1
-    } 
-    if (minY > (globalYmax - 20))
-    {
-        minY = globalYmax - 20
-        state.zoom = state.zoom - 1
-    }
-
-    var miniY = d3.scaleLog()
-        .domain([minY, 100])
-        .range([height, 0])
-
-
-
-    var line = d3.line()
-        .x(function (d, i) {
-            return miniX(d.x)
-        })
-        .y(function (d, i) {
-            return miniY(d.y)
-        })
-        .curve(d3.curveMonotoneX) // apply smoothing to the line
-
+    var globalYmax = 0, globalYmin = 100
     function interpolate(data, n) {
         var interpolatedData = []
         for (let i = (n / 2); i < (data.length - (n / 2)); i = i + (n / 2)) {
@@ -110,6 +70,8 @@ export function updateSimilarityChart(svgid, settings = defaultSettings) {
 
             }
             var avg = d3.mean(arr)
+            if (globalYmax < avg) globalYmax = avg
+            if (globalYmin > avg) globalYmin = avg
             interpolatedData.push({ x: data[i].seconds, y: avg })
 
         }
@@ -127,25 +89,68 @@ export function updateSimilarityChart(svgid, settings = defaultSettings) {
 
     })
 
+    var firstSeries = waypoints[0].similarityTimeseries.map(e => e.seconds)
+    var min_x = firstSeries[0]
+    var max_x = firstSeries.slice(-1)[0]
+
+    var miniX = d3.scaleLinear()
+        .domain([min_x, max_x])
+        .range([0, width])
+
+
+    var minY = globalYmin - state.zoom
+   
+
+    var miniY = d3.scaleLinear()
+        .domain([minY, 100])
+        .range([height, 0])
+
+
+
+    var line = d3.line()
+        .x(function (d, i) {
+            return miniX(d.x)
+        })
+        .y(function (d, i) {
+            return miniY(d.y)
+        })
+        .curve(d3.curveMonotoneX) // apply smoothing to the line
+
+
 
     var chart = svg.selectAll(".line")
         .data(data)
 
     chart.exit().remove()
-    chart.enter().append("path").attr("class", "line")
+    var series = chart.enter()
+
+    series.append("path").attr("class", "line")
         .attr("fill", "none")
+        .attr("class", "line")
         .attr("stroke", function (d) {
             return settings.lineColor
         })
         .on("mouseover", function (event, d) {
-            d3.select(this)
+            var thisLine = d3.select(this)
+            
+            svg.selectAll(".legend").style("fill", "black").style("opacity", 0.1)
+            svg.select("." + d.waypoint.id).style("fill", "red").style("opacity", 1).raise()
+            svg.selectAll(".line").style("opacity", 0.1)
+            thisLine
                 .attr("stroke", "red")
+                .style("opacity", 1)
                 .raise()
             var menu = addMenu(event, "menu")
             menu.append("text").text(d.waypoint.user + " - " + d.waypoint.label)
         })
         .on("mouseout", function () {
             d3.select(this).attr("stroke", settings.lineColor)
+            svg.selectAll(".legend").style("fill", "black").style("opacity", 1)
+            svg.selectAll(".line")
+                .style("opacity", 1)
+                .attr("stroke", function (d) {
+                    return settings.lineColor
+                })
             menuRemove()
         })
         .style("opacity", function (d) {
@@ -162,5 +167,23 @@ export function updateSimilarityChart(svgid, settings = defaultSettings) {
 
             return line(d.points)
         })
+
+    var interpolated_max_x = data[0].points.slice(-1)[0].x
+    series.append("text")
+        .text(function (d) { return d.waypoint.user + " - " + d.waypoint.label })
+        .attr("class", function (d) { return d.waypoint.id + " " + " legend" })
+        .attr("x", miniX(interpolated_max_x) + 10)
+        .attr("y", function (d) {
+            return miniY(d.points.slice(-1)[0].y)
+        })
+
+    var axis = d3.axisLeft()
+    .tickFormat(function(d){return d + "%"})
+    .scale(miniY)
+
+    svg.append("g").call(axis)
+    svg.selectAll(".domain").remove()
+    svg.selectAll(".tick").selectAll("text").style("font-size", "20px").style("opacity", 0.5)
+    svg.selectAll(".tick").selectAll("line").remove()
 
 }

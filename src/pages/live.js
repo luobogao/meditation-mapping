@@ -9,7 +9,7 @@ import { auth, login, updateUsername } from "../utils/database"
 import { onAuthStateChanged } from "firebase/auth"
 import { waypoints_muse, waypoints_mindlink } from "../utils/vectors";
 import { dot, getRelativeVector, pca, runModel, measureDistance, cosineSimilarity, euclideanDistance, combinedDistance } from "../utils/analysis";
-import { updateChartWaypoints, updateChartUser } from "../utils/charts"
+import {zoom, updateChartWaypoints, updateChartUser } from "../utils/charts"
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { getAllWaypoints } from "../utils/database"
 
@@ -476,8 +476,12 @@ export function rebuildChart() {
     updateAllCharts()
 
 }
-export function updateAllCharts() {
+export function updateAllCharts(reset = false) {
 
+    if (reset == true)
+    {
+        d3.select("#chartsvg").call(zoom.transform, d3.zoomIdentity)
+    }
     buildTimeslider()
     var data = state.highRes
     switch (state.resolution) {
@@ -703,12 +707,12 @@ function buildMiniCharts(div) {
     // Similarity chart
     function addChart(id) {
         div.append("svg")
-            .attr("width", (miniChartSize + (2 * miniChartMargin)) + "px")
-            .attr("height", (miniChartSize + (2 * miniChartMargin)) + "px")
+            .attr("width", (chartWidth + (2 * chartMargin)) + "px")
+            .attr("height", (chartHeight + (2 * chartMargin)) + "px")
             .append("svg")
-            .attr("width", miniChartSize + "px")
-            .attr("height", miniChartSize + "px")
-            .attr("transform", "translate(" + miniChartMargin + "," + miniChartMargin + ")")
+            .attr("width", chartWidth + "px")
+            .attr("height", chartHeight + "px")
+            .attr("transform", "translate(" + chartMargin + "," + chartMargin + ")")
             .attr("id", id)
 
     }

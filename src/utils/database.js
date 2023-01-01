@@ -80,9 +80,10 @@ export function updateUsername() {
 }
 export function addWaypoint(waypoint)
 {
-    var id = waypoint.user + " - " + waypoint.label
+    
     var date = new Date()
-    var millis = date.getMilliseconds()
+    var millis = date.getTime()
+    if (waypoint.notes == undefined) waypoint.notes = null
     var entry = {user: waypoint.user, label: waypoint.label, vector: waypoint.vector, notes: waypoint.notes, delete: false, addedTime: millis}
     
     var promise = addDoc(collection(db, "waypoints"), entry)

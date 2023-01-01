@@ -131,7 +131,7 @@ export function buildChartSelectors(div) {
                 d3.selectAll(".chart-checkbox").property("checked", false)
                 d3.select(this).property("checked", true)
                 state.chartType = el.key
-                updateAllCharts()
+                updateAllCharts(true)
             })
     })
 

@@ -41,6 +41,7 @@ var waypointOpacity = 0.9
 var userPointColor = "grey"
 var waypointColor = "blue"
 var labelOffset = 11 // The distance of labels from points
+var lastTransform
 
 // Modes
 var link_mode = "center"  // "center" or "between" - center links all nodes to origin 0,0
@@ -58,6 +59,95 @@ var minx, maxx, miny, maxy, minz, maxz
 
 var cube;
 
+
+var lastx = 0
+var lasty = 0
+var lastZoom = 1
+
+
+function handleZoom(e) {
+    // When user zooms, all chart "g" elements are changed accordingly
+
+    if (e.sourceEvent == null) {
+        d3.select("#chartsvg").selectAll("g").attr("transform", e.transform)
+        return
+    }
+    const zoom_type = e.sourceEvent.type
+
+
+
+    if (zoom_type == "wheel") {
+
+        // Zoom
+        if (state.chartType == "pca") {
+            // both 2d and 3d modes uses scroll wheel for zooming
+            var widthD = (chartWidth * e.transform.k) - chartWidth
+            var heightD = (chartHeight * e.transform.k) - chartHeight
+            e.transform.x = -1 * (widthD / 2)
+            e.transform.y = -1 * (heightD / 2)
+            lastTransform = e.transform
+            d3.select("#chartsvg").selectAll("g").attr("transform", e.transform)
+
+        }
+
+        // For graph-type charts, "zoom" means changing the y-axis
+        else {
+            if (e.transform.k > lastZoom) {
+                state.zoom += 1
+            }
+            else {
+                state.zoom -= 1
+            }
+            lastZoom = e.transform.k
+            
+            updateAllCharts()
+
+        }
+
+    }
+    else {
+
+        if (mode3d == true) {
+            // 3d mode rotates in-place instead of panning
+            var x = e.sourceEvent.clientX
+            var y = e.sourceEvent.clientY
+
+            var xd = (lastx - x)
+            var yd = (lasty - y)
+            lastx = x
+            lasty = y
+            if (Math.abs(xd) < 20 && Math.abs(yd) < 20) {
+
+                rotate(xd / 100, 0, yd / 100)
+
+            }
+        }
+        else {
+            // 2d mode allows for panning
+            d3.select("#chartsvg").selectAll("g").attr("transform", e.transform)
+        }
+    }
+
+
+
+
+}
+export var zoom = d3.zoom()
+    .on('zoom', handleZoom)
+    .on("start", function () {
+        zooming = true
+        popUpremove()
+        menuRemove()
+        clearInterval(rotateOpening)
+
+    })
+    .on("end", function () {
+        zooming = false
+
+    })
+
+
+
 export function updateChartWaypoints() {
 
     label_array = []
@@ -70,88 +160,6 @@ export function updateChartWaypoints() {
 
 
     zooming = false // set to true when using is moving/zooming, to prevent popups
-    let zoom = d3.zoom()
-        .on('zoom', handleZoom)
-        .on("start", function () {
-            zooming = true
-            popUpremove()
-            menuRemove()
-            clearInterval(rotateOpening)
-
-        })
-        .on("end", function () {
-            zooming = false
-
-        })
-
-    var lastx = 0
-    var lasty = 0
-    var lastZoom = 1
-    function handleZoom(e) {
-        // When user zooms, all chart "g" elements are changed accordingly
-
-        const zoom_type = e.sourceEvent.type
-
-
-
-        if (zoom_type == "wheel") {
-
-            // Zoom
-            if (state.chartType == "pca") {
-                // both 2d and 3d modes uses scroll wheel for zooming
-                var widthD = (chartWidth * e.transform.k) - chartWidth
-                var heightD = (chartHeight * e.transform.k) - chartHeight
-                e.transform.x = -1 * (widthD / 2)
-                e.transform.y = -1 * (heightD / 2)
-                d3.select("#chartsvg").selectAll("g").attr("transform", e.transform)
-
-            }
-
-            // For graph-type charts, "zoom" means changing the y-axis
-            else {
-                if (e.transform.k > lastZoom )
-                {
-                    state.zoom += 1
-                }
-                else 
-                {
-                    state.zoom -= 1
-                }
-                lastZoom = e.transform.k
-                
-                updateAllCharts()
-                
-            }
-
-        }
-        else {
-
-            if (mode3d == true) {
-                // 3d mode rotates in-place instead of panning
-                var x = e.sourceEvent.clientX
-                var y = e.sourceEvent.clientY
-
-                var xd = (lastx - x)
-                var yd = (lasty - y)
-                lastx = x
-                lasty = y
-                if (Math.abs(xd) < 20 && Math.abs(yd) < 20) {
-
-                    rotate(xd / 100, 0, yd / 100)
-
-                }
-            }
-            else {
-                // 2d mode allows for panning
-                d3.select("#chartsvg").selectAll("g").attr("transform", e.transform)
-            }
-        }
-
-
-
-
-    }
-
 
 
     // Add a series of "g" containers to the SVG in order of "elevation"
@@ -162,7 +170,10 @@ export function updateChartWaypoints() {
     svg.selectAll("*").remove()
 
     d3.select("#chartsvg").call(zoom)
+    if (lastTransform != null) {
+        d3.select("#chartsvg").call(zoom.transform, lastTransform)
 
+    }
 
 
     // Get min/max only from the selected waypoints
@@ -419,10 +430,12 @@ function addWaypoints(svg, data) {
                 waypoint.attr("fill", "blue")
                     .attr("selected", true)
             }
-
+            waypoint.remove()
 
             waypoint.raise()
-            recenter(d, 1000)
+            //recenter(d, 1000)
+            addWaypoint(d.fullentry)
+            
         }
         )
         .on("mouseover", function (event, d) {
@@ -651,9 +664,6 @@ function adjustLabels() {
 export function updateChartUser(data) {
 
     clearInterval(rotateOpening)
-
-    var svg = d3.select("#chart_user")
-    svg.selectAll("*").remove() // Clear last chart, if any
 
     var vectors = data.map(e => getRelativeVector(e.vector))
 
@@ -1047,7 +1057,7 @@ function readjustAllPoints(duration) {
     }
 
     function updatePoints(classname) {
-        
+
         svg.selectAll("." + classname)
             .transition()
             .attr("cx", function (d) {
@@ -1095,7 +1105,7 @@ function readjustAllPoints(duration) {
     }
 
     function updateLabels(classname) {
-        
+
         svg.selectAll("." + classname)
             .transition()
             .attr("x", function (d) {
@@ -1117,7 +1127,7 @@ function readjustAllPoints(duration) {
             .duration(duration)
     }
     function updateLines(classname) {
-        
+
         svg.selectAll("." + classname)
             .transition()
             .attr("x1", function (d) { return x(d[0].xp) })

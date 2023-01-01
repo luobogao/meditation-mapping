@@ -13,30 +13,27 @@ export function buildTimeslider() {
     var minSeconds = data[0].seconds
     var maxSeconds = data.slice(-1)[0].seconds
     var totalSeconds = maxSeconds - minSeconds
-    var margin = 10
+    var margin = 30
 
     const slider = sliderBottom().min(0).max(totalSeconds)
-    .tickFormat(function(d, i)
-    {
-        if (totalSeconds < (15 * 60))
-        {
-            return d
-        }
-        else
-        {
-            return parseInt(d / 60)
-        }
-        
-    })
-    .step(10).width(width - (2 * margin))
+        .tickFormat(function (d, i) {
+            if (totalSeconds < (15 * 60)) {
+                return d
+            }
+            else {
+                return parseInt(d / 60)
+            }
+
+        })
+        .step(10)
+        .width(width - (2 * margin))
         .on("drag", val => {
 
             d3.selectAll(".userpoints")
                 .style("opacity", function (d) {
 
                     var decay = 2
-                    switch (state.resolution)
-                    {
+                    switch (state.resolution) {
                         case 1:
                             decay = 1.5;
                             break;
