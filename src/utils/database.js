@@ -99,7 +99,7 @@ export function deleteWaypoint(waypoint)
 
 export function getAllWaypoints()
 {
-    var q = query(collection(db, "waypoints"), where("delete", "!=", "Kaio"))
+    var q = query(collection(db, "waypoints"), where("delete", "!=", true))
     var promise = getDocs(q)
     return promise
 }
@@ -112,7 +112,7 @@ export function updateWaypointNotes(waypoint, notes)
 export function updateWaypoint(waypoint)
 {
     var date = new Date()
-    var millis = date.getMilliseconds
+    var millis = date.getMilliseconds()
     waypoint.updatedTime = millis
     var promise = updateDoc(doc(db, "waypoints", waypoint.id), waypoint)
     return promise

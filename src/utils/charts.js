@@ -1,4 +1,4 @@
-import { chartWidth, chartHeight, mode3d, waypoints } from "../pages/live"
+import {userDataLoaded, chartWidth, chartHeight, mode3d, waypoints } from "../pages/live"
 import { popUp, popUpremove, addMenu, menuRemove } from "./ui";
 import { getRelativeVector, runModel } from "../utils/analysis";
 import { addWaypoint, deleteWaypoint, updateWaypointNotes, updateWaypoint } from "../utils/database"
@@ -6,7 +6,7 @@ import { centroid, clone } from "./functions";
 import { node_links } from "./vectors";
 import { x_mini } from "./minichart";
 import { state, rebuildChart, user } from "../pages/live";
-
+import { updateSimilarityChart } from "./minicharts";
 const d3 = require("d3");
 
 
@@ -74,6 +74,8 @@ export function updateChartWaypoints() {
         .on('zoom', handleZoom)
         .on("start", function () {
             zooming = true
+            popUpremove()
+            menuRemove()
             clearInterval(rotateOpening)
 
         })
@@ -113,7 +115,7 @@ export function updateChartWaypoints() {
                 lastx = x
                 lasty = y
                 if (Math.abs(xd) < 20 && Math.abs(yd) < 20) {
-                    popUpremove()
+                    
                     rotate(xd / 100, 0, yd / 100)
 
                 }
@@ -352,7 +354,7 @@ function addWaypoints(svg, data) {
         })
         .on("contextmenu", function (event, d) {
             event.preventDefault()
-            var menu = addMenu(event, "test")
+            var menu = addMenu(event, "options")
             menu.append("div").text("Waypoint Options")
 
             // Edit
@@ -387,6 +389,7 @@ function addWaypoints(svg, data) {
         .on("click", function (i, d) {
             // Toggle red/blue for selected waypoint
             var waypoint = d3.select(this)
+            console.log(d.fullentry)
             var selected = waypoint.attr("selected")
             if (selected) {
                 waypoint.attr("fill", "blue")
@@ -409,24 +412,65 @@ function addWaypoints(svg, data) {
                 d3.select(this).style("fill", "red")
 
                 const user = d.fullentry.user
-                var html = "<h2>" + user + "</h2>"
+                const menu = addMenu(event, "")
+                menu.append("text").text(d.fullentry.label).style("font-size", "30px")
+                menu.append("text").text(d.fullentry.user).style("font-size", "20px").style("opacity", 0.5)
+
+                // NOTES
                 if (note != undefined) 
                 {
                     if (note.length > 0)
                     {
-                        html = html + "<br><br>" + note 
-                    }
-                    
+                        menu.append("text").text(note).style("margin-top", "20px")
+                    }                    
+                }
+
+                // SIMIARITY CHART
+                if (d.fullentry.similarityTimeseries != null)
+                {
+                    //var maxEuclidean = d3.max(d.fullentry.similarityTimeseries.map(e => e.euclideanDistance))
+                    //menu.append("text").text("Euclidean: " + parseInt(maxEuclidean)).style("font-size", "30px")
+                    menu.append("div")
+                    .style("display", "flex")
+                    .style("justify-content", "center")
+                    .append("svg")
+                    .style("border", "1px solid grey")
+                    .style("border-radius", "5px")
+                    .style("margin-top", "20px").attr("id", "popup-minichart")
+                    .attr("width", 300)
+                    .attr("height", 200)
+                    var settings = {lineColor: "white", highlightID: d.fullentry.id, lineSize: 3}
+                    updateSimilarityChart("popup-minichart", settings)
+
                 }
                 
-                popUp(event, html)
+                
+                
             }
 
 
         })
         .on("mouseout", function (event, d) {
-            d3.select(this).style("fill", waypointColor)
-            //popUpremove()
+            
+            var el = d3.select(this)
+
+            if (userDataLoaded == true && d.match == false)
+            {
+                
+                el.style("fill",  "red")
+            } 
+            else 
+            {
+                
+                el.style("fill", waypointColor)
+            }
+            
+            // Only remove the menu if it isn't an 'options' menu
+            if (d3.select("#menu").attr("type") != "options")
+            {
+                menuRemove()
+            }
+            
 
         })
 }

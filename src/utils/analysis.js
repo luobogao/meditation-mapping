@@ -69,8 +69,8 @@ export function euclideanDistance(a, b)
         var value = Math.pow(a[i] - b[i], 2)
         values += value
     }
-    console.log(Math.sqrt(values))
-    return 20 / Math.sqrt(values)
+    
+    return 100 - Math.sqrt(values)
 }
 
 

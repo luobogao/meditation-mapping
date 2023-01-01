@@ -45,19 +45,28 @@ export function addCheckbox(div, name, checked, textSize) {
     return checkbox
 
 }
-export function addMenu(event, title) {
+export function addMenu(event, type) {
+    // when type == options, the menu doesn't disappear when mouse is moved away from waypoint
     var x = event.pageX
     var y = event.pageY
     var menu = d3.select("#menu")
+    
+    if (y > (window.innerHeight - 400)) y = y - 400
     menu.selectAll("*").remove()
     popUpremove()
     var div = menu
         .style("display", "flex")
+        .attr("type", type)  
         //.style("width", "200px")
         //.style("height", "100px")
         .style("left", (x + 10) + "px")
         .style("top", (y + 10) + "px")
         .append("div").style("margin", "10px")
+        .style("display", "flex")
+        .style("flex-direction", "column")
+        .style('max-width', "300px")
+        .style('max-height', "800px")
+        .style("overflow", "scroll")
         
     return div
 }

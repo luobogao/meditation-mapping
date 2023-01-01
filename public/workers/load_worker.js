@@ -226,7 +226,7 @@ function processDataMuse(rows) {
 
 
     if (averageLowRes.length < 3) {
-        alert("Meditation session was too short: " + averageLowRes.length + " minutes")
+        console.error("Meditation session was too short: " + averageLowRes.length + " minutes")
     }
 
     returnObj.raw = clone(standardRows)

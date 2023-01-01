@@ -66,7 +66,16 @@ export function parseTime (str)
     }
 
 }
-
+export function parsePx(attribute)
+{
+    if (attribute == null)
+    {
+        console.error("Trying to get attribute from null object")
+        return
+    }
+    // Parses an 'attr' from a D3 element: "500px" -> 500
+    return parseInt(attribute.toString().replace("px", ""))
+}
 
 export function round(v)
 {
