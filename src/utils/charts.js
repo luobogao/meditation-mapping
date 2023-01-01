@@ -1046,8 +1046,8 @@ function readjustAllPoints(duration) {
         cameraProject(userCircles)
     }
 
-    function updatePoints(svgid, classname) {
-        var svg = d3.select("#" + svgid)
+    function updatePoints(classname) {
+        
         svg.selectAll("." + classname)
             .transition()
             .attr("cx", function (d) {
@@ -1094,8 +1094,8 @@ function readjustAllPoints(duration) {
             .duration(duration)
     }
 
-    function updateLabels(svgid, classname) {
-        var svg = d3.select("#" + svgid)
+    function updateLabels(classname) {
+        
         svg.selectAll("." + classname)
             .transition()
             .attr("x", function (d) {
@@ -1116,8 +1116,8 @@ function readjustAllPoints(duration) {
             })
             .duration(duration)
     }
-    function updateLines(svgid, classname) {
-        var svg = d3.select("#" + svgid)
+    function updateLines(classname) {
+        
         svg.selectAll("." + classname)
             .transition()
             .attr("x1", function (d) { return x(d[0].xp) })
@@ -1138,10 +1138,10 @@ function readjustAllPoints(duration) {
             .duration(duration)
 
     }
-    updatePoints("chart_user", "userpoints")
-    updatePoints("chart_labels", "waypoints")
-    updateLabels("chart_labels", "label")
-    updateLines("chart_labels", "waypoint_link")
+    updatePoints("userpoints")
+    updatePoints("waypoints")
+    updateLabels("label")
+    updateLines("waypoint_link")
 
 
 
