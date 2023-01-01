@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from "react";
 import * as firebaseui from "firebaseui"
+import { buildTimeslider } from "../utils/timeslider";
 import "firebaseui/dist/firebaseui.css"
-import { addCheckbox } from "../utils/ui";
+import { addCheckbox, buildChartSelectors, buildResolutionSelectors } from "../utils/ui";
 import { unique } from "../utils/functions";
 import { buildSimilarityChart, updateSimilarityChart } from "../utils/minicharts";
 import { auth, login, updateUsername } from "../utils/database"
 import { onAuthStateChanged } from "firebase/auth"
 import { waypoints_muse, waypoints_mindlink } from "../utils/vectors";
-import { dot, getRelativeVector, pca, runModel, measureDistance, cosineSimilarity, euclideanDistance } from "../utils/analysis";
+import { dot, getRelativeVector, pca, runModel, measureDistance, cosineSimilarity, euclideanDistance, combinedDistance } from "../utils/analysis";
 import { updateChartWaypoints, updateChartUser } from "../utils/charts"
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { getAllWaypoints } from "../utils/database"
@@ -373,7 +374,12 @@ export function rebuildChart() {
     // Take top N waypoints by distance
     var filtered_waypoint_ids = filtered_waypoints_user.map(e => e.id)
     if (state.limitMatches) {
-        filtered_waypoint_ids = distances.slice(0, maxWaypoints).map(e => e[0]) //.filter(e => e[1] > minimumMatch).map(e => e[0])
+
+        // Filter by top N
+        //filtered_waypoint_ids = distances.slice(0, maxWaypoints).map(e => e[0]) 
+
+        // Filter by min Cosine
+        filtered_waypoint_ids = distances.filter(e => e[1] > minimumMatch).map(e => e[0])
     }
     console.log("filtered: ")
     console.log(filtered_waypoint_ids)
@@ -430,11 +436,13 @@ export function rebuildChart() {
     // Add distances to each waypoint
     waypoints.forEach(waypoint => {
         const waypointVector = getRelativeVector(waypoint.vector)
+        
         const distances = state.averageMax.map(row =>
         ({
             seconds: row.seconds,
             cosineDistance: cosineSimilarity(getRelativeVector(row.vector), waypointVector),
-            euclideanDistance: euclideanDistance(getRelativeVector(row.vector), waypointVector)
+            euclideanDistance: euclideanDistance(getRelativeVector(row.vector), waypointVector),
+            combinedDistance: combinedDistance(getRelativeVector(row.vector), waypointVector)
         }))
         waypoint.similarityTimeseries = distances
     })
@@ -443,8 +451,9 @@ export function rebuildChart() {
     updateAllCharts()
 
 }
-function updateAllCharts() {
+export function updateAllCharts() {
 
+    buildTimeslider()
     var data = state.highRes
     switch (state.resolution) {
         case 1:
@@ -460,8 +469,8 @@ function updateAllCharts() {
     if (state.chartType == "pca") {
         updateChartWaypoints()
         updateChartUser(data)
-        updateSimilarityChart("miniSimilarityChart")
-        updateSimilarityChart("miniEuclideanChart", { lineColor: "black", highlightID: null, key: "euclidean", lineSize: 10 })
+        //updateSimilarityChart("miniSimilarityChart")
+        //updateSimilarityChart("miniEuclideanChart", { lineColor: "black", highlightID: null, key: "euclidean", lineSize: 10 })
     }
     else if (state.chartType == "euclidean") {
         updateSimilarityChart("chart", { lineColor: "black", highlightID: null, key: "euclidean", lineSize: 10 })
@@ -470,7 +479,7 @@ function updateAllCharts() {
         updateSimilarityChart("chart")
     }
 
-    d3.select("#other-selectors").style("display", "flex") // Show the other options now that waypoints are loaded
+    d3.selectAll(".user-selectors").style("display", "flex") // Show the other options now that waypoints are loaded
 
 
 }
@@ -570,18 +579,12 @@ function setup() {
         .style("display", "flex")
         .style("justify-content", "center")
 
-    // Bottom bar
-    var bottom = d3.select("#bottom-bar")
-    bottom.style("position", "absolute")
-        .style("bottom", "0px")
-        .style("left", "300px")
-
 
     buildBrowseFile(browse_btn, "UPLOAD", "t1")
     buildRightSidebar()
-    buildMiniCharts(bottom)
-
-
+    buildBottomBar()
+    buildTopBar()
+    
 }
 function buildRightSidebar() {
     var sidebar = d3.select("#sidebar-right")
@@ -593,13 +596,11 @@ function buildRightSidebar() {
     var otherSelectors = sidebar.append("div").style("margin", "10px").style("margin-top", "50px")
         .style("display", "none")
         .style("flex-direction", "column")
-        .attr("id", "other-selectors")
+        .attr("class", "user-selectors")
 
+ 
     var resolutionContainer = otherSelectors.append("div").style("display", "flex").style("flex-direction", "row")
     buildResolutionSelectors(resolutionContainer)
-
-    var charttypeContainer = otherSelectors.append("div").style("display", "flex").style("flex-direction", "row")
-    buildChartSelectors(charttypeContainer)
 
     // Show Hidden Waypoints
     var showAll_box = addCheckbox(otherSelectors, "Show Hidden Waypoints", state.showAllWaypoints, "20px")
@@ -632,96 +633,45 @@ function buildRightSidebar() {
 
 
 }
-function buildChartSelectors(div) {
-    var chart1, chart2, chart3 = false
-    switch (state.chartType) {
-        case "pca":
-            chart1 = true
-            break;
-        case "cosine":
-            chart2 = true
-            break;
-        case "euclidean":
-            chart3 = true
-            break
+function buildBottomBar()
+{
+    var bar = d3.select("#bottom-bar")
+    bar.style("position", "absolute")
+    .style("height", "50px")
+    .attr("class", "user-selectors")
+    .style("display", "none")
+    .style("bottom", 0 + "px")
+    .style("left", sidebarWidth + "px")
+    .style("right", sidebarWidth + "px")
+    .style("justify-content", "center")
+    .style("background", "grey")
 
-    }
-    var chart1box = addCheckbox(div, "3-D", chart1, "12px")
-    var chart2box = addCheckbox(div, "Cosine", chart2, "12px")
-    var chart3box = addCheckbox(div, "Euclidean", chart3, "12px")
+    var width = window.innerWidth - sidebarWidth - sidebarWidth
 
-    chart1box
-        .attr("class", "chartolution-checkbox")
-        .on("click", function () {
-            d3.selectAll(".chartolution-checkbox").property("checked", false)
-            d3.select(this).property("checked", true)
-            state.chartType = "pca"
-            updateAllCharts()
-        })
-    chart2box
-        .attr("class", "chartolution-checkbox")
-        .on("click", function () {
-            d3.selectAll(".chartolution-checkbox").property("checked", false)
-            d3.select(this).property("checked", true)
-            state.chartType = "cosine"
-            updateAllCharts()
-        })
-    chart3box
-        .attr("class", "chartolution-checkbox")
-        .on("click", function () {
-            d3.selectAll(".chartolution-checkbox").property("checked", false)
-            d3.select(this).property("checked", true)
-            state.chartType = "euclidean"
+    bar.append("svg")
+    .style("margin", "5px")
+    .attr("id", "timeslider").attr("width", width + "px").attr("heigth", "20px")
+}
 
-            updateAllCharts()
-        })
+function buildTopBar()
+{
+    var bar = d3.select("#top-bar")
+    bar.style("position", "absolute")
+    .attr("class", "user-selectors")
+    .style("display", "none")
+    .style("top", 0 + "px")
+    .style("left", sidebarWidth + "px")
+    .style("right", sidebarWidth + "px")
+    .style("justify-content", "center")
+    //.style("background", "rgba(0, 0, 0, 0.1)")
+    
+
+    
+    var charttypeContainer = bar.append("div").style("display", "flex").style("flex-direction", "row")
+    buildChartSelectors(charttypeContainer)
 
 }
-function buildResolutionSelectors(div) {
-    var res1, res10, res60 = false
-    switch (state.resolution) {
-        case 1:
-            res1 = true
-            break;
-        case 10:
-            res10 = true
-            break;
-        case 60:
-            res60 = true
-            break
 
-    }
-    var res1box = addCheckbox(div, "1 Sec", res1, "12px")
-    var res10box = addCheckbox(div, "10 Sec", res10, "12px")
-    var res60box = addCheckbox(div, "60 Sec", res60, "12px")
-
-    res1box
-        .attr("class", "resolution-checkbox")
-        .on("click", function () {
-            d3.selectAll(".resolution-checkbox").property("checked", false)
-            d3.select(this).property("checked", true)
-            state.resolution = 1
-            updateAllCharts()
-        })
-    res10box
-        .attr("class", "resolution-checkbox")
-        .on("click", function () {
-            d3.selectAll(".resolution-checkbox").property("checked", false)
-            d3.select(this).property("checked", true)
-            state.resolution = 10
-            updateAllCharts()
-        })
-    res60box
-        .attr("class", "resolution-checkbox")
-        .on("click", function () {
-            d3.selectAll(".resolution-checkbox").property("checked", false)
-            d3.select(this).property("checked", true)
-            state.resolution = 60
-
-            updateAllCharts()
-        })
-
-}
 function buildMiniCharts(div) {
 
     // Similarity chart
@@ -777,6 +727,7 @@ export default function Live() {
             <div id="menu"></div>
             <div id="sidebar-right" className="sidebar"></div>
             <div id="bottom-bar"></div>
+            <div id="top-bar"></div>
         </main>
     );
 }

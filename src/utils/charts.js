@@ -723,6 +723,7 @@ export function updateChartUser(data) {
         .on("mouseover", function (i, d) {
 
             if (zooming != true) {
+                console.log(d.moment.seconds)
                 d3.select(this).style("opacity", 1) //.style("stroke", "black")
 
                 // Move the mini-chart marker to the same point

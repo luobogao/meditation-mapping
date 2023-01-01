@@ -80,7 +80,7 @@ export function updateSimilarityChart(svgid, settings = defaultSettings) {
                         arr.push(data[b].cosineDistance)
                         break;
                     case "euclidean":
-                        arr.push(data[b].euclideanDistance)
+                        arr.push(data[b].combinedDistance)
                         break;
                 }
                 

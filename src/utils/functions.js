@@ -70,7 +70,7 @@ export function parsePx(attribute)
 {
     if (attribute == null)
     {
-        console.error("Trying to get attribute from null object")
+        console.error("Attribute has not be set yet, cannot parse")
         return
     }
     // Parses an 'attr' from a D3 element: "500px" -> 500

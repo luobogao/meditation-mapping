@@ -41,26 +41,21 @@ function getRootVectorMindLink(row) {
 }
 
 // Duplicated ulility functions
-function clone(obj)
-{
+function clone(obj) {
     return JSON.parse(JSON.stringify(obj))
 }
-function round(v)
-{
+function round(v) {
     return Math.round(v * 10000) / 10000
 }
-function parseTime (str)
-{
+function parseTime(str) {
 
-    if (str.length == 13 || typeof str === "number")
-    {
+    if (str.length == 13 || typeof str === "number") {
         return parseInt(str)
     }
-    else 
-    {
+    else {
         let format = "YYYY-MM-DD HH:mm:ss.SSS"
-        let date = moment (str, format)
-        let millis = date.valueOf ()
+        let date = moment(str, format)
+        let millis = date.valueOf()
         return millis
     }
 
@@ -73,7 +68,7 @@ self.addEventListener("message", function (e) {
     let headers = data.slice(-1)[0]
     let rows = data.slice(0, data.length - 1)
     console.log("--> Loaded " + rows.length + " rows...")
-    console.log(rows[0])
+    
     let keys = Object.keys(rows[0])
     if (keys.includes("timestampMs")) {
         processDataMindLink(rows, "data1")
@@ -191,8 +186,7 @@ function processDataMuse(rows) {
 
     // Remove last 10 seconds and first 10 seconds - user is probably moving during this time
     rows = rows.slice(10, rows.length - 10)
-    console.log("--> Validated rows: " + rows.length)
-
+    
     let last_timestamp = parseTime(rows.slice(-1)[0].TimeStamp)
     let total_seconds = Math.round((last_timestamp - first_timestamp) / 1000)
     let total_hours = total_seconds / 60 / 60
@@ -207,8 +201,7 @@ function processDataMuse(rows) {
             standardRows.push(row)
         }
     }
-    console.log("--> Standardized rows")
-
+    
     var lowResolution = 60   // average over 60 seconds
     var highResolution = 10  // average over 10 seconds
 
@@ -256,16 +249,24 @@ function averageRows(rows, roundN) {
 
 
     console.log("----> Rounding with " + roundN + " in " + rows.length + " rows")
+    var firstSeconds = rows[0].seconds
+    var lastSeconds = rows.slice(-1)[0].seconds
+    var totalSeconds = lastSeconds - firstSeconds
     roundN = Math.round(roundN)
     if (roundN <= 2) {
-        
-        rows.map(row => row.vector = getRootVector(row))
+
+        rows.forEach(row => 
+            {
+                row.vector = getRootVector(row)
+                row.percent = (row.seconds - firstSeconds) / totalSeconds
+            }
+            )
         return rows
     }
     else {
         const roundN_half = Math.round(roundN / 2)
         let newRows = []
-        var firstSeconds = rows[0].seconds
+
         for (let i = roundN_half + 1; i < rows.length - roundN_half; i = i + roundN) {
             if (i < rows.length) {
                 let row = rows[i]
@@ -273,6 +274,8 @@ function averageRows(rows, roundN) {
                 newRow.firstSeconds = firstSeconds
                 newRow.seconds = row.seconds
                 newRow.minutes = row.minutes
+
+                newRow.percent = (row.seconds - firstSeconds) / totalSeconds
 
                 // Average each band + channel
                 bands.forEach(band => {
@@ -324,7 +327,7 @@ function processDataMindLink(rows) {
     let first_timestamp = parseInt(rows[0].timestampMs)
     let f = "YYYY-MM-DD HH:mm "
     let d = moment(first_timestamp).format(f)
-    
+
     var returnObj = {}
     returnObj.filename = d
     returnObj.date = d
@@ -347,9 +350,9 @@ function processDataMindLink(rows) {
 
     }
     console.log("--> Removing " + rows.filter(row => row.valid == false).length + " invalid rows")
-    
+
     rows = rows.filter(row => row.valid == true)
-    
+
 
     let last_timestamp = rows.slice(-1)[0].timestampMs
     let total_seconds = Math.round((last_timestamp - first_timestamp) / 1000)
@@ -363,24 +366,23 @@ function processDataMindLink(rows) {
     let avgHigh = averageRowsMindLink(clone(standardRows), 10)
     let avgMax = averageRowsMindLink(clone(standardRows), standardRows.length / 100)
     let avg10 = averageRowsMindLink(clone(standardRows), standardRows.length / 10)
-    
+
     returnObj.raw = clone(standardRows)
     returnObj.lowRes = avgLow
     returnObj.highRes = avgHigh
     returnObj.avg10 = avg10
     returnObj.averageMax = avgMax
     postMessage(JSON.stringify(returnObj))
-    
+
 }
 function averageRowsMindLink(rows, roundN) {
 
-    
+
     roundN = Math.floor(roundN)
-    
-    
+
+
     let roundN2 = Math.round(roundN / 2)
-    if (roundN2 <= 5)
-    {
+    if (roundN2 <= 5) {
         rows.map(row => row.vector = getRootVectorMindLink(row))
         return rows
     }
@@ -390,7 +392,7 @@ function averageRowsMindLink(rows, roundN) {
     var firstSeconds = rows[0].seconds
 
     for (let i = roundN2 + 1; i < rows.length - roundN2 - 5; i = i + roundN) {
-    
+
         let newRow = {}
         let seconds = rows[i].seconds
         let minutes = rows[i].minutes

@@ -30,7 +30,7 @@ var maxes = []
 var principals = []
 var modelType = "cosine" // How to measure variances
 var standardizeType = "ratio" // Method to standardize a vector
-var distanceType = "cosine"
+var distanceType = "combined"
 
 
 export function measureDistance(a, b)
@@ -43,7 +43,18 @@ export function measureDistance(a, b)
         case "cosine":
             return cosineSimilarity(a, b)
             break;
+        case "combined":
+            return combinedDistance(a, b)
+            break;
     }
+}
+export function combinedDistance(a, b)
+{
+    var cos = cosineSimilarity(a, b)
+    var euc = euclideanDistance(a, b)
+    var combined = Math.sqrt((Math.pow(cos, 2) + (1 * Math.pow(euc, 2)))) / 1.3
+    return combined
+
 }
 export function cosineSimilarity(a, b)
 // Cosine Similarity - used to find how similar to high-dimensional vectors are to each other
@@ -70,7 +81,10 @@ export function euclideanDistance(a, b)
         values += value
     }
     
-    return 100 - Math.sqrt(values)
+    // Normalize so bigger is progressively less than 100, but never less than 0
+    var normalized = 100 - (100 * Math.pow((values / 1000), 0.5))
+    if (normalized < 10) normalized = 10
+    return normalized
 }
 
 
