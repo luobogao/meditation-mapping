@@ -63,7 +63,7 @@ export function cosineSimilarity(a, b)
 {
     var similarity = dot(a, b) / (Math.sqrt(dot(a, a)) * Math.sqrt(dot(b, b)))
     similarity = Math.round(similarity * 10000) / 100
-    //if (similarity < 0) similarity = 0
+    if (similarity < 0) similarity = 0
     return similarity
 }
 

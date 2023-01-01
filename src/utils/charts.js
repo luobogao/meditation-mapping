@@ -1,4 +1,4 @@
-import {userDataLoaded, chartWidth, chartHeight, mode3d, waypoints } from "../pages/live"
+import { userDataLoaded, chartWidth, chartHeight, mode3d, waypoints, updateAllCharts } from "../pages/live"
 import { popUp, popUpremove, addMenu, menuRemove } from "./ui";
 import { getRelativeVector, runModel } from "../utils/analysis";
 import { addWaypoint, deleteWaypoint, updateWaypointNotes, updateWaypoint } from "../utils/database"
@@ -86,6 +86,7 @@ export function updateChartWaypoints() {
 
     var lastx = 0
     var lasty = 0
+    var lastZoom = 1
     function handleZoom(e) {
         // When user zooms, all chart "g" elements are changed accordingly
 
@@ -94,13 +95,33 @@ export function updateChartWaypoints() {
 
 
         if (zoom_type == "wheel") {
-            // both 2d and 3d modes uses scroll wheel for zooming
 
-            var widthD = (chartWidth * e.transform.k) - chartWidth
-            var heightD = (chartHeight * e.transform.k) - chartHeight
-            e.transform.x = -1 * (widthD / 2)
-            e.transform.y = -1 * (heightD / 2)
-            d3.select("#chartsvg").selectAll("g").attr("transform", e.transform)
+            // Zoom
+            if (state.chartType == "pca") {
+                // both 2d and 3d modes uses scroll wheel for zooming
+                var widthD = (chartWidth * e.transform.k) - chartWidth
+                var heightD = (chartHeight * e.transform.k) - chartHeight
+                e.transform.x = -1 * (widthD / 2)
+                e.transform.y = -1 * (heightD / 2)
+                d3.select("#chartsvg").selectAll("g").attr("transform", e.transform)
+
+            }
+
+            // For graph-type charts, "zoom" means changing the y-axis
+            else {
+                if (e.transform.k > lastZoom )
+                {
+                    state.zoom += 1
+                }
+                else 
+                {
+                    state.zoom -= 1
+                }
+                lastZoom = e.transform.k
+                
+                updateAllCharts()
+                
+            }
 
         }
         else {
@@ -115,7 +136,7 @@ export function updateChartWaypoints() {
                 lastx = x
                 lasty = y
                 if (Math.abs(xd) < 20 && Math.abs(yd) < 20) {
-                    
+
                     rotate(xd / 100, 0, yd / 100)
 
                 }
@@ -257,7 +278,7 @@ export function updateChartWaypoints() {
 
     buildLinks(svg, waypointCircles)
     addWaypoints(svg, waypointCircles)
-    
+
     if (rotateStart == true) {
 
         rotate(Math.random(), 0, Math.random())
@@ -272,7 +293,7 @@ export function updateChartWaypoints() {
 }
 function addWaypoints(svg, data) {
     // ADD WAYPOINTS
-    
+
 
     d3.select("#chartsvg")
         .on("click", function () {
@@ -361,9 +382,8 @@ function addWaypoints(svg, data) {
             menu.append("button")
                 .style("margin-top", "20px")
                 .text("Edit")
-                .on("click", function () 
-                {
-                    
+                .on("click", function () {
+
                     editWaypoint(d.fullentry, menu)
 
                 })
@@ -406,7 +426,7 @@ function addWaypoints(svg, data) {
         }
         )
         .on("mouseover", function (event, d) {
-            
+
             if (zooming == false) {
                 var note = d.fullentry.notes
                 d3.select(this).style("fill", "red")
@@ -417,60 +437,54 @@ function addWaypoints(svg, data) {
                 menu.append("text").text(d.fullentry.user).style("font-size", "20px").style("opacity", 0.5)
 
                 // NOTES
-                if (note != undefined) 
-                {
-                    if (note.length > 0)
-                    {
+                if (note != undefined) {
+                    if (note.length > 0) {
                         menu.append("text").text(note).style("margin-top", "20px")
-                    }                    
+                    }
                 }
 
                 // SIMIARITY CHART
-                if (d.fullentry.similarityTimeseries != null)
-                {
+                if (d.fullentry.similarityTimeseries != null) {
                     //var maxEuclidean = d3.max(d.fullentry.similarityTimeseries.map(e => e.euclideanDistance))
                     //menu.append("text").text("Euclidean: " + parseInt(maxEuclidean)).style("font-size", "30px")
                     menu.append("div")
-                    .style("display", "flex")
-                    .style("justify-content", "center")
-                    .append("svg")
-                    .style("border", "1px solid grey")
-                    .style("border-radius", "5px")
-                    .style("margin-top", "20px").attr("id", "popup-minichart")
-                    .attr("width", 300)
-                    .attr("height", 200)
-                    var settings = {lineColor: "white", highlightID: d.fullentry.id, lineSize: 3}
+                        .style("display", "flex")
+                        .style("justify-content", "center")
+                        .append("svg")
+                        .style("border", "1px solid grey")
+                        .style("border-radius", "5px")
+                        .style("margin-top", "20px").attr("id", "popup-minichart")
+                        .attr("width", 300)
+                        .attr("height", 200)
+                    var settings = { lineColor: "white", highlightID: d.fullentry.id, lineSize: 3 }
                     updateSimilarityChart("popup-minichart", settings)
 
                 }
-                
-                
-                
+
+
+
             }
 
 
         })
         .on("mouseout", function (event, d) {
-            
+
             var el = d3.select(this)
 
-            if (userDataLoaded == true && d.match == false)
-            {
-                
-                el.style("fill",  "red")
-            } 
-            else 
-            {
-                
+            if (userDataLoaded == true && d.match == false) {
+
+                el.style("fill", "red")
+            }
+            else {
+
                 el.style("fill", waypointColor)
             }
-            
+
             // Only remove the menu if it isn't an 'options' menu
-            if (d3.select("#menu").attr("type") != "options")
-            {
+            if (d3.select("#menu").attr("type") != "options") {
                 menuRemove()
             }
-            
+
 
         })
 }
@@ -646,6 +660,21 @@ export function updateChartUser(data) {
     // FOR TESTING: use the waypoints as user point, they should match PERFECTLY with waypoinst
     //var vectors = waypoints.filter(e => e.match == true).map(e => getRelativeVector(e.vector))
 
+    switch (state.resolution) {
+        case 1:
+            userSize = 15;
+            userOpacity = 0.1;
+            break;
+        case 10:
+            userSize = 25;
+            userOpacity = 0.2;
+            break;
+        case 60:
+            userSize = 40;
+            userOpacity = 0.3;
+            break;
+    }
+
 
     var mapped = runModel(vectors)
 
@@ -790,46 +819,43 @@ export function updateChartUser(data) {
     recenter(center)
 
 }
-function editWaypoint(waypoint, menu)
-{
+function editWaypoint(waypoint, menu) {
     menu.selectAll("*").remove()
     menu.append("div").text("User: " + state.userName)
     menu.append("div").text("Label:").style("margin-top", "20px")
     var label = menu.append("input").attr("type", "text").attr("value", waypoint.label).style("width", "220px")
-    .on("change", function (d) {
-        var label = d3.select(this).node().value
-        console.log(label)
-    })
+        .on("change", function (d) {
+            var label = d3.select(this).node().value
+            console.log(label)
+        })
     menu.append("div").text("Notes:").style("margin-top", "20px")
     var notes = menu.append("textarea").attr("rows", 10).attr("cols", 30).text(waypoint.notes)
-    .on("change", function (d) {
-        var notes = d3.select(this).node().value
-        console.log(label)
-    })
+        .on("change", function (d) {
+            var notes = d3.select(this).node().value
+            console.log(label)
+        })
     menu.append("div").style("margin-top", "30px")
         .append("button").text("Submit")
-        .on("click", function()
-        {
+        .on("click", function () {
             var l = label.node().value
             var n = notes.node().value
 
-            if (l.length > 1)
-            {
+            if (l.length > 1) {
                 waypoint.label = l
                 waypoint.notes = n
                 waypoint.userid = user.uid
-                
+
                 // Clean up the waypoint for posting
                 var updateObj = clone(waypoint)
                 delete waypoint.coordinates
                 delete waypoint.match
-                                
+
                 updateWaypoint(updateObj)
                     .then(() => {
                         console.log("updated waypoint")
                         menuRemove()
                         rebuildChart()
-                        
+
                     })
                     .catch((error) => {
                         console.error("Failed to update waypoint")
@@ -844,14 +870,14 @@ function addUserWaypoint(user_point, menu) {
     menu.append("div").text("User: " + state.userName)
     menu.append("div").text("Label:").style("margin-top", "20px")
     var label = menu.append("input").attr("type", "text").style("width", "220px")
-    .on("change", function (d) {        
-    
-    })
+        .on("change", function (d) {
+
+        })
     menu.append("div").text("Notes:").style("margin-top", "20px")
     var notes = menu.append("textarea").attr("rows", 10).attr("cols", 30)
-    .on("change", function (d) {
-    
-    })
+        .on("change", function (d) {
+
+        })
     menu.append("div").style("margin-top", "30px")
         .append("button").text("Submit")
         .on("click", function () {
@@ -860,7 +886,7 @@ function addUserWaypoint(user_point, menu) {
 
             if (l.length > 1) {
                 // Note: an ID will be automatically generated by firebase
-                var newWaypoint = {userid: user.uid, user: state.userName, label: l, vector: user_point.vector, notes: n }
+                var newWaypoint = { userid: user.uid, user: state.userName, label: l, vector: user_point.vector, notes: n }
                 addWaypoint(newWaypoint)
                     .then((doc) => {
                         console.log("Added waypoint: " + doc.id)
@@ -886,7 +912,7 @@ function addUserWaypoint(user_point, menu) {
 
 function rotate(pitch, yaw, roll) {
     console.log("ROTATING")
-    
+
     accPitch += pitch
     accYaw += yaw
     accRoll += roll

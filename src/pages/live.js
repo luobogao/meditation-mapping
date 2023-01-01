@@ -45,6 +45,7 @@ export var state =
     "device": "Muse",
     "selected_users": [],
     "resolution": 10,
+    "zoom": 1, // increasing this value will change the y-min of distance graphs
     "showAllWaypoints": false, // Shows all waypoints (as red) even when not matching
     "chartType": "pca", // PCA, Cosine, or Euclidean
     "limitMatches": true,
@@ -144,11 +145,30 @@ function downloadWaypoints() {
 
         // Build model of meditation states using the "vectors.js" file
         // This first time, include ALL the waypoints
-        let vectors = waypoints.filter(e => e.exclude != true)
-            .filter(e => state.selected_users.includes(e.user))
-            .map(e => getRelativeVector(e.vector))
 
-        buildModel(vectors)
+        function buildModel_waypoint() {
+            let vectors = waypoints.filter(e => e.exclude != true)
+                .filter(e => state.selected_users.includes(e.user))
+                .map(e => getRelativeVector(e.vector))
+            buildModel(vectors)
+        }
+        function buildModel_user()
+        {
+            let vectors = state.averageMax.map(e => getRelativeVector(e.vector))
+            buildModel(vectors)
+        }
+        if (userDataLoaded)
+        {
+            //buildModel_user()
+            buildModel_waypoint()
+        }
+        else
+        {
+            buildModel_waypoint()
+        }
+        
+
+        
 
         waypoints.forEach(e => {
             if (state.selected_users.includes(e.user)) {
@@ -304,6 +324,7 @@ function buildBrowseFile(div, label, id) {
 export function rebuildChart() {
     waypoints = waypoints.filter(waypoint => waypoint.remove != true)
     console.log("total waypoints: " + waypoints.length)
+    state.zoom = 1
 
     // Remove waypoints from users de-selected by user
     waypoints.forEach(waypoint => {
@@ -379,7 +400,11 @@ export function rebuildChart() {
         //filtered_waypoint_ids = distances.slice(0, maxWaypoints).map(e => e[0]) 
 
         // Filter by min Cosine
-        filtered_waypoint_ids = distances.filter(e => e[1] > minimumMatch).map(e => e[0])
+        filtered_waypoint_ids = 
+            distances
+            .filter(e => e[1] > minimumMatch)
+            .slice(0, maxWaypoints)
+            .map(e => e[0])
     }
     console.log("filtered: ")
     console.log(filtered_waypoint_ids)
@@ -436,7 +461,7 @@ export function rebuildChart() {
     // Add distances to each waypoint
     waypoints.forEach(waypoint => {
         const waypointVector = getRelativeVector(waypoint.vector)
-        
+
         const distances = state.averageMax.map(row =>
         ({
             seconds: row.seconds,
@@ -476,7 +501,10 @@ export function updateAllCharts() {
         updateSimilarityChart("chart", { lineColor: "black", highlightID: null, key: "euclidean", lineSize: 10 })
     }
     else if (state.chartType == "cosine") {
-        updateSimilarityChart("chart")
+        updateSimilarityChart("chart", { lineColor: "black", highlightID: null, key: "cosine", lineSize: 10 })
+    }
+    else if (state.chartType == "cosine*euclidean") {
+        updateSimilarityChart("chart", { lineColor: "black", highlightID: null, key: "cosine*euclidean", lineSize: 10 })
     }
 
     d3.selectAll(".user-selectors").style("display", "flex") // Show the other options now that waypoints are loaded
@@ -584,7 +612,7 @@ function setup() {
     buildRightSidebar()
     buildBottomBar()
     buildTopBar()
-    
+
 }
 function buildRightSidebar() {
     var sidebar = d3.select("#sidebar-right")
@@ -598,7 +626,7 @@ function buildRightSidebar() {
         .style("flex-direction", "column")
         .attr("class", "user-selectors")
 
- 
+
     var resolutionContainer = otherSelectors.append("div").style("display", "flex").style("flex-direction", "row")
     buildResolutionSelectors(resolutionContainer)
 
@@ -633,40 +661,38 @@ function buildRightSidebar() {
 
 
 }
-function buildBottomBar()
-{
+function buildBottomBar() {
     var bar = d3.select("#bottom-bar")
     bar.style("position", "absolute")
-    .style("height", "50px")
-    .attr("class", "user-selectors")
-    .style("display", "none")
-    .style("bottom", 0 + "px")
-    .style("left", sidebarWidth + "px")
-    .style("right", sidebarWidth + "px")
-    .style("justify-content", "center")
-    .style("background", "grey")
+        .style("height", "50px")
+        .attr("class", "user-selectors")
+        .style("display", "none")
+        .style("bottom", 0 + "px")
+        .style("left", sidebarWidth + "px")
+        .style("right", sidebarWidth + "px")
+        .style("justify-content", "center")
+        //.style("background", "grey")
 
     var width = window.innerWidth - sidebarWidth - sidebarWidth
 
     bar.append("svg")
-    .style("margin", "5px")
-    .attr("id", "timeslider").attr("width", width + "px").attr("heigth", "20px")
+        .style("margin", "5px")
+        .attr("id", "timeslider").attr("width", width + "px").attr("heigth", "20px")
 }
 
-function buildTopBar()
-{
+function buildTopBar() {
     var bar = d3.select("#top-bar")
     bar.style("position", "absolute")
-    .attr("class", "user-selectors")
-    .style("display", "none")
-    .style("top", 0 + "px")
-    .style("left", sidebarWidth + "px")
-    .style("right", sidebarWidth + "px")
-    .style("justify-content", "center")
+        .attr("class", "user-selectors")
+        .style("display", "none")
+        .style("top", 0 + "px")
+        .style("left", sidebarWidth + "px")
+        .style("right", sidebarWidth + "px")
+        .style("justify-content", "center")
     //.style("background", "rgba(0, 0, 0, 0.1)")
-    
 
-    
+
+
     var charttypeContainer = bar.append("div").style("display", "flex").style("flex-direction", "row")
     buildChartSelectors(charttypeContainer)
 

@@ -1,4 +1,4 @@
-import { miniChartSize, waypoints } from "../pages/live"
+import { miniChartSize, waypoints, state } from "../pages/live"
 import { parsePx } from "./functions";
 import { addMenu, menuRemove } from "./ui";
 const d3 = require("d3");
@@ -7,8 +7,8 @@ var similarityLine, miniX, miniY, similaritySVG
 export function buildSimilarityChart() {
 
     similaritySVG = d3.select("#similarityChart")
-    .style("border", "1px solid grey")
-    .style("border-radius", "5px")
+        .style("border", "1px solid grey")
+        .style("border-radius", "5px")
 
 
     similaritySVG.append("svg:rect")
@@ -20,39 +20,73 @@ export function buildSimilarityChart() {
             console.log("moving")
         })
 }
-var defaultSettings = {lineColor: "black", highlightID: null, key: "cosine", lineSize: 3}
+var defaultSettings = { lineColor: "black", highlightID: null, key: "cosine", lineSize: 3 }
 export function updateSimilarityChart(svgid, settings = defaultSettings) {
 
-    
-    if (waypoints[0].similarityTimeseries == null)
-    {
+    const opacity = 0.7
+    var margin = 20
+    if (waypoints[0].similarityTimeseries == null) {
         return
     }
-    var svg = d3.select("#" + svgid)
-    if (svg == null)
-    {
+    var container = d3.select("#" + svgid)
+    var width = parsePx(container.attr("width")) - margin
+    var height = parsePx(container.attr("height")) - margin
+
+    container.selectAll("*").remove()
+    var svg = container.append("g")
+        .attr("width", (width - 100) + "px")
+        .attr("transform", "translate(" + "0" + "," + margin + ")")
+    if (svg == null) {
         return
     }
-    
-    svg.selectAll("*").remove()
-    var width = parsePx( svg.attr("width"))
-    var height = parsePx( svg.attr("height"))
-    
+
+    var key = ""
+    switch (settings.key) {
+        case "cosine":
+            key = "cosineDistance"
+            break;
+        case "euclidean":
+            key = "euclideanDistance"
+            break;
+        case "cosine*euclidean":
+            key = "combinedDistance"
+            break;
+    }
+    var globalYmin = d3.min(waypoints.map(waypoint => d3.min(waypoint.similarityTimeseries.map(e => e[key]))))
+    var globalYmax = d3.max(waypoints.map(waypoint => d3.max(waypoint.similarityTimeseries.map(e => e[key]))))
+
     var firstSeries = waypoints[0].similarityTimeseries.map(e => e.seconds)
     var min_x = firstSeries[0]
     var max_x = firstSeries.slice(-1)[0]
 
-    //console.log("min: " + min_x + " max: " + max_x)
-    console.log("width: " + width + ", height: " + height)
     var miniX = d3.scaleLinear()
         .domain([min_x, max_x])
         .range([0, width])
 
+        
+    var minY = globalYmin - state.zoom
+    if (minY > 98)
+    {
+        minY = 98
+        state.zoom = state.zoom + 1
+    } 
+    
+    if (minY < 10)
+    {
+        minY = 10
+        state.zoom = state.zoom - 1
+    } 
+    if (minY > (globalYmax - 20))
+    {
+        minY = globalYmax - 20
+        state.zoom = state.zoom - 1
+    }
+
     var miniY = d3.scaleLog()
-        .domain([50, 100])
+        .domain([minY, 100])
         .range([height, 0])
 
-    
+
 
     var line = d3.line()
         .x(function (d, i) {
@@ -63,30 +97,20 @@ export function updateSimilarityChart(svgid, settings = defaultSettings) {
         })
         .curve(d3.curveMonotoneX) // apply smoothing to the line
 
-    function interpolate(data, n)
-    {
+    function interpolate(data, n) {
         var interpolatedData = []
-        for (let i = (n / 2); i < (data.length - (n / 2)); i = i + (n / 2))
-        {
-            
+        for (let i = (n / 2); i < (data.length - (n / 2)); i = i + (n / 2)) {
+
 
             var arr = []
-            
-            for (let b = i; b < i + (n / 2); b ++)
-            {
-                switch (settings.key)
-                {
-                    case "cosine":
-                        arr.push(data[b].cosineDistance)
-                        break;
-                    case "euclidean":
-                        arr.push(data[b].combinedDistance)
-                        break;
-                }
-                
+
+            for (let b = i; b < i + (n / 2); b++) {
+
+                arr.push(data[b][key])
+
             }
             var avg = d3.mean(arr)
-            interpolatedData.push({x: data[i].seconds, y: avg})
+            interpolatedData.push({ x: data[i].seconds, y: avg })
 
         }
         return interpolatedData
@@ -94,52 +118,48 @@ export function updateSimilarityChart(svgid, settings = defaultSettings) {
     var data = []
 
     waypoints.forEach(waypoint => {
-        if (waypoint.match)
-        {
+        if (waypoint.match) {
             var series = interpolate(waypoint.similarityTimeseries, 20)
-            var entry = {points: series, waypoint: waypoint}
+            var entry = { points: series, waypoint: waypoint }
             data.push(entry)
         }
-        
+
 
     })
-    
-    
+
+
     var chart = svg.selectAll(".line")
         .data(data)
 
     chart.exit().remove()
     chart.enter().append("path").attr("class", "line")
         .attr("fill", "none")
-        .attr("stroke", function(d)
-        {
+        .attr("stroke", function (d) {
             return settings.lineColor
         })
-        .on("mouseover", function(event, d)
-        {
-            d3.select(this).attr("stroke", "red")
+        .on("mouseover", function (event, d) {
+            d3.select(this)
+                .attr("stroke", "red")
+                .raise()
             var menu = addMenu(event, "menu")
             menu.append("text").text(d.waypoint.user + " - " + d.waypoint.label)
         })
-        .on("mouseout", function()
-        {
+        .on("mouseout", function () {
             d3.select(this).attr("stroke", settings.lineColor)
             menuRemove()
         })
-        .style("opacity", function(d)
-        {
-            if (settings.highlightID != null)
-            {
-                if (d.waypoint.id == settings.highlightID) return 0.8
+        .style("opacity", function (d) {
+            if (settings.highlightID != null) {
+                if (d.waypoint.id == settings.highlightID) return opacity
                 else return 0.5
             }
-            else return 0.8
-            
-            
+            else return opacity
+
+
         })
         .attr("stroke-width", settings.lineSize)
         .attr("d", function (d) {
-            
+
             return line(d.points)
         })
 
