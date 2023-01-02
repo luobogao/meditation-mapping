@@ -1,11 +1,11 @@
 import { userDataLoaded, chartWidth, chartHeight, mode3d, waypoints, updateAllCharts, anonymous } from "../pages/live"
-import { popUp, popUpremove, addMenu, menuRemove } from "./ui";
+import { popUp, popUpremove, addMenu, menuRemove, moveMenu } from "./ui";
 import { getRelativeVector, runModel } from "../utils/analysis";
 import { addWaypoint, deleteWaypoint, updateWaypointNotes, updateWaypoint } from "../utils/database"
 import { centroid, clone } from "./functions";
 import { node_links } from "./vectors";
 import { x_mini } from "./minichart";
-import { state, rebuildChart, user } from "../pages/live";
+import { state, rebuildChart, user} from "../pages/live";
 import { updateSimilarityChart } from "./minicharts";
 const d3 = require("d3");
 
@@ -280,6 +280,8 @@ export function updateChartWaypoints() {
         rotateOpening = setInterval(function () {
             rotate(0.001, 0, 0.001)
         }, 10)
+        // Automatically stop after 20 seconds, it seems this rotation causes a memory problem
+        setTimeout(function () { clearInterval(rotateOpening) }, (1000 * 20))
 
     }
 
@@ -465,6 +467,7 @@ function addWaypoints(svg, data) {
                     updateSimilarityChart("popup-minichart", settings)
 
                 }
+                moveMenu()
 
 
 
@@ -504,6 +507,14 @@ function addWaypoints(svg, data) {
             rotate(0.01, 0, 0.01)
         }, 100)
 
+    }
+    else
+    {
+        if (bestWaypointMatch != null)
+        {
+            recenter(data.filter(d => d.fullentry.id == bestWaypointMatch)[0], 0)
+        }
+        
     }
 
 }
@@ -807,14 +818,19 @@ export function updateChartUser(data) {
                 menu.append("text").text("Please login to add this waypoint to your profile").style("margin-top", "20px")
             }
             else {
+                if (state.resolution != 60) {
+                    menu.append("text").text("To add this waypoint, please use '60 seconds' setting").style("margin-top", "20px")
+                }
+                else {
+                    menu.append("button")
+                        .style("margin-top", "20px")
+                        .text("Add this Waypoint")
+                        .on("click", function () {
+                            addUserWaypoint(d.moment, menu)
 
-                menu.append("button")
-                    .style("margin-top", "20px")
-                    .text("Add this Waypoint")
-                    .on("click", function () {
-                        addUserWaypoint(d.moment, menu)
+                        })
+                }
 
-                    })
             }
 
 

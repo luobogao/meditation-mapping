@@ -54,7 +54,11 @@ export function updateSimilarityChart(svgid, settings = defaultSettings) {
         case "cosine*euclidean":
             key = "combinedDistance"
             break;
+        case "gamma":
+            key = "gamma"
+            break;
     }
+    if (key == "gamma") window.alert("Not ready yet...")
 
     var globalYmax = 0, globalYmin = 100
     function interpolate(data, n) {
@@ -137,7 +141,7 @@ export function updateSimilarityChart(svgid, settings = defaultSettings) {
                 .transition()
                 .style("fill", "black").style("opacity", 0.1)
                 .duration(80)
-            var text = svg.select("." + d.waypoint.id)
+            var text = svg.select("." + "uid" + d.waypoint.id)
             text
                 .transition()
                 .style("fill", "red").style("opacity", 1)
@@ -188,7 +192,7 @@ export function updateSimilarityChart(svgid, settings = defaultSettings) {
     var interpolated_max_x = data[0].points.slice(-1)[0].x
     series.append("text")
         .text(function (d) { return d.waypoint.user + " - " + d.waypoint.label })
-        .attr("class", function (d) { return d.waypoint.id + " " + " legend" })
+        .attr("class", function (d) { return "uid" + d.waypoint.id + " " + " legend" })
         .attr("x", miniX(interpolated_max_x) + 10)
         .attr("y", function (d) {
             return miniY(d.points.slice(-1)[0].y)

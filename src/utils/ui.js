@@ -73,9 +73,16 @@ export function addMenu(event, type) {
         .style('max-width', "300px")
         .style('max-height', "800px")
         .style("overflow", "scroll")
+    moveMenu()
 
+    return div
+}
+export function moveMenu()
+{
+    // Checks if menu is still entirely within window
+    // Timeout necessary to give DOM chance to display
     setTimeout(function () {
-        var bounds = div.node().getBoundingClientRect()
+        var bounds = d3.select("#menu").node().getBoundingClientRect()
         var minY = bounds.y + bounds.height
         
         if (minY > (window.innerHeight - 30))
@@ -86,8 +93,7 @@ export function addMenu(event, type) {
         
     }, 10)
 
-
-    return div
+    
 }
 export function popUpremove() {
     d3.select("#popup")

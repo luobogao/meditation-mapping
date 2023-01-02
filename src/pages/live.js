@@ -369,8 +369,8 @@ export function rebuildChart() {
 
     }
 
-    // Find nearby waypoints to user's data
-    var userVectors = state.avg10.map(e => getRelativeVector(e.vector))
+    // Find nearby waypoints to user's data - use every 60 seconds
+    var userVectors = state.lowRes.map(e => getRelativeVector(e.vector))
     var distanceIds = {}
     userVectors.forEach(uservector => {
 
@@ -401,6 +401,8 @@ export function rebuildChart() {
         return b[1] - a[1]
     })
 
+    var bestWaypointMatch = distances[0][0]
+
     // Take top N waypoints by distance
     var filtered_waypoint_ids = filtered_waypoints_user.map(e => e.id)
     if (state.limitMatches) {
@@ -415,8 +417,6 @@ export function rebuildChart() {
                 .slice(0, maxWaypoints)
                 .map(e => e[0])
     }
-    console.log("filtered: ")
-    console.log(filtered_waypoint_ids)
 
     if (filtered_waypoint_ids.length == 0) {
         alert("zero waypoints selected!")
