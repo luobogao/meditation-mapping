@@ -21,7 +21,10 @@ var accPitch = 0
 var accRoll = 0
 var accYaw = 0
 
+var loaded = false
+
 var rotateStart = false
+var rotateDuration = 0 // briefly set to 100 for opening rotation
 var rotateOpening = false // an 'interval' which rotates the chart when user starts
 var waypointCircles = []
 var waypointLinks = []
@@ -99,7 +102,7 @@ function handleZoom(e) {
                 state.zoom -= 1
             }
             lastZoom = e.transform.k
-            
+
             updateAllCharts()
 
         }
@@ -139,6 +142,7 @@ export var zoom = d3.zoom()
         popUpremove()
         menuRemove()
         clearInterval(rotateOpening)
+        rotateDuration = 0
 
     })
     .on("end", function () {
@@ -310,6 +314,8 @@ function addWaypoints(svg, data) {
         .on("click", function () {
             menuRemove()
             popUpremove()
+            d3.select("#welcome").remove()
+            
         })
 
     svg.selectAll(".waypoints")
@@ -435,7 +441,7 @@ function addWaypoints(svg, data) {
             waypoint.raise()
             //recenter(d, 1000)
             addWaypoint(d.fullentry)
-            
+
         }
         )
         .on("mouseover", function (event, d) {
@@ -500,6 +506,18 @@ function addWaypoints(svg, data) {
 
 
         })
+
+    var r = true
+    if (r == true && loaded == false) {
+        loaded = true
+        rotate(Math.random(), 0, Math.random())
+        rotateOpening = setInterval(function () {
+            rotateDuration = 100
+            rotate(0.01, 0, 0.01)
+        }, 100)
+
+    }
+
 }
 function buildLinks(svg, waypointData) {
 
@@ -921,7 +939,7 @@ function addUserWaypoint(user_point, menu) {
 }
 
 function rotate(pitch, yaw, roll) {
-    console.log("ROTATING")
+    
 
     accPitch += pitch
     accYaw += yaw
@@ -1006,7 +1024,7 @@ function rotate(pitch, yaw, roll) {
 
 
     // Move the SVGs to new rotated coordinates
-    readjustAllPoints(0)
+    readjustAllPoints(rotateDuration)
 }
 
 function cameraProject(matrix) {

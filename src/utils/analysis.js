@@ -52,7 +52,7 @@ export function combinedDistance(a, b)
 {
     var cos = cosineSimilarity(a, b)
     var euc = euclideanDistance(a, b)
-    var combined = Math.sqrt((Math.pow(cos, 2) + (1 * Math.pow(euc, 2)))) / 1.3
+    var combined = Math.sqrt((Math.pow(cos, 2) + (1 * Math.pow(euc, 2)))) / Math.sqrt(2)
     return combined
 
 }
@@ -82,7 +82,7 @@ export function euclideanDistance(a, b)
     }
     
     // Normalize so bigger is progressively less than 100, but never less than 0
-    var normalized = 100 - (100 * Math.pow((values / 1000), 0.5))
+    var normalized = 100 - (100 * Math.pow((values / 10000), 0.8))
     if (normalized < 10) normalized = 10
     return normalized
 }

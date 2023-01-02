@@ -5,13 +5,13 @@ import "firebaseui/dist/firebaseui.css"
 import { addCheckbox, buildChartSelectors, buildResolutionSelectors } from "../utils/ui";
 import { unique } from "../utils/functions";
 import { buildSimilarityChart, updateSimilarityChart } from "../utils/minicharts";
-import { auth, login, updateUsername } from "../utils/database"
-import { onAuthStateChanged } from "firebase/auth"
+import { auth, login, updateUsername, getAllWaypoints, downloadCSV } from "../utils/database"
+import { onAuthStateChanged, signInAnonymously } from "firebase/auth"
 import { waypoints_muse, waypoints_mindlink } from "../utils/vectors";
 import { dot, getRelativeVector, pca, runModel, measureDistance, cosineSimilarity, euclideanDistance, combinedDistance } from "../utils/analysis";
-import {zoom, updateChartWaypoints, updateChartUser } from "../utils/charts"
+import { zoom, updateChartWaypoints, updateChartUser } from "../utils/charts"
 import { signInWithEmailAndPassword } from "firebase/auth";
-import { getAllWaypoints } from "../utils/database"
+
 
 
 export var userDataLoaded = false
@@ -34,6 +34,8 @@ const backgroundColor = "#d9d9d9"
 export var waypoints
 var users;
 export var user;  // Firebase user
+export var anonymous = true
+var firstLoad = true
 var fr;
 export const miniChartSize = 200
 const miniChartMargin = 10
@@ -60,8 +62,14 @@ export var state =
 
 var email = null
 onAuthStateChanged(auth, (fbuser) => {
-    if (fbuser) {
+
+    if (fbuser && fbuser.email == null)
+    {
+        anonymous = true
+    }
+    if (fbuser && fbuser.email != null) {
         user = fbuser
+        anonymous = false
         console.log("Authenticated user:")
         console.log(user.displayName)
         d3.select("#user").text("Logged in as: " + user.email)
@@ -69,20 +77,24 @@ onAuthStateChanged(auth, (fbuser) => {
 
         // No display name - prompt user to choose one
         if (user.displayName == null) {
+            d3.select("#welcome").remove()
             console.log("No user name yet")
-            var container = d3.select("#firebase-auth-container")
+            var container = buildAuthContainer()
+            
             container.selectAll("*").remove()
             container.style("background", "grey").style("border-radius", "5px").style("height", "220px")
             var div = container.append("div").style("margin", "20px").style("display", "flex").style("flex-direction", "column")
             div.append("text").text("Please choose a Username:").style("color", "white").style("margin-bottom", "10px")
             div.append("input").attr("type", "text").attr("id", "username-input").on("change", function (d) {
-                updateUsername()
+                
 
             })
             div.append("text").text("Should be just your first name, or any one-word username. This will be the name other users see if you submit a meditation 'waypoint'").style("color", "white").style("margin-top", "10px")
             div.append("button").style("position", "absolute").style("bottom", "10px").style("right", "10px").text("OK")
                 .on("click", function () {
+                    d3.select("#firebase-auth-container").remove()
                     updateUsername()
+                    
                 })
         }
 
@@ -90,15 +102,19 @@ onAuthStateChanged(auth, (fbuser) => {
         else {
             state.userName = user.displayName
             d3.select("#user").text("Logged in: " + user.displayName)
-            d3.select("#firebase-auth-container").style("display", "none")
+            d3.select("#firebase-auth-container").remove()
             d3.select("#signin").on("click", function () {
                 console.log("Signing out...")
                 auth.signOut()
-                d3.select("#user").text("Not Signed In")
-                d3.select("#signin").text("Sign In")
+                d3.select("#user").text("")
+                d3.select("#signin").text("Login")
             })
             // Download all waypoints
-            downloadWaypoints()
+            var text = d3.select("#welcome-auth")
+            if (text != null) {
+                text.style("display", "flex").text("Logged in as: " + user.displayName)
+            }
+            if (firstLoad) downloadWaypoints()
         }
 
 
@@ -106,13 +122,23 @@ onAuthStateChanged(auth, (fbuser) => {
     }
     // Not authenticated yet - launch login
     else {
-        console.log("No user!")
+        console.log("Not logged in")
         user = null
         email = null
-        d3.select("#signin").on("click", function () {
-
+        d3.select("#signin").text("Login").on("click", function () {
+            login()
         })
-        login()
+
+        signInAnonymously(auth).then(() => {
+            console.log("---> Logged in anonymously")
+            var text = d3.select("#welcome-auth")
+            if (text != null) {
+                text.style("display", "flex").text("Logged in Anonymously")
+            }
+            if (firstLoad) downloadWaypoints()
+            
+        })
+
     }
 })
 
@@ -152,23 +178,20 @@ function downloadWaypoints() {
                 .map(e => getRelativeVector(e.vector))
             buildModel(vectors)
         }
-        function buildModel_user()
-        {
+        function buildModel_user() {
             let vectors = state.averageMax.map(e => getRelativeVector(e.vector))
             buildModel(vectors)
         }
-        if (userDataLoaded)
-        {
+        if (userDataLoaded) {
             //buildModel_user()
             buildModel_waypoint()
         }
-        else
-        {
+        else {
             buildModel_waypoint()
         }
-        
 
-        
+
+
 
         waypoints.forEach(e => {
             if (state.selected_users.includes(e.user)) {
@@ -210,6 +233,11 @@ function downloadWaypoints() {
             })
 
         })
+        if (firstLoad )
+        {
+            buildWelcome()
+            
+        }
 
 
     })
@@ -224,7 +252,11 @@ function receivedFile() {
 
     let string = fr.result
     console.log("--> Loaded file")
+    processCSV(string)
 
+
+}
+export function processCSV(string) {
     d3.select("#loader").style("display", "flex")
 
 
@@ -254,10 +286,10 @@ function receivedFile() {
         userDataLoaded = true
         rebuildChart()
     })
-
 }
-function buildBrowseFile(div, label, id) {
-    var width = "80px"
+function buildBrowseFile(div, label, widthpx, color, textColor, id) {
+
+    var width = widthpx + "px"
     let holder = div.append("div")
         .style("position", "relative")
         //.attr("font-family", fontFamily)
@@ -291,8 +323,8 @@ function buildBrowseFile(div, label, id) {
 
         .on("change", function (evt) {
             document.getElementById(id).click()
-            d3.select("#chart_user").selectAll("*").remove() // Clear last chart, if any
 
+            d3.select("#welcome").remove()
             let file = evt.target.files[0]
 
             fr = new FileReader()
@@ -307,15 +339,14 @@ function buildBrowseFile(div, label, id) {
 
     let fakefile = holder.append("div")
         .style("position", "absolute")
+        .style("width", width)
         .style("top", "0px")
         .style("left", "0px")
         .style("z-index", 1)
 
     let btn = fakefile.append("button")
         .style("font-size", "18px")
-        //.attr("font-family", fontFamily)
-        .attr("color", "#ececf1ff")
-        //.style ("height", "30px")
+        .style("width", width)
         .attr("id", id)
         .text(label)
 
@@ -400,11 +431,11 @@ export function rebuildChart() {
         //filtered_waypoint_ids = distances.slice(0, maxWaypoints).map(e => e[0]) 
 
         // Filter by min Cosine
-        filtered_waypoint_ids = 
+        filtered_waypoint_ids =
             distances
-            .filter(e => e[1] > minimumMatch)
-            .slice(0, maxWaypoints)
-            .map(e => e[0])
+                .filter(e => e[1] > minimumMatch)
+                .slice(0, maxWaypoints)
+                .map(e => e[0])
     }
     console.log("filtered: ")
     console.log(filtered_waypoint_ids)
@@ -478,8 +509,7 @@ export function rebuildChart() {
 }
 export function updateAllCharts(reset = false) {
 
-    if (reset == true)
-    {
+    if (reset == true) {
         d3.select("#chartsvg").call(zoom.transform, d3.zoomIdentity)
     }
     buildTimeslider()
@@ -521,8 +551,6 @@ function buildPage() {
     //getData(db)
     setup()
 
-
-
 }
 
 function buildModel(vectors) {
@@ -544,7 +572,23 @@ function buildModel(vectors) {
 
 
 }
+export function buildAuthContainer() {
 
+    var div = d3.select("#main-container")
+        .append("div")
+        .attr("id", "firebase-auth-container")
+        .style("position", "absolute")
+        .style("left", 0)
+        .style("top", 0)
+        .style("bottom", 0)
+        .style("right", 0)
+        .style("margin", "auto auto auto auto")
+        .style("width", "400px")
+        .style("height", "400px")
+        .style("opacity", 0.9)
+    return div
+
+}
 
 function setup() {
     d3.select("#main-container").style("display", "flex")
@@ -559,19 +603,6 @@ function setup() {
 
     d3.selectAll(".sidebar").style("width", sidebarWidth + "px")
         .style("background", "grey")
-
-
-    d3.select("#firebase-auth-container").style("position", "absolute")
-
-        .style("left", 0)
-        .style("top", 0)
-        .style("bottom", 0)
-        .style("right", 0)
-        .style("margin", "auto auto auto auto")
-        .style("width", "400px")
-        .style("height", "400px")
-        .style("opacity", 0.9)
-
 
     // Auth data
     d3.select("#auth-container")
@@ -612,10 +643,73 @@ function setup() {
         .style("justify-content", "center")
 
 
-    buildBrowseFile(browse_btn, "UPLOAD", "t1")
+    buildBrowseFile(browse_btn, "UPLOAD", 80, "grey", "black", "t1")
     buildRightSidebar()
     buildBottomBar()
     buildTopBar()
+    
+
+}
+function buildWelcome() {
+    firstLoad = false
+    var welcome = d3.select("#welcome")
+        .style("width", "400px")
+        .style("height", "200px")
+        .style("position", "fixed")
+        .style("top", "50%")
+        .style("left", "50%")
+        .style("background", "black")
+        .style("margin-top", "-100px")
+        .style("margin-left", "-200px")
+        .style("opacity", 0)
+        .style("border-radius", "10px")
+
+    welcome.transition()
+        .style("opacity", 0.9)
+        .duration(1000)
+        .delay(1000)
+
+    var div1 = welcome.append("div").style("margin", "10px")
+        .style("display", "flex")
+        .style("flex-direction", "column")
+    div1.append("text").text("Welcome!").style("color", "white").style("font-size", "40px")
+
+    var div = div1.append("div").style("align-items", "center").style("display", "flex")
+        .style("flex-direction", "column").style("margin-top", "10px")
+
+
+    function addBtn(string) {
+        var btn = div.append("text").text(string)
+            .style("color", "black")
+            .style("font-size", "20px")
+            .style("border", "1px solid white")
+            .style("background", "#FCFCFC")
+            .style("border-radius", "5px")
+            .style("text-align", "center")
+            .style("width", "220px")
+            .style("margin", "10px")
+            .style("cursor", "pointer")
+            .on("mouseover", function () {
+                d3.select(this).style("background", "grey").style("color", "black")
+            })
+            .on('mouseout', function () {
+                d3.select(this).style("background", "#FCFCFC").style("color", "black")
+            })
+
+        return btn
+    }
+    buildBrowseFile(div, "Upload Muse File", 220, "black", "white", "t3")
+    div.append("text").text("OR").style("font-size", "20px").style("opacity", 0.8).style("color", "white").style("font-align", "center").style("margin-top", "10px")
+    addBtn("Use Random Example")
+        .on("click", function () {
+            d3.select("#welcome").remove()
+            downloadCSV("Self-Inquiry - BEST.csv")
+        })
+
+
+    div1.append("text").text("Logged in as: ").attr("id", "welcome-auth").style("display", "none").style("color", "white").style("opacity", 0.6)
+
+
 
 }
 function buildRightSidebar() {
@@ -675,7 +769,7 @@ function buildBottomBar() {
         .style("left", sidebarWidth + "px")
         .style("right", sidebarWidth + "px")
         .style("justify-content", "center")
-        //.style("background", "grey")
+    //.style("background", "grey")
 
     var width = window.innerWidth - sidebarWidth - sidebarWidth
 
@@ -751,13 +845,13 @@ export default function Live() {
                 </div>
                 <div id="browse-div"></div>
             </div>
-            <div id="firebase-auth-container"></div>
             <svg id="chartsvg"></svg>
             <div id="popup"></div>
             <div id="menu"></div>
             <div id="sidebar-right" className="sidebar"></div>
             <div id="bottom-bar"></div>
             <div id="top-bar"></div>
+            <div id="welcome"></div>
         </main>
     );
 }

@@ -99,7 +99,7 @@ export function updateSimilarityChart(svgid, settings = defaultSettings) {
 
 
     var minY = globalYmin - state.zoom
-   
+
 
     var miniY = d3.scaleLinear()
         .domain([minY, 100])
@@ -132,26 +132,43 @@ export function updateSimilarityChart(svgid, settings = defaultSettings) {
         })
         .on("mouseover", function (event, d) {
             var thisLine = d3.select(this)
-            
-            svg.selectAll(".legend").style("fill", "black").style("opacity", 0.1)
-            svg.select("." + d.waypoint.id).style("fill", "red").style("opacity", 1).raise()
-            svg.selectAll(".line").style("opacity", 0.1)
+
+            svg.selectAll(".legend")
+                .transition()
+                .style("fill", "black").style("opacity", 0.1)
+                .duration(80)
+            var text = svg.select("." + d.waypoint.id)
+            text
+                .transition()
+                .style("fill", "red").style("opacity", 1)
+                .duration(100)
+            text.raise()
+            svg.selectAll(".line")
+                .transition()
+                .style("opacity", 0.1)
+                .duration(100)
             thisLine
+                .transition()
                 .attr("stroke", "red")
                 .style("opacity", 1)
-                .raise()
-            var menu = addMenu(event, "menu")
-            menu.append("text").text(d.waypoint.user + " - " + d.waypoint.label)
+                .duration(100)
+            thisLine.raise()
+            
         })
         .on("mouseout", function () {
             d3.select(this).attr("stroke", settings.lineColor)
-            svg.selectAll(".legend").style("fill", "black").style("opacity", 1)
+            svg.selectAll(".legend")
+                .transition()
+                .style("fill", "black").style("opacity", 1)
+                .duration(100)
             svg.selectAll(".line")
+                .transition()
                 .style("opacity", 1)
                 .attr("stroke", function (d) {
                     return settings.lineColor
                 })
-            menuRemove()
+                .duration(100)
+            
         })
         .style("opacity", function (d) {
             if (settings.highlightID != null) {
@@ -178,8 +195,8 @@ export function updateSimilarityChart(svgid, settings = defaultSettings) {
         })
 
     var axis = d3.axisLeft()
-    .tickFormat(function(d){return d + "%"})
-    .scale(miniY)
+        .tickFormat(function (d) { return d + "%" })
+        .scale(miniY)
 
     svg.append("g").call(axis)
     svg.selectAll(".domain").remove()
