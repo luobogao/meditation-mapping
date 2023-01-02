@@ -1,4 +1,4 @@
-import { state, updateAllCharts } from "../pages/live";
+import { state, updateAllCharts, rebuildChart, users } from "../pages/live";
 
 const d3 = require("d3");
 export function popUp(event, html) {
@@ -56,15 +56,16 @@ export function addMenu(event, type) {
     var y = event.pageY
     var menu = d3.select("#menu")
 
-    if (y > (window.innerHeight - 400)) y = y - 400
+
     menu.selectAll("*").remove()
     popUpremove()
     var div = menu
         .style("display", "flex")
         .attr("type", type)
+        .attr("id", "menu")
         //.style("width", "200px")
         //.style("height", "100px")
-        .style("left", (x + 10) + "px")
+        .style("left", (x + 20) + "px")
         .style("top", (y + 10) + "px")
         .append("div").style("margin", "10px")
         .style("display", "flex")
@@ -72,6 +73,19 @@ export function addMenu(event, type) {
         .style('max-width', "300px")
         .style('max-height', "800px")
         .style("overflow", "scroll")
+
+    setTimeout(function () {
+        var bounds = div.node().getBoundingClientRect()
+        var minY = bounds.y + bounds.height
+        
+        if (minY > (window.innerHeight - 30))
+        {
+            console.log("overflow!")
+            d3.select("#menu").style("top", (window.innerHeight - bounds.height - 30) + "px")
+        }
+        
+    }, 10)
+
 
     return div
 }
@@ -88,6 +102,38 @@ export function menuRemove() {
         .style("display", "none")
         .duration(100)
         .selectAll("*").remove()
+}
+export function buildUserSelectors() {
+    // Build the checkboxes for the users
+    var userDiv = d3.select('#user-selectors')
+    userDiv.selectAll("*").remove()
+    users.forEach(name => {
+
+        var checked = false
+        if (state.selected_users.includes(name)) checked = true
+
+        var checkbox = addCheckbox(userDiv, name, checked, "20px")
+        checkbox.on("click", function () {
+            const newState = this.checked
+
+            // Add or remove a name from the "Selected Users" list
+            // This action should prompt a rebuild of the model and a redrawing of the graph
+            if (newState == true) {
+                state.selected_users.push(name)
+            }
+            else {
+                var i = state.selected_users.indexOf(name)
+                if (i != -1) {
+                    state.selected_users.splice(i, 1)
+                }
+
+            }
+
+            rebuildChart()
+
+        })
+
+    })
 }
 
 export function buildChartSelectors(div) {

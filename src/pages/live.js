@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import * as firebaseui from "firebaseui"
 import { buildTimeslider } from "../utils/timeslider";
 import "firebaseui/dist/firebaseui.css"
-import { addCheckbox, buildChartSelectors, buildResolutionSelectors } from "../utils/ui";
+import { addCheckbox, buildChartSelectors, buildResolutionSelectors, buildUserSelectors } from "../utils/ui";
 import { unique } from "../utils/functions";
 import { buildSimilarityChart, updateSimilarityChart } from "../utils/minicharts";
 import { auth, login, updateUsername, getAllWaypoints, downloadCSV } from "../utils/database"
@@ -32,7 +32,7 @@ export const chartHeight = window.innerHeight
 export var mode3d = true
 const backgroundColor = "#d9d9d9"
 export var waypoints
-var users;
+export var users;
 export var user;  // Firebase user
 export var anonymous = true
 var firstLoad = true
@@ -144,6 +144,12 @@ onAuthStateChanged(auth, (fbuser) => {
 
 function downloadWaypoints() {
 
+    var showWelcome = false
+    if (firstLoad == true && anonymous)
+    {
+        showWelcome = true
+    }
+    firstLoad = false
     // Reset waypoints
     waypoints = []
     users = []
@@ -202,38 +208,10 @@ function downloadWaypoints() {
 
         buildSimilarityChart()
         updateChartWaypoints()
-
-        // Build the checkboxes for the users
-        var userDiv = d3.select('#user-selectors')
-        userDiv.selectAll("*").remove()
-        users.forEach(name => {
-
-            var checked = false
-            if (state.selected_users.includes(name)) checked = true
-
-            var checkbox = addCheckbox(userDiv, name, checked, "30px")
-            checkbox.on("click", function () {
-                const newState = this.checked
-
-                // Add or remove a name from the "Selected Users" list
-                // This action should prompt a rebuild of the model and a redrawing of the graph
-                if (newState == true) {
-                    state.selected_users.push(name)
-                }
-                else {
-                    var i = state.selected_users.indexOf(name)
-                    if (i != -1) {
-                        state.selected_users.splice(i, 1)
-                    }
-
-                }
-
-                rebuildChart()
-
-            })
-
-        })
-        if (firstLoad )
+        buildUserSelectors()
+        
+        // Show the welcom screen only after data is loaded
+        if (showWelcome )
         {
             buildWelcome()
             

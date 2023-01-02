@@ -71,6 +71,7 @@ export function updateUsername() {
             d3.select("#user").text("Logged in: " + newUsername)
             dialog.selectAll('*').remove()
             dialog.style("display", "none")
+            registerUser()
         })
             .catch((error) => {
                 console.error("Error updating!")
@@ -91,13 +92,20 @@ export function downloadCSV(path) {
         })
     })
 }
+function registerUser()
+{
+    var user = auth.currentUser
+    addDoc(collection(db, "users"), {id: user.uid, userName: user.displayName, userID: user.uid})
+}
 export function addWaypoint(waypoint) {
 
     if (!anonymous) {
         var date = new Date()
         var millis = date.getTime()
+        var userid = auth.currentUser.uid
+        console.log("User: " + userid)
         if (waypoint.notes == undefined) waypoint.notes = null
-        var entry = { user: waypoint.user, label: waypoint.label, vector: waypoint.vector, notes: waypoint.notes, delete: false, addedTime: millis }
+        var entry = { user: waypoint.user, addedBy: userid, label: waypoint.label, vector: waypoint.vector, notes: waypoint.notes, delete: false, addedTime: millis }
 
         var promise = addDoc(collection(db, "waypoints"), entry)
         return promise
