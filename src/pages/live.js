@@ -4,8 +4,8 @@ import { buildTimeslider } from "../utils/timeslider";
 import "firebaseui/dist/firebaseui.css"
 import { addCheckbox, buildChartSelectors, buildResolutionSelectors, buildUserSelectors } from "../utils/ui";
 import { unique } from "../utils/functions";
-import { buildSimilarityChart, updateSimilarityChart } from "../utils/minicharts";
-import { auth, login, updateUsername, getAllWaypoints, downloadCSV } from "../utils/database"
+import { updateTimeseries, buildSimilarityChart, updateSimilarityChart } from "../utils/minicharts";
+import { auth, login, updateUsername, listenEEG, getAllWaypoints, downloadCSV } from "../utils/database"
 import { onAuthStateChanged, signInAnonymously } from "firebase/auth"
 import { waypoints_muse, waypoints_mindlink } from "../utils/vectors";
 import { dot, getRelativeVector, pca, runModel, measureDistance, cosineSimilarity, euclideanDistance, combinedDistance } from "../utils/analysis";
@@ -37,6 +37,7 @@ export var user;  // Firebase user
 export var anonymous = true
 var firstLoad = true
 var fr;
+
 export const miniChartSize = 200
 const miniChartMargin = 10
 
@@ -63,8 +64,7 @@ export var state =
 var email = null
 onAuthStateChanged(auth, (fbuser) => {
 
-    if (fbuser && fbuser.email == null)
-    {
+    if (fbuser && fbuser.email == null) {
         anonymous = true
     }
     if (fbuser && fbuser.email != null) {
@@ -74,19 +74,20 @@ onAuthStateChanged(auth, (fbuser) => {
         console.log(user.displayName)
         d3.select("#user").text("Logged in as: " + user.email)
         d3.select("#signin").text("Sign Out")
+        listenEEG(user.uid)
 
         // No display name - prompt user to choose one
         if (user.displayName == null) {
             d3.select("#welcome").remove()
             console.log("No user name yet")
             var container = buildAuthContainer()
-            
+
             container.selectAll("*").remove()
             container.style("background", "grey").style("border-radius", "5px").style("height", "220px")
             var div = container.append("div").style("margin", "20px").style("display", "flex").style("flex-direction", "column")
             div.append("text").text("Please choose a Username:").style("color", "white").style("margin-bottom", "10px")
             div.append("input").attr("type", "text").attr("id", "username-input").on("change", function (d) {
-                
+
 
             })
             div.append("text").text("Should be just your first name, or any one-word username. This will be the name other users see if you submit a meditation 'waypoint'").style("color", "white").style("margin-top", "10px")
@@ -94,11 +95,11 @@ onAuthStateChanged(auth, (fbuser) => {
                 .on("click", function () {
                     d3.select("#firebase-auth-container").remove()
                     updateUsername()
-                    
+
                 })
         }
 
-        // Found disaply name, good to go
+        // Found display name, good to go
         else {
             state.userName = user.displayName
             d3.select("#user").text("Logged in: " + user.displayName)
@@ -136,17 +137,18 @@ onAuthStateChanged(auth, (fbuser) => {
                 text.style("display", "flex").text("Logged in Anonymously")
             }
             if (firstLoad) downloadWaypoints()
-            
+
         })
 
     }
 })
 
+
 function downloadWaypoints() {
 
+
     var showWelcome = false
-    if (firstLoad == true && anonymous)
-    {
+    if (firstLoad == true && anonymous) {
         showWelcome = true
     }
     firstLoad = false
@@ -154,8 +156,6 @@ function downloadWaypoints() {
     waypoints = []
     users = []
     getAllWaypoints().then((snapshot) => {
-        console.log("----> Got waypoints: ")
-        console.log(snapshot)
 
         snapshot.forEach((doc) => {
             var waypoint = doc.data()
@@ -209,12 +209,11 @@ function downloadWaypoints() {
         buildSimilarityChart()
         updateChartWaypoints()
         buildUserSelectors()
-        
+
         // Show the welcom screen only after data is loaded
-        if (showWelcome )
-        {
+        if (showWelcome) {
             buildWelcome()
-            
+
         }
 
 
@@ -403,20 +402,17 @@ export function rebuildChart() {
 
     var bestWaypointMatch = distances[0][0]
 
-    // Take top N waypoints by distance
+    // Take top N waypoints by distance and slice by max N
     var filtered_waypoint_ids = filtered_waypoints_user.map(e => e.id)
     if (state.limitMatches) {
 
-        // Filter by top N
-        //filtered_waypoint_ids = distances.slice(0, maxWaypoints).map(e => e[0]) 
-
-        // Filter by min Cosine
         filtered_waypoint_ids =
             distances
                 .filter(e => e[1] > minimumMatch)
                 .slice(0, maxWaypoints)
                 .map(e => e[0])
     }
+
 
     if (filtered_waypoint_ids.length == 0) {
         alert("zero waypoints selected!")
@@ -490,6 +486,7 @@ export function updateAllCharts(reset = false) {
     if (reset == true) {
         d3.select("#chartsvg").call(zoom.transform, d3.zoomIdentity)
     }
+    updateTimeseries("bottom-timeseries", state.highRes)
     buildTimeslider()
     var data = state.highRes
     switch (state.resolution) {
@@ -625,8 +622,25 @@ function setup() {
     buildRightSidebar()
     buildBottomBar()
     buildTopBar()
-    
 
+    buildRealtime()
+
+
+}
+function buildRealtime() {
+
+    var div = d3.select("#realtime-container")
+        .style("position", "absolute")
+        .style("left", "20px")
+        .style("bottom", "20px")
+        .style("width", "300px")
+        .style("height", "100px")
+        .style("opacity", 0.9)
+    d3.select("#realtime-div")
+        .text("Waiting...")
+
+    d3.select("#realtime-record")
+        .style("width", "150px")
 }
 function buildWelcome() {
     firstLoad = false
@@ -740,20 +754,27 @@ function buildRightSidebar() {
 function buildBottomBar() {
     var bar = d3.select("#bottom-bar")
     bar.style("position", "absolute")
-        .style("height", "50px")
+        //.style("height", "50px")
         .attr("class", "user-selectors")
         .style("display", "none")
         .style("bottom", 0 + "px")
         .style("left", sidebarWidth + "px")
         .style("right", sidebarWidth + "px")
         .style("justify-content", "center")
+        .style("flex-direction", "column")
     //.style("background", "grey")
 
     var width = window.innerWidth - sidebarWidth - sidebarWidth
 
+    // Bottom-bar Gamma
     bar.append("svg")
         .style("margin", "5px")
-        .attr("id", "timeslider").attr("width", width + "px").attr("heigth", "20px")
+        .attr("id", "bottom-timeseries").attr("width", width + "px").attr("height", "200px")
+
+    // Slider
+    bar.append("svg")
+        .style("margin", "5px")
+        .attr("id", "timeslider").attr("width", width + "px").attr("height", "20px")
 }
 
 function buildTopBar() {
@@ -816,6 +837,10 @@ export default function Live() {
                     <h3 style={{ textAlign: "right" }}>Project</h3>
                     <div className="subtitle">100% Free and Open-Source</div>
                     <div className="subtitle">Dedicated to All Sentient Beings</div>
+                    <div id="realtime-container">
+                        <div id="realtime-div"></div>
+                        <button id="realtime-record">Record</button>
+                    </div>
                     <div id="auth-container">
                         <div id="user"></div>
                         <button id="signin">Sign In</button>

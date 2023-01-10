@@ -27,9 +27,11 @@ export function buildTimeslider() {
         })
         .step(10)
         .width(width - (2 * margin))
-        .on("drag", val => {
+        .on("drag", second => {
 
-            d3.selectAll(".userpoints")
+            let userPoints = d3.selectAll(".userpoints")
+
+            userPoints
                 .style("opacity", function (d) {
 
                     var decay = 2
@@ -44,12 +46,33 @@ export function buildTimeslider() {
                             decay = 3.5;
                             break;
                     }
-                    var percent = val / totalSeconds
+                    var percent = second / totalSeconds
                     var diff = Math.abs(d.moment.percent - percent)
                     var inverse = 100 - Math.pow(diff * 100, 2)
                     if (inverse < 0) inverse = 0
                     return inverse / 100
                 })
+                .attr("r", function (d) {
+
+                    var decay = 2
+                    switch (state.resolution) {
+                        case 1:
+                            decay = 1.5;
+                            break;
+                        case 10:
+                            decay = 2.5;
+                            break;
+                        case 60:
+                            decay = 3.5;
+                            break;
+                    }
+                    var percent = second / totalSeconds
+                    var diff = Math.abs(d.moment.percent - percent)
+                    var inverse = 100 - Math.pow(diff * 100, 2)
+                    if (inverse < 0) inverse = 0
+                    return (inverse / 5) + "px"
+                })
+            
 
         })
 

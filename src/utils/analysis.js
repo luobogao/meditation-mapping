@@ -5,7 +5,7 @@ const d3 = require("d3");
 const math = require("mathjs");
 
 const channels = ["TP9", "TP10", "AF7", "AF8"]
-const bands = ["Delta", "Theta", "Alpha", //"Beta", "Gamma"
+const bands = ["Delta", "Theta", "Alpha", "Beta", "Gamma"
 ]
 const band_channels = []
 bands.forEach(band => {
@@ -52,7 +52,8 @@ export function combinedDistance(a, b)
 {
     var cos = cosineSimilarity(a, b)
     var euc = euclideanDistance(a, b)
-    var combined = Math.sqrt((Math.pow(cos, 2) + (1 * Math.pow(euc, 2)))) / Math.sqrt(2)
+    //var combined = Math.sqrt((Math.pow(cos, 2) + (1 * Math.pow(euc, 2)))) / Math.sqrt(2)
+    var combined = Math.sqrt(cos * euc)
     return combined
 
 }

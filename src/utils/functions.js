@@ -2,6 +2,25 @@ const d3 = require("d3");
 const moment = require("moment")
 
 debug = false
+export function interpolate(data, key, n) {
+    var interpolatedData = []
+    for (let i = (n / 2); i < (data.length - (n / 2)); i = i + (n / 2)) {
+
+
+        var arr = []
+
+        for (let b = i; b < i + (n / 2); b++) {
+
+            arr.push(data[b][key])
+
+        }
+        var avg = d3.mean(arr)
+        
+        interpolatedData.push({ x: data[i].seconds, y: avg })
+
+    }
+    return interpolatedData
+}
 export function centroid(matrix)
 {
     

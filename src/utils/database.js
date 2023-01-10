@@ -1,5 +1,6 @@
 import { getFirestore, collection, getDocs, setDoc, doc, deleteDoc, updateDoc, query, where, addDoc } from 'firebase/firestore/lite';
-import { getStorage, ref, getBlob } from "firebase/storage"
+import { getStorage, ref as storageRef, getBlob }  from "firebase/storage"
+import {getDatabase, ref as dbref, onValue} from "firebase/database"
 import { initializeApp } from "firebase/app";
 import { getAuth, onAuthStateChanged, updateProfile } from "firebase/auth"
 import * as firebaseui from "firebaseui"
@@ -19,7 +20,8 @@ const firebaseConfig = {
     storageBucket: process.env.REACT_APP_STORAGE_BUCKET,
     messagingSenderId: process.env.REACT_APP_MESSAGING_SENDER_ID,
     appId: process.env.REACT_APP_APP_ID,
-    measurementId: process.env.REACT_APP_MEASUREMENT_ID
+    measurementId: process.env.REACT_APP_MEASUREMENT_ID,
+    databaseURL: process.env.REACT_APP_DATABASE_ID
 };
 
 
@@ -28,6 +30,7 @@ const firebaseConfig = {
 // Initialize Firebase
 
 const app = initializeApp(firebaseConfig);
+const database = getDatabase(app)
 
 //const analytics = getAnalytics(app);
 console.log("app initialized")
@@ -37,6 +40,18 @@ export const storage = getStorage()
 export const db = getFirestore(app)
 
 export const auth = getAuth(app)
+
+export function listenEEG(uid)
+{
+    const eegref = dbref(database, "live-muse/" + uid)
+    console.log("Listening for data on user: " + uid)
+    onValue(eegref, (snapshot) =>
+    {
+        d3.select("#realtime-div").text("LIVE CONNECTION")
+        const data = snapshot.val()
+        //console.log(data)
+    })
+}
 
 export function login() {
     buildAuthContainer()
@@ -83,7 +98,7 @@ export function updateUsername() {
 
 }
 export function downloadCSV(path) {
-    var pathReference = ref(storage, "Self-Inquiry - BEST.csv")
+    var pathReference = storageRef(storage, "Self-Inquiry - BEST.csv")
     getBlob(pathReference).then((blob) => {
         blob.text().then((string) => {
             console.log("---> Downloaded CSV")

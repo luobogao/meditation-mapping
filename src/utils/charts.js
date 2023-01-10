@@ -161,6 +161,7 @@ export function updateChartWaypoints() {
     waypointLinks = []
     d3.select("#chart").selectAll("*").remove() // Clear everything
 
+
     clearInterval(rotateOpening)
 
 
@@ -274,18 +275,7 @@ export function updateChartWaypoints() {
     buildLinks(svg, waypointCircles)
     addWaypoints(svg, waypointCircles)
 
-    if (rotateStart == true) {
-
-        rotate(Math.random(), 0, Math.random())
-        rotateOpening = setInterval(function () {
-            rotate(0.001, 0, 0.001)
-        }, 10)
-        // Automatically stop after 20 seconds, it seems this rotation causes a memory problem
-        setTimeout(function () { clearInterval(rotateOpening) }, (1000 * 20))
-
-    }
-
-
+    
 
 }
 function addWaypoints(svg, data) {
@@ -510,11 +500,9 @@ function addWaypoints(svg, data) {
     }
     else
     {
-        if (bestWaypointMatch != null)
-        {
-            recenter(data.filter(d => d.fullentry.id == bestWaypointMatch)[0], 0)
-        }
         
+        //    recenter(data.filter(d => d.fullentry.id == bestWaypointMatch)[0], 0)
+                
     }
 
 }
@@ -748,6 +736,7 @@ export function updateChartUser(data) {
             userOpacity = 0.3;
             break;
     }
+    if (data.length > 30 && userSize  == 40)  userSize = 20
 
 
     var mapped = runModel(vectors)

@@ -2,6 +2,7 @@ import { miniChartSize, waypoints, state } from "../pages/live"
 import { parsePx } from "./functions";
 import { addMenu, menuRemove } from "./ui";
 import { zoom } from "./charts";
+import { interpolate } from "./functions";
 const d3 = require("d3");
 var similarityLine, miniX, miniY, similaritySVG
 
@@ -60,32 +61,18 @@ export function updateSimilarityChart(svgid, settings = defaultSettings) {
     }
     if (key == "gamma") window.alert("Not ready yet...")
 
-    var globalYmax = 0, globalYmin = 100
-    function interpolate(data, n) {
-        var interpolatedData = []
-        for (let i = (n / 2); i < (data.length - (n / 2)); i = i + (n / 2)) {
+    var globalYmax = 0, globalYmin = 90
 
-
-            var arr = []
-
-            for (let b = i; b < i + (n / 2); b++) {
-
-                arr.push(data[b][key])
-
-            }
-            var avg = d3.mean(arr)
-            if (globalYmax < avg) globalYmax = avg
-            if (globalYmin > avg) globalYmin = avg
-            interpolatedData.push({ x: data[i].seconds, y: avg })
-
-        }
-        return interpolatedData
-    }
     var data = []
 
     waypoints.forEach(waypoint => {
         if (waypoint.match) {
-            var series = interpolate(waypoint.similarityTimeseries, 20)
+            var series = interpolate(waypoint.similarityTimeseries, key, 20)
+            var yValues = series.map(e => e.y)
+            var min = d3.min(yValues)
+            var max = d3.max(yValues)
+            if (min < globalYmin) globalYmin = min
+            if (max > globalYmax) globalYmax = max
             var entry = { points: series, waypoint: waypoint }
             data.push(entry)
         }
@@ -157,7 +144,7 @@ export function updateSimilarityChart(svgid, settings = defaultSettings) {
                 .style("opacity", 1)
                 .duration(100)
             thisLine.raise()
-            
+
         })
         .on("mouseout", function () {
             d3.select(this).attr("stroke", settings.lineColor)
@@ -172,7 +159,7 @@ export function updateSimilarityChart(svgid, settings = defaultSettings) {
                     return settings.lineColor
                 })
                 .duration(100)
-            
+
         })
         .style("opacity", function (d) {
             if (settings.highlightID != null) {
@@ -206,5 +193,56 @@ export function updateSimilarityChart(svgid, settings = defaultSettings) {
     svg.selectAll(".domain").remove()
     svg.selectAll(".tick").selectAll("text").style("font-size", "20px").style("opacity", 0.5)
     svg.selectAll(".tick").selectAll("line").remove()
+
+}
+export function updateTimeseries(svgid, data) {
+    var svg = d3.select('#' + svgid)
+    svg.selectAll('*').remove()
+    var width = parsePx(svg.attr("width")) - 20
+    var height = parsePx(svg.attr("height")) - 10
+
+
+    var xSeries = data.map(e => e.seconds)
+    
+    data.forEach(row =>
+        {
+            row.x = row.seconds
+            row.y = Math.pow(10, row["Gamma_TP10"])
+        })
+    var min_x = xSeries[0]
+    var max_x = xSeries.slice(-1)[0]
+
+    var miniX = d3.scaleLinear()
+        .domain([min_x, max_x])
+        .range([0, width])
+
+
+    console.log("data:")
+    console.log(data)
+    var minY = 1
+
+
+    var miniY = d3.scaleLog()
+        .domain([minY, 1000])
+        .range([height, 0])
+
+
+    var line = d3.line()
+        .x(function (d, i) {
+            return miniX(d.x)
+        })
+        .y(function (d, i) {
+            return miniY(d.y)
+        })
+        .curve(d3.curveMonotoneX) // apply smoothing to the line
+
+
+    svg.append("path")
+        .attr("fill", "none")
+        .attr("stroke-width", 3)
+        .attr("stroke", "black")
+        .attr("d", line(data))
+
+
 
 }
