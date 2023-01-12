@@ -92,13 +92,12 @@ function processDataMuse(rows) {
 
     if (rows.length > 100000) {
         alert("File is too large!")
-        return;
+        return
     }
     // This object will hold all the resulting data, then be stringified and passed back to app
     var returnObj = {}
 
-    console.log("first row: ")
-    console.log(rows[0])
+    
     // Remove rows with blank data
     rows = rows.filter(row => row.Delta_TP9 || row.Theta_AF8 || row.Beta_AF7 || row.Gamma_TP10) // remove blank rows
 
@@ -252,9 +251,13 @@ function averageRows(rows, roundN) {
     var firstSeconds = rows[0].seconds
     var lastSeconds = rows.slice(-1)[0].seconds
     var totalSeconds = lastSeconds - firstSeconds
+    var secondsPerN = totalSeconds / roundN
     roundN = Math.round(roundN)
-    if (roundN <= 2) {
 
+    // Less than ten second rounding or less than ten points - just return raw array, with the basics added
+    if (roundN < 10 || secondsPerN < 10) {
+
+        
         rows.forEach(row => 
             {
                 row.vector = getRootVector(row)

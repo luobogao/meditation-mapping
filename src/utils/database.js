@@ -1,13 +1,13 @@
 import { getFirestore, collection, getDocs, setDoc, doc, deleteDoc, updateDoc, query, where, addDoc } from 'firebase/firestore/lite';
-import { getStorage, ref as storageRef, getBlob }  from "firebase/storage"
-import {getDatabase, ref as dbref, onValue} from "firebase/database"
+import { getStorage, ref as storageRef, getBlob } from "firebase/storage"
+import { getDatabase, ref as dbref, onValue } from "firebase/database"
 import { initializeApp } from "firebase/app";
 import { getAuth, onAuthStateChanged, updateProfile } from "firebase/auth"
 import * as firebaseui from "firebaseui"
 import "firebaseui/dist/firebaseui.css"
 import firebase from "firebase/compat/app"
 
-import {processCSV, buildAuthContainer, anonymous } from '../pages/live';
+import { processCSV, buildAuthContainer, anonymous } from '../pages/live';
 
 const d3 = require("d3");
 
@@ -41,15 +41,13 @@ export const db = getFirestore(app)
 
 export const auth = getAuth(app)
 
-export function listenEEG(uid)
-{
+export function listenEEG(uid) {
     const eegref = dbref(database, "live-muse/" + uid)
     console.log("Listening for data on user: " + uid)
-    onValue(eegref, (snapshot) =>
-    {
+    onValue(eegref, (snapshot) => {
         d3.select("#realtime-div").text("LIVE CONNECTION")
         const data = snapshot.val()
-        //console.log(data)
+        
     })
 }
 
@@ -107,20 +105,23 @@ export function downloadCSV(path) {
         })
     })
 }
-function registerUser()
-{
+function registerUser() {
     var user = auth.currentUser
-    addDoc(collection(db, "users"), {id: user.uid, userName: user.displayName, userID: user.uid})
+    addDoc(collection(db, "users"), { id: user.uid, userName: user.displayName, userID: user.uid })
 }
+
 export function addWaypoint(waypoint) {
 
     if (!anonymous) {
         var date = new Date()
         var millis = date.getTime()
         var userid = auth.currentUser.uid
-        console.log("User: " + userid)
+
         if (waypoint.notes == undefined) waypoint.notes = null
-        var entry = { user: waypoint.user, addedBy: userid, label: waypoint.label, vector: waypoint.vector, notes: waypoint.notes, delete: false, addedTime: millis }
+        var entry = {
+            user: waypoint.user, addedBy: userid, label: waypoint.label, vector: waypoint.vector,
+            notes: waypoint.notes, delete: false, addedTime: millis, resolution: waypoint.resolution
+        }
 
         var promise = addDoc(collection(db, "waypoints"), entry)
         return promise
@@ -143,20 +144,13 @@ export function getAllWaypoints() {
     var promise = getDocs(q)
     return promise
 }
-export function updateWaypointNotes(waypoint, notes) {
-    if (!anonymous) {
-        var promise = updateDoc(doc(db, "waypoints", waypoint.id), { notes: notes })
-        return promise
-    }
-
-}
 
 export function updateWaypoint(waypoint) {
     if (!anonymous) {
         var date = new Date()
-        var millis = date.getMilliseconds()
+        var millis = date.getTime()
         waypoint.updatedTime = millis
-        var promise = updateDoc(doc(db, "waypoints", waypoint.id), waypoint)
+        var promise = updateDoc(doc(db, "waypoints", waypoint.id), {notes: waypoint.notes, label: waypoint.label, updateTime: millis, updatedBy: auth.currentUser.uid})
         return promise
     }
 

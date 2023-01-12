@@ -31,6 +31,7 @@ var principals = []
 var modelType = "cosine" // How to measure variances
 var standardizeType = "ratio" // Method to standardize a vector
 var distanceType = "combined"
+var eucAdjust = 0.8           // How much to adjust the Euclidean measurement compared with cos. 0.8 seems good to even out the cos data, anything more is far too dramatic
 
 
 export function measureDistance(a, b)
@@ -52,8 +53,10 @@ export function combinedDistance(a, b)
 {
     var cos = cosineSimilarity(a, b)
     var euc = euclideanDistance(a, b)
-    //var combined = Math.sqrt((Math.pow(cos, 2) + (1 * Math.pow(euc, 2)))) / Math.sqrt(2)
-    var combined = Math.sqrt(cos * euc)
+    
+    var combined = Math.sqrt((Math.pow(cos, 2) + (Math.pow(eucAdjust * euc, 2)))) / Math.sqrt(2)
+    //var combined = Math.sqrt(cos * euc)
+    if (cos < 0) combined = -1 * combined
     return combined
 
 }
@@ -64,7 +67,7 @@ export function cosineSimilarity(a, b)
 {
     var similarity = dot(a, b) / (Math.sqrt(dot(a, a)) * Math.sqrt(dot(b, b)))
     similarity = Math.round(similarity * 10000) / 100
-    if (similarity < 0) similarity = 0
+    //if (similarity < 0) similarity = 0
     return similarity
 }
 

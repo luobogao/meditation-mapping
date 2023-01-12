@@ -24,6 +24,11 @@ bands.forEach(band => {
     })
 })
 
+// Critical variables
+const minimumMatch = 70 // minimum distance for waypoints to match
+const maxWaypoints = 5  // Take top N waypoints sorted by cosine distance to user's data
+
+
 const d3 = require("d3");
 const sidebarWidth = 300
 const chartMargin = 10
@@ -168,6 +173,7 @@ function downloadWaypoints() {
 
 
         })
+        
         if (waypoints.length == 0 || users.length == 0) {
             alert("Could not download data from server...")
             return
@@ -331,28 +337,33 @@ function buildBrowseFile(div, label, widthpx, color, textColor, id) {
 
 export function rebuildChart() {
     waypoints = waypoints.filter(waypoint => waypoint.remove != true)
-    console.log("total waypoints: " + waypoints.length)
+    
     state.zoom = 1
 
     // Remove waypoints from users de-selected by user
     waypoints.forEach(waypoint => {
         waypoint.match = state.selected_users.includes(waypoint.user)
     })
+    waypoints.forEach(waypoint => 
+        {
+            if (waypoint.hide == true) waypoint.match = false
+        })
+    
     var filtered_waypoints_user = waypoints.filter(e => e.match == true)
+    
 
     if (userDataLoaded == false) {
+        // Only plot the waypoints - user hasn't loaded data yet
+        
         let vectors = waypoints.filter(w => w.match == true).map(e => getRelativeVector(e.vector))
         buildModel(vectors)
         updateChartWaypoints()
         return
     }
 
-    // Critical variables
-    const minimumMatch = 80 // minimum distance for waypoints to match
-    const maxWaypoints = 5  // Take top N waypoints sorted by cosine distance to user's data
-
+    
     if (filtered_waypoints_user.length == 0) {
-        alert("No Wayopints?")
+        alert("No Waypoints?")
         return
     }
 
@@ -402,15 +413,20 @@ export function rebuildChart() {
 
     var bestWaypointMatch = distances[0][0]
 
-    // Take top N waypoints by distance and slice by max N
-    var filtered_waypoint_ids = filtered_waypoints_user.map(e => e.id)
+    // Select waypoint IDs to use
+    var filtered_waypoint_ids
     if (state.limitMatches) {
 
         filtered_waypoint_ids =
             distances
-                .filter(e => e[1] > minimumMatch)
+                //.filter(e => e[1] > minimumMatch)
                 .slice(0, maxWaypoints)
                 .map(e => e[0])
+    }
+    else
+    {
+        // Use ALL waypoints
+        filtered_waypoint_ids = filtered_waypoints_user.map(e => e.id)
     }
 
 
@@ -430,7 +446,10 @@ export function rebuildChart() {
     var filtered_waypoints = waypoints.filter(e => e.match == true)
 
     // Re-build the PCA using only the top-N waypoints
-    let vectors = waypoints.filter(w => w.match == true).map(e => getRelativeVector(e.vector))
+    //let vectors = waypoints.filter(w => w.match == true).map(e => getRelativeVector(e.vector))
+
+    // Rebuild PCA using the USER's data (seems to give much better results that top N vectors)
+    let vectors = state.highRes.map(e => getRelativeVector(e.vector))
     buildModel(vectors)
 
     function addWaypointDistances(rows) {
@@ -507,13 +526,13 @@ export function updateAllCharts(reset = false) {
         //updateSimilarityChart("miniEuclideanChart", { lineColor: "black", highlightID: null, key: "euclidean", lineSize: 10 })
     }
     else if (state.chartType == "euclidean") {
-        updateSimilarityChart("chart", { lineColor: "black", highlightID: null, key: "euclidean", lineSize: 10 })
+        updateSimilarityChart("chart", { lineColor: "black", highlightID: null, key: "euclidean", lineSize: 10, type: "absolute", points: 10 })
     }
     else if (state.chartType == "cosine") {
-        updateSimilarityChart("chart", { lineColor: "black", highlightID: null, key: "cosine", lineSize: 10 })
+        updateSimilarityChart("chart", { lineColor: "black", highlightID: null, key: "cosine", lineSize: 10, type: "absolute", points: 10 })
     }
     else if (state.chartType == "cosine*euclidean") {
-        updateSimilarityChart("chart", { lineColor: "black", highlightID: null, key: "cosine*euclidean", lineSize: 10 })
+        updateSimilarityChart("chart", { lineColor: "black", highlightID: null, key: "cosine*euclidean", lineSize: 10, type: "absolute", points: 10 })
     }
 
     d3.selectAll(".user-selectors").style("display", "flex") // Show the other options now that waypoints are loaded
@@ -630,6 +649,7 @@ function setup() {
 function buildRealtime() {
 
     var div = d3.select("#realtime-container")
+        .style("display", "none")
         .style("position", "absolute")
         .style("left", "20px")
         .style("bottom", "20px")
@@ -734,7 +754,7 @@ function buildRightSidebar() {
     })
 
     // Checkbox: Limit to N waypoints
-    var limitWaypoints_box = addCheckbox(otherSelectors, "Limit to 5 Waypoints", state.limitMatches, "20px")
+    var limitWaypoints_box = addCheckbox(otherSelectors, "Limit to " + maxWaypoints + " Waypoints", state.limitMatches, "20px")
     limitWaypoints_box.on("click", function () {
         const active = this.checked
         if (active == true) {
@@ -758,13 +778,13 @@ function buildBottomBar() {
         .attr("class", "user-selectors")
         .style("display", "none")
         .style("bottom", 0 + "px")
-        .style("left", sidebarWidth + "px")
-        .style("right", sidebarWidth + "px")
+        .style("left", (sidebarWidth + 100) + "px")
+        .style("right", (sidebarWidth + 100) + "px")
         .style("justify-content", "center")
         .style("flex-direction", "column")
     //.style("background", "grey")
 
-    var width = window.innerWidth - sidebarWidth - sidebarWidth
+    var width = window.innerWidth - sidebarWidth - sidebarWidth - 300
 
     // Bottom-bar Gamma
     bar.append("svg")
