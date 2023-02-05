@@ -51,6 +51,11 @@ export function updateSimilarityChart(svgid, settings = defaultSettings) {
         .attr("height", height + "px")
         .attr("transform", "translate(" + marginXleft + "," + marginY + ")")
 
+    d3.select("#chartsvg").on("click", function()
+    {
+        resetLineColors(svg, settings)
+    })
+
 
     var key = ""
     switch (settings.key) {
@@ -177,7 +182,7 @@ function updateAbsolute(svg, key, width, height, opacity, settings) {
                 .transition()
                 .style("fill", "black").style("opacity", 0.1)
                 .duration(80)
-            var text = svg.select("." + "uid" + d.waypoint.id)
+                var text = svg.select("." + "uid" + d.waypoint.id)
             text
                 .transition()
                 .style("fill", "red").style("opacity", 1)
@@ -186,6 +191,7 @@ function updateAbsolute(svg, key, width, height, opacity, settings) {
             svg.selectAll(".line")
                 .transition()
                 .style("opacity", 0.1)
+                .attr("stroke", "black")
                 .duration(100)
             thisLine
                 .transition()
@@ -196,18 +202,7 @@ function updateAbsolute(svg, key, width, height, opacity, settings) {
 
         })
         .on("mouseout", function () {
-            d3.select(this).attr("stroke", settings.lineColor)
-            svg.selectAll(".legend")
-                .transition()
-                .style("fill", "black").style("opacity", 1)
-                .duration(100)
-            svg.selectAll(".line")
-                .transition()
-                .style("opacity", 1)
-                .attr("stroke", function (d) {
-                    return settings.lineColor
-                })
-                .duration(100)
+            
 
         })
         .style("opacity", function (d) {
@@ -223,6 +218,11 @@ function updateAbsolute(svg, key, width, height, opacity, settings) {
         .attr("d", function (d) {
 
             return line(d.points)
+        })
+        .on("click", function(event, d)
+        {
+            d3.select(this).remove()
+            svg.select("." + "uid" + d.waypoint.id).remove()
         })
 
 
@@ -248,6 +248,18 @@ function updateAbsolute(svg, key, width, height, opacity, settings) {
 
     }
 
+}
+function resetLineColors(svg, settings) {
+
+    svg.selectAll(".legend")
+        .transition()
+        .style("fill", "black").style("opacity", 1)
+        .duration(100)
+    svg.selectAll(".line")
+        .transition()
+        .style("opacity", 1)
+        .attr("stroke", "black")
+        .duration(100)
 }
 
 export function updateTimeseries(svgid, data) {
@@ -302,6 +314,9 @@ export function updateTimeseries(svgid, data) {
 function updateRelative(svg, width, height) {
 
     var data = []
+
+
+
 
     var xSeries = data.map(e => e.seconds)
     var min_x = xSeries[0]

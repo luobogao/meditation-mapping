@@ -10,6 +10,7 @@ import About from "./pages/about"
 import Home from "./pages/home"
 import Layout from "./pages/layout"
 import Live from "./pages/live"
+import Record from "./pages/record"
 
 
 
@@ -21,6 +22,7 @@ root.render(<BrowserRouter>
       <Route index element={<Home />} />
       <Route path="about" element={<About />} />
       <Route path="live" element={<Live />} />
+      <Route path="record" element={<Record />} />
     </Route>
   </Routes>
 </BrowserRouter>)
