@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 const d3 = require("d3");
 
-var buttonHistory = {}
+var buttonClickCounts = {}
+var buttonTimeSeries = []
 var button_count = 0
 var axes_count = 0
 var last_btn = 0
@@ -55,58 +56,167 @@ var buttonMapOut =
         16: "NEUTRAL"
     }
 }
-var x = d3.scaleLinear()
-    .range([0, 400])
-    .domain([0, 20])
-    
+var buttonColors =
+{
+    "THINKING": "blue",
+    "HEARING": "red",
+    "FEELING": "orange",
+    "SEEING": "green",
+    "TASTE": "purple",
+    "SMELLING": "yellow",
+    "DON’T KNOW": "black",
+    "ONOMATOPOEIA": "pink",
+    "POSITIVE": "green",
+    "NEGATIVE": "red",
+    "JHANAS": "blue",
+    "ÑANAS": "darkblue",
+    "CONTRACTED": "red",
+    "EXPANDED": "pu.duration(500)rple",
+    "BEGINNING PHENOMENON": "green",
+    "END PHENOMENON": "red",
+    "NEUTRAL": "blue"
+}
 
-var y = d3.scaleLinear()
+var maxBarX = 10
+var barWidth = d3.scaleLinear()
+    .range([0, 400])
+    .domain([0, maxBarX])
+
+
+var barY = d3.scaleLinear()
     .range([0, 400])
     .domain([0, 20])
-    
+
+var date = new Date()
+var timestart = date.getTime() // Timeseries chart starts at time when user opens page
+var timeend = timestart + (1000 * 30)
+var circleX = d3.scaleLinear()
+    .domain([timestart, timeend])
+    .range([50, 900])
+
+
 
 function clickedGamepadButton(id) {
     var code = buttonMap[id]
     var name = buttonMapOut["INSIGHT"][code]
-    console.log(name)
-    if (buttonHistory[name] != null) {
-        buttonHistory[name] = buttonHistory[name] + 1
+    var color = buttonColors[name]
+
+
+    // Add +1 to the total count for this button name
+    if (buttonClickCounts[name] != null) {
+        buttonClickCounts[name] = buttonClickCounts[name] + 1
     }
     else {
-        buttonHistory[name] = 1
+        buttonClickCounts[name] = 1
     }
 
-    var btns = Object.entries(buttonHistory)
+    // Bar Chart
+    var btns = Object.entries(buttonClickCounts)
+    updateBarChart(btns)
+
+    // Time Series
+    var date = new Date()
+    var millis = date.getTime()
+    var newClick = { millis: millis, button: name, color: color }
+    buttonTimeSeries.push(newClick)
+    updateTimeSeries(buttonTimeSeries)
+
+
+}
+function updateTimeSeries(timeseries) {
+    var svg = d3.select("#timechartsvg")
+    var d = svg.selectAll(".circle")
+        .data(timeseries)
+
+    var lastTime = timeseries.slice(-1)[0].millis
+
+
+
+
+    d.enter().append("circle")
+        .attr("class", "circle")
+        .attr("cx", function (d, i) { return circleX(d.millis) })
+        .attr("cy", 170)
+        .attr("r", "10")
+        .attr("fill", function (d) { return d.color })
+
+    d.enter().append("text")
+        .attr("class", "text")
+        .text(function (d) { return d.button })
+        .attr("x", 0)
+        .attr("y", 0)
+        .attr("transform", function (d, i) {
+            return "translate(" + circleX(d.millis) + ", " + 200 + "), rotate(-45)"
+        })
+        .style("text-anchor", "end")
+
+    if (lastTime > (timeend - (1000 * 10))) {
+        console.log("Scaling timeseries chart")
+        timeend = timeend + (1000 * 30)
+        circleX = d3.scaleLinear()
+            .domain([timestart, timeend])
+            .range([50, 900])
+
+        svg.selectAll(".circle")
+            .transition()
+            .attr("cx", function (d, i) { return circleX(d.millis) })
+            .duration(500)
+
+        svg.selectAll(".text")
+            .transition()
+            .attr("transform", function (d, i) {
+                return "translate(" + circleX(d.millis) + ", " + 200 + "), rotate(-45)"
+            })
+            .duration(500)
+
+    }
+
+
+
+
+}
+function updateBarChart(btns) {
+
+    var newMaxX = d3.max(btns.map(e => e[1]))
 
     var d = d3.select("#barchartsvg").selectAll(".bar")
         .data(btns)
 
+    // Clicks are out of bounds - rescale chart
+    if (newMaxX > (maxBarX * 0.75)) {
+        maxBarX = maxBarX * 1.33
+        barWidth = d3.scaleLinear()
+            .range([0, 400])
+            .domain([0, maxBarX])
+
+    }
+
     var nums = d3.select("#barchartsvg").selectAll(".num")
         .data(btns)
 
-    d.attr("width", function (d, i) { return x(d[1]) })
+    d.attr("width", function (d, i) { return barWidth(d[1]) })
 
-    nums.attr("x", function (d, i) { return x(d[1]) + 210})
-    .text(function(d){return d[1]})
+    nums.attr("x", function (d, i) { return barWidth(d[1]) + 210 })
+        .text(function (d) { return d[1] })
 
     d.enter()
         .append("rect")
         .attr("class", "bar")
         .attr("height", "18px")
         .attr("x", 200)
-        .attr("width", function (d, i) { return x(d[1]) })
-        .attr("y", function (d, i) { return y(i) + 3 })
+        .attr("width", function (d, i) { return barWidth(d[1]) })
+        .attr("y", function (d, i) { return barY(i) + 3 })
 
     d.enter().append("text")
-    .attr("y", function (d, i) { return y(i) + 20})
-    .attr("x", 20)
-    .text(function(d){return d[0]})
+        .attr("y", function (d, i) { return barY(i) + 20 })
+        .attr("x", 20)
+        .text(function (d) { return d[0] })
 
     d.enter().append("text")
-    .attr("class", "num")
-    .attr("y", function (d, i) { return y(i) + 20})
-    .attr("x", function (d, i) { return x(d[1]) + 210 })
-    .text(function(d){return d[1]})
+        .attr("class", "num")
+        .attr("y", function (d, i) { return barY(i) + 20 })
+        .attr("x", function (d, i) { return barWidth(d[1]) + 210 })
+        .text(function (d) { return d[1] })
 
 }
 window.addEventListener("gamepadconnected", function (e) {
@@ -207,9 +317,25 @@ window.addEventListener("gamepadconnected", function (e) {
     }, 20)
 });
 function buildPage() {
-    d3.select("#barchart").append("svg").attr("id", "barchartsvg")
+    var container = d3.select("#charts")
+    container.style("margin", "20px")
+    container.append("svg")
         .attr("width", "1000px")
         .attr("height", "400px")
+        .append("g")
+        .attr("id", "barchartsvg")
+        .attr("width", 1000 - 10)
+        .attr("height", 400 - 10)
+        .attr("transform", "translate(10, 10)")
+
+    container.append("svg")
+        .attr("width", "1000px")
+        .attr("height", "400px")
+        .append("g")
+        .attr("id", "timechartsvg")
+        .attr("width", 1000 - 10)
+        .attr("height", 400 - 10)
+        .attr("transform", "translate(10, 10)")
 }
 
 export default function Record() {
@@ -224,7 +350,7 @@ export default function Record() {
             <h1>
                 Gamepad
             </h1>
-            <div id="barchart"></div>
+            <div id="charts"></div>
         </div>
     );
 };
