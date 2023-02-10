@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from "react";
 const d3 = require("d3");
 
+const fontFamily = "Roboto, sans-serif"
+var minTimeClick = 1000 // Minimum time between clicks
+const textSize = 22
+const barChartHeight = 300
+const timeChartHeight = 200
 var buttonClickCounts = {}
 var buttonTimeSeries = []
 var button_count = 0
@@ -54,6 +59,46 @@ var buttonMapOut =
         14: "BEGINNING PHENOMENON",
         15: "END PHENOMENON",
         16: "NEUTRAL"
+    },
+    "CONCENTRATION":
+    {
+        0: "SUKKHA",
+        1: "CONTENTMENT",
+        2: "PITI",
+        3: "EQUANIMITY",
+        4: "DISTRACTION",
+        5: "TORPOR",
+        6: "TRANSITION",
+        7: "ABSORPTION",
+        8: "POSITIVE",
+        9: "NEGATIVE",
+        10: "JHANAS",
+        11: "NIMITTAS",
+        12: "PERIPHERAL",
+        13: "SPREAD",
+        14: "CENTRALIZED",
+        15: "360 DEGREES",
+        16: "NEURAL"
+    },
+    "BODY":
+    {
+        0: "TORSO",
+        1: "HANDS AND ARMS",
+        2: "HEAD",
+        3: "BELLY",
+        4: "APNEA FULL",
+        5: "APNEA EMPTY",
+        6: "BREATH IN",
+        7: "BREATH OUT",
+        8: "WAIST",
+        9: "LEGS AND FOOT",
+        10: "HEATED",
+        11: "COLD",
+        12: "TENSE",
+        13: "HEAVY",
+        14: "RELAXED",
+        15: "LIGHT",
+        16: "COUNT"
     }
 }
 var buttonColors =
@@ -87,18 +132,35 @@ var barY = d3.scaleLinear()
     .range([0, 400])
     .domain([0, 20])
 
+
 var date = new Date()
 var timestart = date.getTime() // Timeseries chart starts at time when user opens page
-var timeend = timestart + (1000 * 30)
+var initialDuration = 30       // How many seconds to start out with
+var timeend = timestart + (1000 * initialDuration)
 var circleX = d3.scaleLinear()
     .domain([timestart, timeend])
     .range([50, 900])
 
+function pushNotice(message) {
+    var div = d3.select('#charts')
+        .append("div")
+        .attr("id", "notice")
+        .style("position", "absolute")
+        .style("top", "50%")
+        .style("left", "50%")
+        .style("margin", "-50px 0 0 -50px")
+        .text(message)
+        .style("font-size", textSize + "px")
 
+    div.transition()
+        .style('opacity', 0)
+        .duration(2000)
+}
 
 function clickedGamepadButton(id) {
     var code = buttonMap[id]
-    var name = buttonMapOut["INSIGHT"][code]
+    var mode = d3.select("#mode-select").property("value")
+    var name = buttonMapOut[mode][code]
     var color = buttonColors[name]
 
 
@@ -117,111 +179,151 @@ function clickedGamepadButton(id) {
     // Time Series
     var date = new Date()
     var millis = date.getTime()
+
+    
+
+    // Check if the user has come back to page after a long time - if yes, reset any existing data
+    if (buttonTimeSeries.length > 0) {
+        var lastMillis = buttonTimeSeries.slice(-1)[0].millis
+        var timeDiff = millis - lastMillis
+        if (timeDiff > (1000 * 60 * 30)) {
+            resetGamepadRecord()
+        }
+    
+    }
+    // Add a new timeseries entry
     var newClick = { millis: millis, button: name, color: color }
     buttonTimeSeries.push(newClick)
+
+    // Update chart
     updateTimeSeries(buttonTimeSeries)
 
 
 }
 function updateTimeSeries(timeseries) {
     var svg = d3.select("#timechartsvg")
-    var d = svg.selectAll(".circle")
-        .data(timeseries)
+    if (timeseries == null || timeseries.length == 0) {
+        svg.selectAll("*").remove()
+    }
+    else {
+        var d = svg.selectAll(".circle")
+            .data(timeseries)
 
-    var lastTime = timeseries.slice(-1)[0].millis
+        var lastTime = timeseries.slice(-1)[0].millis
 
 
 
 
-    d.enter().append("circle")
-        .attr("class", "circle")
-        .attr("cx", function (d, i) { return circleX(d.millis) })
-        .attr("cy", 170)
-        .attr("r", "10")
-        .attr("fill", function (d) { return d.color })
-
-    d.enter().append("text")
-        .attr("class", "text")
-        .text(function (d) { return d.button })
-        .attr("x", 0)
-        .attr("y", 0)
-        .attr("transform", function (d, i) {
-            return "translate(" + circleX(d.millis) + ", " + 200 + "), rotate(-45)"
-        })
-        .style("text-anchor", "end")
-
-    if (lastTime > (timeend - (1000 * 10))) {
-        console.log("Scaling timeseries chart")
-        timeend = timeend + (1000 * 30)
-        circleX = d3.scaleLinear()
-            .domain([timestart, timeend])
-            .range([50, 900])
-
-        svg.selectAll(".circle")
-            .transition()
+        d.enter().append("circle")
+            .attr("class", "circle")
             .attr("cx", function (d, i) { return circleX(d.millis) })
-            .duration(500)
+            .attr("cy", 30)
+            .attr("r", "10")
+            .attr("fill", function (d) { return d.color })
 
-        svg.selectAll(".text")
-            .transition()
+        d.enter().append("text")
+            .attr("class", "text")
+            .style("font-size", "14px")
+            .text(function (d) { return d.button })
+            .attr("x", 0)
+            .attr("y", 0)
             .attr("transform", function (d, i) {
-                return "translate(" + circleX(d.millis) + ", " + 200 + "), rotate(-45)"
+                return "translate(" + circleX(d.millis) + ", " + 50 + "), rotate(-45)"
             })
-            .duration(500)
+            .style("text-anchor", "end")
+
+        if (lastTime > (timeend - (1000 * 10))) {
+            console.log("Scaling timeseries chart")
+            timeend = lastTime + (1000 * 30)
+            circleX = d3.scaleLinear()
+                .domain([timestart, timeend])
+                .range([50, 900])
+
+            svg.selectAll(".circle")
+                .transition()
+                .attr("cx", function (d, i) { return circleX(d.millis) })
+                .duration(500)
+
+            svg.selectAll(".text")
+                .transition()
+                .attr("transform", function (d, i) {
+                    return "translate(" + circleX(d.millis) + ", " + 50 + "), rotate(-45)"
+                })
+                .duration(500)
+
+        }
+
+
+
 
     }
-
-
-
 
 }
+function saveGamepadCSV(history) {
+    var string = "data:text/csv;charset=utf-8,timestampGamepad,button\r\n"
+    history.forEach(entry => {
+        string = string + entry.millis + "," + entry.button + "\r\n"
+    })
+
+    var encodeduri = encodeURI(string)
+    window.open(encodeduri)
+}
+
+
 function updateBarChart(btns) {
+    var svg = d3.select("#barchartsvg")
+    if (btns == null) {
+        svg.selectAll("*").remove()
+    }
+    else {
+        var nums = svg.selectAll(".num")
+            .data(btns)
 
-    var newMaxX = d3.max(btns.map(e => e[1]))
+        var newMaxX = d3.max(btns.map(e => e[1]))
 
-    var d = d3.select("#barchartsvg").selectAll(".bar")
-        .data(btns)
+        var d = svg.selectAll(".bar")
+            .data(btns)
 
-    // Clicks are out of bounds - rescale chart
-    if (newMaxX > (maxBarX * 0.75)) {
-        maxBarX = maxBarX * 1.33
-        barWidth = d3.scaleLinear()
-            .range([0, 400])
-            .domain([0, maxBarX])
+        // Clicks are out of bounds - rescale chart
+        if (newMaxX > (maxBarX * 0.75)) {
+            maxBarX = maxBarX * 1.33
+            barWidth = d3.scaleLinear()
+                .range([0, 400])
+                .domain([0, maxBarX])
 
+        }
+
+
+        d.attr("width", function (d, i) { return barWidth(d[1]) })
+
+        nums.attr("x", function (d, i) { return barWidth(d[1]) + 210 })
+            .text(function (d) { return d[1] })
+
+        d.enter()
+            .append("rect")
+            .attr("class", "bar")
+            .attr("height", "18px")
+            .attr("x", 200)
+            .attr("width", function (d, i) { return barWidth(d[1]) })
+            .attr("y", function (d, i) { return barY(i) + 3 })
+
+        d.enter().append("text")
+            .attr("y", function (d, i) { return barY(i) + 20 })
+            .attr("x", 20)
+            .text(function (d) { return d[0] })
+
+        d.enter().append("text")
+            .attr("class", "num")
+            .attr("y", function (d, i) { return barY(i) + 20 })
+            .attr("x", function (d, i) { return barWidth(d[1]) + 210 })
+            .text(function (d) { return d[1] })
     }
 
-    var nums = d3.select("#barchartsvg").selectAll(".num")
-        .data(btns)
-
-    d.attr("width", function (d, i) { return barWidth(d[1]) })
-
-    nums.attr("x", function (d, i) { return barWidth(d[1]) + 210 })
-        .text(function (d) { return d[1] })
-
-    d.enter()
-        .append("rect")
-        .attr("class", "bar")
-        .attr("height", "18px")
-        .attr("x", 200)
-        .attr("width", function (d, i) { return barWidth(d[1]) })
-        .attr("y", function (d, i) { return barY(i) + 3 })
-
-    d.enter().append("text")
-        .attr("y", function (d, i) { return barY(i) + 20 })
-        .attr("x", 20)
-        .text(function (d) { return d[0] })
-
-    d.enter().append("text")
-        .attr("class", "num")
-        .attr("y", function (d, i) { return barY(i) + 20 })
-        .attr("x", function (d, i) { return barWidth(d[1]) + 210 })
-        .text(function (d) { return d[1] })
 
 }
 window.addEventListener("gamepadconnected", function (e) {
     var gp = navigator.getGamepads()[e.gamepad.index];
-
+    pushNotice("Found Gamepad!")
     button_count = gp.buttons.length
     axes_count = gp.axes.length
 
@@ -243,7 +345,7 @@ window.addEventListener("gamepadconnected", function (e) {
                 var date = new Date()
 
                 var millis = date.getTime()
-                if (last_btn != b || (millis - last_btn_time) > 200) {
+                if (last_btn != b || (millis - last_btn_time) > minTimeClick) {
                     last_btn_time = millis
                     last_btn = b
                     btn_history.push({ timestamp: millis, btn: b, value: button.value })
@@ -301,7 +403,7 @@ window.addEventListener("gamepadconnected", function (e) {
                     var id = pad + " " + a + " " + dir
 
                     var millis = date.getTime()
-                    if ((millis - last_axes_time) > 200) {
+                    if ((millis - last_axes_time) > minTimeClick) {
                         console.log("pad: " + pad + " " + a + " " + dir)
                         last_axes_time = millis
                         last_axes = id
@@ -316,26 +418,96 @@ window.addEventListener("gamepadconnected", function (e) {
 
     }, 20)
 });
+
+function buildModeSelector(div) {
+    let select = div.append("select")
+        .style("display", "flex")
+        .style("font-size", textSize + "px")
+        .attr("id", "mode-select")
+        .attr("font-family", fontFamily)
+        .style("border-radius", "5px")
+        .style("background", "#f0f0f0")
+        .style("padding", "0px")
+
+    var data = [
+        { label: "Insight", key: "INSIGHT" },
+        { label: "Concentration", key: "CONCENTRATION" },
+        { label: "Body", key: "BODY" }]
+
+
+    select.selectAll("opt")
+        .data(data)
+        .enter()
+        .append("option")
+        .text(function (d) { return d.label })
+        .attr("value", function (d) { return d.key })
+        .each(function (d, i) {
+
+        })
+
+    select.on("change", function (d) {
+        var opt = d3.select(this).property("value")
+
+
+
+    })
+
+}
+function resetGamepadRecord() {
+    buttonTimeSeries = []
+    buttonClickCounts = {}
+    var date = new Date()
+    timestart = date.getTime() - (1000 * 1)
+
+    var timeend = timestart + (1000 * 31)
+    circleX = d3.scaleLinear()
+        .domain([timestart, timeend])
+        .range([50, 900])
+
+    d3.select("#timechartsvg").selectAll("*").remove()
+    pushNotice("Resetting...")
+    updateBarChart(null)
+    updateTimeSeries(null)
+}
+
 function buildPage() {
     var container = d3.select("#charts")
     container.style("margin", "20px")
+    buildModeSelector(container)
     container.append("svg")
         .attr("width", "1000px")
-        .attr("height", "400px")
+        .attr("height", barChartHeight + "px")
         .append("g")
         .attr("id", "barchartsvg")
         .attr("width", 1000 - 10)
-        .attr("height", 400 - 10)
+        .attr("height", barChartHeight - 10)
         .attr("transform", "translate(10, 10)")
 
     container.append("svg")
         .attr("width", "1000px")
-        .attr("height", "400px")
+        .attr("height", timeChartHeight + "px")
         .append("g")
         .attr("id", "timechartsvg")
         .attr("width", 1000 - 10)
-        .attr("height", 400 - 10)
+        .attr("height", timeChartHeight - 10)
         .attr("transform", "translate(10, 10)")
+
+    var options = d3.select("#options").style("margin", "20px")
+
+    options.append("button")
+        .text("Save CSV")
+        .style("font-size", textSize + "px")
+        .on("click", function () {
+            saveGamepadCSV(buttonTimeSeries)
+        })
+
+    options.append("button")
+        .style("margin-left", "30px")
+        .text("Reset")
+        .style("font-size", textSize + "px")
+        .on("click", function () {
+            resetGamepadRecord()
+        })
 }
 
 export default function Record() {
@@ -351,6 +523,7 @@ export default function Record() {
                 Gamepad
             </h1>
             <div id="charts"></div>
+            <div id="options"></div>
         </div>
     );
 };
