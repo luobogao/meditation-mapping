@@ -79,6 +79,8 @@ onAuthStateChanged(auth, (fbuser) => {
         console.log(user.displayName)
         d3.select("#user").text("Logged in as: " + user.email)
         d3.select("#signin").text("Sign Out")
+        
+        // Automatically start listening for realtime db updates for this user (data from Muse probably)
         listenEEG(user.uid)
 
         // No display name - prompt user to choose one

@@ -1,11 +1,26 @@
 import React, { useState, useEffect } from "react";
+import { clone } from "../utils/functions";
+import { eegdata } from "../utils/database";
 const d3 = require("d3");
 
 const fontFamily = "Roboto, sans-serif"
+
+// EEG data from Realtime database
+var lastEEGdata = null // last data, as copied from 'database' page
+var eegDataRecord = [] // All data recorded
+var eegStatus = true  // Set to true when data from realtimedb seems to be live, set to false when last timestamp is old
+var eegLineIds = ["tp10_gamma", "tp9_gamma", "af7_gamma", "af8_gamma"]
+
+// Gamepad settings
+var foundGamepad = false
+var tagOffset = 6    // Move the tags back this many seconds (otherwise they don't appear immediately)
+
+
 var minTimeClick = 1000 // Minimum time between clicks
 const textSize = 22
-const barChartHeight = 300
-const timeChartHeight = 200
+const barChartHeight = 120
+const timeseriesHeight = 300
+const timeseriesWidth = 900
 var buttonClickCounts = {}
 var buttonTimeSeries = []
 var button_count = 0
@@ -15,6 +30,7 @@ var last_axes = 0
 var last_axes_time = 0
 var btn_history = []
 var last_btn_time = 0
+
 var buttonMap = {
     "0": 0,
     "1": 1,
@@ -122,7 +138,8 @@ var buttonColors =
     "NEUTRAL": "blue"
 }
 
-var maxBarX = 10
+var maxBarXdefault = 10
+var maxBarX = maxBarXdefault
 var barWidth = d3.scaleLinear()
     .range([0, 400])
     .domain([0, maxBarX])
@@ -137,9 +154,23 @@ var date = new Date()
 var timestart = date.getTime() // Timeseries chart starts at time when user opens page
 var initialDuration = 30       // How many seconds to start out with
 var timeend = timestart + (1000 * initialDuration)
+
 var circleX = d3.scaleLinear()
     .domain([timestart, timeend])
-    .range([50, 900])
+    .range([50, timeseriesWidth])
+
+// EEG data
+var eegY = d3.scaleLog()
+    .domain([0.01, 100])
+    .range([timeseriesHeight, 10])
+
+var eegLine = d3.line()
+    .x(function (d, i) { return circleX(d[0]); })
+    .y(function (d, i) { return eegY(d[1]); })
+    .defined(((d, i) => d[2]))
+    .curve(d3.curveMonotoneX) // apply smoothing to the line
+
+
 
 function pushNotice(message) {
     var div = d3.select('#charts')
@@ -163,6 +194,15 @@ function clickedGamepadButton(id) {
     var name = buttonMapOut[mode][code]
     var color = buttonColors[name]
 
+    if (foundGamepad == false) {
+        foundGamepad = true
+        name = "Start"
+        code = ""
+
+    }
+    else {
+
+    }
 
     // Add +1 to the total count for this button name
     if (buttonClickCounts[name] != null) {
@@ -180,19 +220,19 @@ function clickedGamepadButton(id) {
     var date = new Date()
     var millis = date.getTime()
 
-    
-
     // Check if the user has come back to page after a long time - if yes, reset any existing data
     if (buttonTimeSeries.length > 0) {
         var lastMillis = buttonTimeSeries.slice(-1)[0].millis
-        var timeDiff = millis - lastMillis
-        if (timeDiff > (1000 * 60 * 30)) {
+        var timeDiff_btn = millis - lastMillis
+        var timeDiff_start = millis - timestart
+        if (timeDiff_btn > (1000 * 60 * 30) || timeDiff_start > (1000 * 60 * 60 * 4)) {
             resetGamepadRecord()
         }
-    
+
     }
     // Add a new timeseries entry
-    var newClick = { millis: millis, button: name, color: color }
+    var adjustedTimestamp = millis - (1000 * tagOffset) // Subtract some seconds for two reasons: 1) Adjust for user reaction, 2) the SVG cuts of last few seconds
+    var newClick = { millis: adjustedTimestamp, button: name, color: color }
     buttonTimeSeries.push(newClick)
 
     // Update chart
@@ -208,11 +248,6 @@ function updateTimeSeries(timeseries) {
     else {
         var d = svg.selectAll(".circle")
             .data(timeseries)
-
-        var lastTime = timeseries.slice(-1)[0].millis
-
-
-
 
         d.enter().append("circle")
             .attr("class", "circle")
@@ -231,31 +266,6 @@ function updateTimeSeries(timeseries) {
                 return "translate(" + circleX(d.millis) + ", " + 50 + "), rotate(-45)"
             })
             .style("text-anchor", "end")
-
-        if (lastTime > (timeend - (1000 * 10))) {
-            console.log("Scaling timeseries chart")
-            timeend = lastTime + (1000 * 30)
-            circleX = d3.scaleLinear()
-                .domain([timestart, timeend])
-                .range([50, 900])
-
-            svg.selectAll(".circle")
-                .transition()
-                .attr("cx", function (d, i) { return circleX(d.millis) })
-                .duration(500)
-
-            svg.selectAll(".text")
-                .transition()
-                .attr("transform", function (d, i) {
-                    return "translate(" + circleX(d.millis) + ", " + 50 + "), rotate(-45)"
-                })
-                .duration(500)
-
-        }
-
-
-
-
     }
 
 }
@@ -268,12 +278,11 @@ function saveGamepadCSV(history) {
     var encodeduri = encodeURI(string)
     window.open(encodeduri)
 }
-
-
 function updateBarChart(btns) {
     var svg = d3.select("#barchartsvg")
     if (btns == null) {
         svg.selectAll("*").remove()
+        maxBarX = maxBarXdefault
     }
     else {
         var nums = svg.selectAll(".num")
@@ -321,104 +330,290 @@ function updateBarChart(btns) {
 
 
 }
+function rescaleTimeseries() {
+
+    // Move the graph every second
+    var svg = d3.select("#timechartsvg")
+
+    var date = new Date()
+    var millis = date.getTime()
+    var interval = 1000 // seconds between updates
+    timeend = millis - (1000 * 5)
+    timestart = timeend - (1000 * 30)
+    circleX = d3.scaleLinear()
+        .domain([timestart, timeend])
+        .range([50, timeseriesWidth])
+
+    svg.selectAll(".circle")
+        .transition()
+        .attr("cx", function (d, i) { return circleX(d.millis) })
+        .ease(d3.easeLinear)
+        .duration(interval)
+
+    svg.selectAll(".eeg")
+        .transition()
+        .attr("cx", function (d, i) { return circleX(d.timestamp) })
+        .ease(d3.easeLinear)
+        .duration(interval)
+
+
+    svg.selectAll(".text")
+        .transition()
+        .attr("transform", function (d, i) {
+            return "translate(" + circleX(d.millis) + ", " + 50 + "), rotate(-45)"
+        })
+        .ease(d3.easeLinear)
+        .duration(interval)
+
+    for (let id in eegLineIds) {
+        var key = eegLineIds[id]
+        var data = eegDataRecord.map(row => [row.timestamp, row[key], row.valid])
+        svg.select("#" + key)
+            .transition()
+            .attr("d", function (d) { return eegLine(data) })
+            .ease(d3.easeLinear)
+            .duration(interval)
+
+    }
+
+}
+
+// Monitor EEG data
+setInterval(function () { rescaleTimeseries() }, 100)
+
+// Record EEG
+setInterval(function () {
+
+    if (eegdata != null) {
+
+
+        if (lastEEGdata == null) {
+            lastEEGdata = clone(eegdata)
+            eegStatus = true
+
+        }
+        else {
+            lastEEGdata.valid = true
+
+            // Data hasn't changed
+            if (eegdata.timestamp == lastEEGdata.timestamp) {
+                if (eegStatus == true) {
+
+                    var date = new Date()
+                    var millis = date.getTime()
+                    var timeDiff = millis - eegdata.timestamp
+
+                    if (timeDiff > (1000 * 2.1)) {
+
+                        eegStatus = false // flag so that console isn't flooded with messages
+                        if (timeDiff > (1000 * 120)) {
+                            console.log("----> Data is old (" + Math.round(timeDiff / 1000 / 60) + " minutes)")
+
+                        }
+                        else if (timeDiff > (1000 * 60 * 60 * 24)) {
+                            console.log("----> Data is old (" + Math.round(timeDiff / 1000 / 60 / 60 / 24) + " days)")
+                        }
+
+
+                        else {
+                            console.log("----> MUSE LOST - Data is old (" + Math.round(timeDiff / 1000) + " seconds)")
+
+                        }
+
+                    }
+                }
+
+            }
+            // Everything is good - record new datapoint
+            else {
+                lastEEGdata = clone(eegdata)
+                eegStatus = true
+                lastEEGdata.valid = true
+
+            }
+
+        }
+
+
+        if (eegStatus == true) {
+            d3.select("#eegicon").style("opacity", 1)
+            d3.select("#eegicon_text").text("Found: Muse").style("opacity", 1)
+
+
+        }
+        else {
+            d3.select("#eegicon").style("opacity", 0.2)
+            d3.select("#eegicon_text").text("Waiting for Muse...").style("opacity", 0.5)
+        }
+        eegDataRecord.push(lastEEGdata)
+        updateEEGgraph(eegDataRecord)
+
+
+    }
+    else {
+        d3.select("#eegicon").style("opacity", 0.2)
+        d3.select("#eegicon_text").text("Waiting for Muse...").style("opacity", 0.5)
+    }
+
+
+}, 1000)
+
+function setupEEGgraph() {
+    var svg = d3.select("#timechartsvg")
+
+    svg.selectAll(".eegline").data(eegLineIds)
+        .enter().append('path').attr("id", function (d) { return d })
+        .attr("class", "eegline")
+        .attr("fill", "none")
+        .attr("stroke", "black")
+        .attr("stroke-width", 5)
+
+}
+function updateEEGgraph(data) {
+    if (tabVisibile == true) {
+        var svg = d3.select("#timechartsvg")
+        if (data == null) {
+            svg.selectAll("points").remove()
+        }
+        else {
+
+            //// Circles at each data point:
+
+            // var points = svg.selectAll(".eeg").data(data)
+            // points.enter().append("circle")
+            //     .attr("class", "eeg")
+            //     .attr("cx", function (d, i) { return circleX(d.timestamp) })
+            //     .attr("cy", function (d, i) { return eegY(d.tp10_gamma) })
+            //     .attr("r", 10)
+            //     .attr("fill", "red")
+
+
+
+
+
+        }
+    }
+
+}
 window.addEventListener("gamepadconnected", function (e) {
     var gp = navigator.getGamepads()[e.gamepad.index];
-    pushNotice("Found Gamepad!")
+
     button_count = gp.buttons.length
     axes_count = gp.axes.length
 
     var message = "A " + gp.id + " was successfully detected! There are a total of " + gp.buttons.length + " buttons and " + axes_count + " axes"
+    d3.select("#gamepadicon").style("opacity", 1)
 
-    console.log(message)
+    d3.select("#gamepadtext").text("Found: " + gp.id).style("opacity", 1)
+        .transition()
+        .style("opacity", 0)
+        .duration(3000)
+
+    d3.select("#gamepadModeSelector").style("display", "flex")
 
 
     setInterval(function () {
 
         // ===> Get a fresh GamepadList! <===
         var gp = navigator.getGamepads()[e.gamepad.index];
+        if (gp != null) {
+            for (var b = 0; b < button_count; b++) {
+                var button = gp.buttons[b]
+                var isPressed = button.pressed;
+                if (isPressed) {
 
-        for (var b = 0; b < button_count; b++) {
-            var button = gp.buttons[b]
-            var isPressed = button.pressed;
-            if (isPressed) {
-
-                var date = new Date()
-
-                var millis = date.getTime()
-                if (last_btn != b || (millis - last_btn_time) > minTimeClick) {
-                    last_btn_time = millis
-                    last_btn = b
-                    btn_history.push({ timestamp: millis, btn: b, value: button.value })
-                    console.log("button: " + b)
-                    clickedGamepadButton(b)
-
-                }
-            }
-
-        }
-        for (var a = 0; a < axes_count; a++) {
-            var axis = gp.axes[a]
-            var pad = 0
-            switch (a) {
-                case 0:
-                    pad = 1;
-                    break;
-
-                case 1:
-                    pad = 1;
-                    break;
-
-                case 3:
-                    pad = 2;
-                    break;
-
-                case 4:
-                    pad = 2;
-                    break;
-
-                case 6:
-                    pad = 3;
-                    break;
-
-                case 7:
-                    pad = 3;
-                    break;
-
-            }
-
-            if (Math.abs(axis) > 0.3) {
-
-
-
-                var dir = 0
-                if (axis > 0) dir = 1
-                else dir = -1
-
-                if (pad == 0 && (a == 2 || a == 5) && dir == -1) {
-
-                }
-                else {
                     var date = new Date()
 
-                    var id = pad + " " + a + " " + dir
-
                     var millis = date.getTime()
-                    if ((millis - last_axes_time) > minTimeClick) {
-                        console.log("pad: " + pad + " " + a + " " + dir)
-                        last_axes_time = millis
-                        last_axes = id
-                        clickedGamepadButton(id)
+                    if (last_btn != b || (millis - last_btn_time) > minTimeClick) {
+                        last_btn_time = millis
+                        last_btn = b
+                        btn_history.push({ timestamp: millis, btn: b, value: button.value })
+                        console.log("button: " + b)
+                        clickedGamepadButton(b)
+
+                    }
+                }
+
+            }
+            for (var a = 0; a < axes_count; a++) {
+                var axis = gp.axes[a]
+                var pad = 0
+                switch (a) {
+                    case 0:
+                        pad = 1;
+                        break;
+
+                    case 1:
+                        pad = 1;
+                        break;
+
+                    case 3:
+                        pad = 2;
+                        break;
+
+                    case 4:
+                        pad = 2;
+                        break;
+
+                    case 6:
+                        pad = 3;
+                        break;
+
+                    case 7:
+                        pad = 3;
+                        break;
+
+                }
+
+                if (Math.abs(axis) > 0.3) {
+
+
+
+                    var dir = 0
+                    if (axis > 0) dir = 1
+                    else dir = -1
+
+                    if (pad == 0 && (a == 2 || a == 5) && dir == -1) {
+
+                    }
+                    else {
+                        var date = new Date()
+
+                        var id = pad + " " + a + " " + dir
+
+                        var millis = date.getTime()
+                        if ((millis - last_axes_time) > minTimeClick) {
+                            console.log("pad: " + pad + " " + a + " " + dir)
+                            last_axes_time = millis
+                            last_axes = id
+                            clickedGamepadButton(id)
+                        }
+
                     }
 
                 }
 
             }
 
+
         }
 
     }, 20)
 });
 
+// Detect when user tabs away
+var tabVisibile = true
+document.addEventListener("visibilitychange", function () {
+    if (document.hidden) {
+        console.log("HIDDEN")
+        tabVisibile = false
+    }
+    else {
+        console.log("RETURNED")
+        tabVisibile = true
+    }
+});
 function buildModeSelector(div) {
     let select = div.append("select")
         .style("display", "flex")
@@ -456,24 +651,71 @@ function buildModeSelector(div) {
 function resetGamepadRecord() {
     buttonTimeSeries = []
     buttonClickCounts = {}
-    var date = new Date()
-    timestart = date.getTime() - (1000 * 1)
-
-    var timeend = timestart + (1000 * 31)
-    circleX = d3.scaleLinear()
-        .domain([timestart, timeend])
-        .range([50, 900])
 
     d3.select("#timechartsvg").selectAll("*").remove()
     pushNotice("Resetting...")
     updateBarChart(null)
     updateTimeSeries(null)
+    updateEEGgraph(null)
+}
+function buildIndicators(div) {
+    var table = div.append('table')
+    var gamepadRow = table.append("tr")
+    var museRow = table.append("tr")
+
+    gamepadRow
+        .append("td")
+        .append("img")
+        .attr('width', 80)
+        .attr("id", "gamepadicon")
+        .style('opacity', 0.2)
+        .attr('height', 80)
+        .attr("alt", "")
+        .attr("src", "gamepadicon.png")
+
+    gamepadRow.append('td')
+        .style("min-width", "400px")
+        .append("div")
+        .attr("id", "gamepadtext")
+        .text("Waiting for gamepad...")
+        .style("opacity", 0.5)
+
+    var selectorDiv = gamepadRow.append("td")
+        .append("div")
+        .attr("id", "gamepadModeSelector")
+        .style("display", "none")
+
+    buildModeSelector(selectorDiv)
+
+    museRow.append("td").append("img")
+        .attr('width', 80)
+        .attr("id", "eegicon")
+        .style('opacity', 0.2)
+        .attr('height', 80)
+        .attr("alt", "")
+        .attr("src", "eegicon.png")
+
+    museRow.append('td')
+        .append("div")
+        .attr("id", "eegicon_text")
+        .text("Waiting for Muse...")
+        .style("opacity", 0.5)
 }
 
 function buildPage() {
+    var header = d3.select("#header").style("margin", "30px")
+        .style("display", "flex")
+        .style("justify-content", "space-between")
     var container = d3.select("#charts")
     container.style("margin", "20px")
-    buildModeSelector(container)
+
+    header.append("h1").text("Live Recording")
+    var options = header.append("div").style("margin", "30px")
+
+    var indicators = container.append("div")
+    buildIndicators(indicators)
+
+    // BAR CHART
     container.append("svg")
         .attr("width", "1000px")
         .attr("height", barChartHeight + "px")
@@ -483,16 +725,15 @@ function buildPage() {
         .attr("height", barChartHeight - 10)
         .attr("transform", "translate(10, 10)")
 
+    // TIMESERIES
     container.append("svg")
-        .attr("width", "1000px")
-        .attr("height", timeChartHeight + "px")
+        .attr("width", timeseriesWidth + 20)
+        .attr("height", timeseriesHeight + "px")
         .append("g")
         .attr("id", "timechartsvg")
-        .attr("width", 1000 - 10)
-        .attr("height", timeChartHeight - 10)
+        .attr("width", timeseriesWidth)
+        .attr("height", timeseriesHeight - 10)
         .attr("transform", "translate(10, 10)")
-
-    var options = d3.select("#options").style("margin", "20px")
 
     options.append("button")
         .text("Save CSV")
@@ -508,6 +749,7 @@ function buildPage() {
         .on("click", function () {
             resetGamepadRecord()
         })
+    setupEEGgraph()
 }
 
 export default function Record() {
@@ -519,9 +761,7 @@ export default function Record() {
 
     return (
         <div>
-            <h1>
-                Gamepad
-            </h1>
+            <div id="header"></div>
             <div id="charts"></div>
             <div id="options"></div>
         </div>

@@ -11,7 +11,7 @@ import { processCSV, buildAuthContainer, anonymous } from '../pages/live';
 
 const d3 = require("d3");
 
-
+export var eegdata = null
 const firebaseConfig = {
 
     apiKey: process.env.REACT_APP_API_KEY,
@@ -46,7 +46,9 @@ export function listenEEG(uid) {
     console.log("Listening for data on user: " + uid)
     onValue(eegref, (snapshot) => {
         d3.select("#realtime-div").text("LIVE CONNECTION")
-        const data = snapshot.val()
+        //console.log("found data:")
+        //console.log(snapshot.val())
+        eegdata = snapshot.val()
         
     })
 }
