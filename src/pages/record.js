@@ -1,19 +1,37 @@
 import React, { useState, useEffect } from "react";
 import { clone } from "../utils/functions";
 import { eegdata } from "../utils/database";
+import { ZoomTransform } from "d3";
 const d3 = require("d3");
 
 const fontFamily = "Roboto, sans-serif"
 
+const eegInterval = 500 // Milliseconds to wait before querying next eeg data (should match the android app)
+
 // EEG data from Realtime database
 var lastEEGdata = null // last data, as copied from 'database' page
+var eegChartDelay = 2
 var eegDataRecord = [] // All data recorded
 var eegStatus = true  // Set to true when data from realtimedb seems to be live, set to false when last timestamp is old
 var eegLineIds = ["tp10_gamma", "tp9_gamma", "af7_gamma", "af8_gamma"]
 
 // Gamepad settings
 var foundGamepad = false
-var tagOffset = 6    // Move the tags back this many seconds (otherwise they don't appear immediately)
+var tagDelay = 2    // Move the tags back this many seconds (otherwise they don't appear immediately)
+
+// Variance Chart
+var varianceChartHeight = 200
+var varianceChartWidth = 200
+var varianceX = d3.scaleBand()
+    .padding(1)
+    .domain([0, 1, 2, 3])
+    .range([10, varianceChartWidth - 20])
+
+var maxVariance = 300
+var varianceY = d3.scaleLog()
+    .domain([1, 10000])
+    .range([varianceChartHeight - 20, 5])
+
 
 
 var minTimeClick = 1000 // Minimum time between clicks
@@ -231,7 +249,7 @@ function clickedGamepadButton(id) {
 
     }
     // Add a new timeseries entry
-    var adjustedTimestamp = millis - (1000 * tagOffset) // Subtract some seconds for two reasons: 1) Adjust for user reaction, 2) the SVG cuts of last few seconds
+    var adjustedTimestamp = millis - (1000 * tagDelay) // Subtract some seconds for two reasons: 1) Adjust for user reaction, 2) the SVG cuts of last few seconds
     var newClick = { millis: adjustedTimestamp, button: name, color: color }
     buttonTimeSeries.push(newClick)
 
@@ -330,6 +348,48 @@ function updateBarChart(btns) {
 
 
 }
+function updateVarianceGraph(data) {
+    var svg = d3.select("#variance_svg")
+    // Bar charts showing variance of each Muse electrode
+    var variances = [data.tp9_variance, data.af7_variance, data.af8_variance, data.tp10_variance]
+    if (eegStatus == false) {
+        svg.selectAll("*").remove()
+    }
+    else {
+
+        var d = svg.selectAll(".bar").data(variances)
+        d.enter()
+            .append("rect")
+            .attr("class", "bar")
+            //.attr("width", varianceX.bandwidth())
+            .attr("width", "30px")
+            .attr("x", function (d, i) { return varianceX(i) })
+
+        d.enter()
+            .append("text")
+            .text(function (d, i) { return ["TP9", "AF7", "AF8", "TP10"][i] })
+            .attr("x", function (d, i) { return varianceX(i) })
+            .attr("y", varianceChartHeight - 20)
+
+        d.transition()
+            .style("fill", function (d) {
+                if (d < 101) return "darkgreen"
+                else if (d < maxVariance) return "green"
+                else if (d < 1000) return "orange"
+                else return "red"
+            })
+            .attr("y", function (d) { return varianceY(d) })
+            .attr("height", function (d, i) { return varianceChartHeight - varianceY(d) - 40 })
+            .duration(eegInterval)
+            .ease(d3.easeLinear)
+
+
+    }
+
+
+
+
+}
 function rescaleTimeseries() {
 
     // Move the graph every second
@@ -337,8 +397,8 @@ function rescaleTimeseries() {
 
     var date = new Date()
     var millis = date.getTime()
-    var interval = 1000 // seconds between updates
-    timeend = millis - (1000 * 5)
+
+    timeend = millis - (1000 * eegChartDelay) // Offset 
     timestart = timeend - (1000 * 30)
     circleX = d3.scaleLinear()
         .domain([timestart, timeend])
@@ -348,13 +408,13 @@ function rescaleTimeseries() {
         .transition()
         .attr("cx", function (d, i) { return circleX(d.millis) })
         .ease(d3.easeLinear)
-        .duration(interval)
+        .duration(eegInterval)
 
     svg.selectAll(".eeg")
         .transition()
         .attr("cx", function (d, i) { return circleX(d.timestamp) })
         .ease(d3.easeLinear)
-        .duration(interval)
+        .duration(eegInterval)
 
 
     svg.selectAll(".text")
@@ -363,16 +423,17 @@ function rescaleTimeseries() {
             return "translate(" + circleX(d.millis) + ", " + 50 + "), rotate(-45)"
         })
         .ease(d3.easeLinear)
-        .duration(interval)
+        .duration(eegInterval)
 
     for (let id in eegLineIds) {
         var key = eegLineIds[id]
         var data = eegDataRecord.map(row => [row.timestamp, row[key], row.valid])
+        
         svg.select("#" + key)
             .transition()
             .attr("d", function (d) { return eegLine(data) })
             .ease(d3.easeLinear)
-            .duration(interval)
+            .duration(eegInterval)
 
     }
 
@@ -385,78 +446,134 @@ setInterval(function () { rescaleTimeseries() }, 100)
 setInterval(function () {
 
     if (eegdata != null) {
-
+        var date = new Date()
+        var millis = date.getTime()
+        var timeDiff = millis - eegdata.timestamp
 
         if (lastEEGdata == null) {
+            console.log("First eeg data: diff = " + timeDiff)
             lastEEGdata = clone(eegdata)
-            eegStatus = true
+         
+
+        }
+
+        
+        if (timeDiff > (1000 * 60)) {
+            if (eegStatus == true) {
+                console.error("--> EEG data is old (" + (timeDiff / 1000 / 60) + " minutes)")
+                eegStatus = false
+            }
+        }
+        else if (eegdata.muse_connected == false) {
+            if (eegStatus == true) {
+                console.error("-> Muse is disconnected")
+                eegStatus = false
+                lastEEGdata = clone(eegdata)
+                
+            }
+
+
 
         }
         else {
-            lastEEGdata.valid = true
 
-            // Data hasn't changed
-            if (eegdata.timestamp == lastEEGdata.timestamp) {
-                if (eegStatus == true) {
+            if (lastEEGdata == null) {
+                console.log("First eeg data")
+                lastEEGdata = clone(eegdata)
+                if (timeDiff > (1000 * 60)) {
+                    eegStatus = false
+                    console.log("EEG data is old")
+                }
+                else {
+                    eegStatus = true
+                }
 
-                    var date = new Date()
-                    var millis = date.getTime()
-                    var timeDiff = millis - eegdata.timestamp
 
-                    if (timeDiff > (1000 * 2.1)) {
+            }
+            else {
 
-                        eegStatus = false // flag so that console isn't flooded with messages
-                        if (timeDiff > (1000 * 120)) {
-                            console.log("----> Data is old (" + Math.round(timeDiff / 1000 / 60) + " minutes)")
+
+
+                // Data hasn't changed
+                if (eegdata.timestamp == lastEEGdata.timestamp) {
+                    if (eegStatus == true) {
+                        console.log("Last timestamp was the same")
+
+
+                        if (timeDiff > (1000 * 2.1)) {
+
+                            eegStatus = false // flag so that console isn't flooded with messages
+                            if (timeDiff > (1000 * 120)) {
+                                console.log("----> Data is old (" + Math.round(timeDiff / 1000 / 60) + " minutes)")
+
+                            }
+                            else if (timeDiff > (1000 * 60 * 60 * 24)) {
+                                console.log("----> Data is old (" + Math.round(timeDiff / 1000 / 60 / 60 / 24) + " days)")
+                            }
+
+
+                            else {
+                                console.log("----> MUSE LOST - Data is old (" + Math.round(timeDiff / 1000) + " seconds)")
+
+                            }
 
                         }
-                        else if (timeDiff > (1000 * 60 * 60 * 24)) {
-                            console.log("----> Data is old (" + Math.round(timeDiff / 1000 / 60 / 60 / 24) + " days)")
-                        }
-
-
-                        else {
-                            console.log("----> MUSE LOST - Data is old (" + Math.round(timeDiff / 1000) + " seconds)")
-
-                        }
-
                     }
+
+                }
+                // Everything is good - record new datapoint
+                else {
+                    lastEEGdata = clone(eegdata)
+                    
+                    eegStatus = true
+                    
+
                 }
 
             }
-            // Everything is good - record new datapoint
-            else {
-                lastEEGdata = clone(eegdata)
-                eegStatus = true
-                lastEEGdata.valid = true
 
-            }
 
         }
-
 
         if (eegStatus == true) {
             d3.select("#eegicon").style("opacity", 1)
             d3.select("#eegicon_text").text("Found: Muse").style("opacity", 1)
-
+            if (lastEEGdata.tp10_variance > maxVariance ||
+                lastEEGdata.tp9_variance > maxVariance ||
+                lastEEGdata.af7_variance > maxVariance ||
+                lastEEGdata.af8_variance > maxVariance
+            ) {
+                console.error("Variance too high!")
+            }
 
         }
         else {
             d3.select("#eegicon").style("opacity", 0.2)
             d3.select("#eegicon_text").text("Waiting for Muse...").style("opacity", 0.5)
         }
+
+
         eegDataRecord.push(lastEEGdata)
-        updateEEGgraph(eegDataRecord)
+        updateVarianceGraph(lastEEGdata)
+
+
+
 
 
     }
     else {
-        d3.select("#eegicon").style("opacity", 0.2)
-        d3.select("#eegicon_text").text("Waiting for Muse...").style("opacity", 0.5)
+
+        if (eegStatus == true) {
+            console.log("No live EEG data")
+            eegStatus = false
+            d3.select("#eegicon").style("opacity", 0.2)
+            d3.select("#eegicon_text").text("Waiting for Muse...").style("opacity", 0.5)
+        }
+
     }
 
 
-}, 1000)
+}, eegInterval)
 
 function setupEEGgraph() {
     var svg = d3.select("#timechartsvg")
@@ -469,32 +586,7 @@ function setupEEGgraph() {
         .attr("stroke-width", 5)
 
 }
-function updateEEGgraph(data) {
-    if (tabVisibile == true) {
-        var svg = d3.select("#timechartsvg")
-        if (data == null) {
-            svg.selectAll("points").remove()
-        }
-        else {
 
-            //// Circles at each data point:
-
-            // var points = svg.selectAll(".eeg").data(data)
-            // points.enter().append("circle")
-            //     .attr("class", "eeg")
-            //     .attr("cx", function (d, i) { return circleX(d.timestamp) })
-            //     .attr("cy", function (d, i) { return eegY(d.tp10_gamma) })
-            //     .attr("r", 10)
-            //     .attr("fill", "red")
-
-
-
-
-
-        }
-    }
-
-}
 window.addEventListener("gamepadconnected", function (e) {
     var gp = navigator.getGamepads()[e.gamepad.index];
 
@@ -656,7 +748,7 @@ function resetGamepadRecord() {
     pushNotice("Resetting...")
     updateBarChart(null)
     updateTimeSeries(null)
-    updateEEGgraph(null)
+    
 }
 function buildIndicators(div) {
     var table = div.append('table')
@@ -671,7 +763,7 @@ function buildIndicators(div) {
         .style('opacity', 0.2)
         .attr('height', 80)
         .attr("alt", "")
-        .attr("src", "gamepadicon.png")
+        .attr("src", "gamepad_icon.svg")
 
     gamepadRow.append('td')
         .style("min-width", "400px")
@@ -693,7 +785,7 @@ function buildIndicators(div) {
         .style('opacity', 0.2)
         .attr('height', 80)
         .attr("alt", "")
-        .attr("src", "eegicon.png")
+        .attr("src", "eeg_icon.svg")
 
     museRow.append('td')
         .append("div")
@@ -724,6 +816,16 @@ function buildPage() {
         .attr("width", 1000 - 10)
         .attr("height", barChartHeight - 10)
         .attr("transform", "translate(10, 10)")
+
+    // Variance chart
+    container.append("svg")
+        .attr("width", varianceChartWidth + "px")
+        .attr("height", varianceChartHeight + "px")
+        .append("g")
+        .attr("id", "variance_svg")
+        .attr("width", varianceChartWidth - 2)
+        .attr("height", varianceChartHeight - 2)
+        .attr("transform", "translate(2, 2)")
 
     // TIMESERIES
     container.append("svg")
