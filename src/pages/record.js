@@ -13,6 +13,7 @@ var lastEEGdata = null // last data, as copied from 'database' page
 var eegChartDelay = 2
 var eegDataRecord = [] // All data recorded
 var eegStatus = true  // Set to true when data from realtimedb seems to be live, set to false when last timestamp is old
+var androidStatus = false
 var eegLineIds = ["tp10_gamma", "tp9_gamma", "af7_gamma", "af8_gamma"]
 
 // Gamepad settings
@@ -258,6 +259,21 @@ function clickedGamepadButton(id) {
 
 
 }
+function updateMuseStatus(data) {
+    console.log("muse:")
+    console.log(data)
+    d3.select("#muse_status_android")
+        .attr("fill", function()
+        {
+            
+            if (androidStatus == true)
+            {
+                
+                return "green"
+            }
+            else return "grey"
+        })
+}
 function updateTimeSeries(timeseries) {
     var svg = d3.select("#timechartsvg")
     if (timeseries == null || timeseries.length == 0) {
@@ -349,14 +365,18 @@ function updateBarChart(btns) {
 
 }
 function updateVarianceGraph(data) {
+
     var svg = d3.select("#variance_svg")
+
     // Bar charts showing variance of each Muse electrode
     var variances = [data.tp9_variance, data.af7_variance, data.af8_variance, data.tp10_variance]
-    if (eegStatus == false) {
-        svg.selectAll("*").remove()
+    if (data.muse_connected == false) {
+        
+
     }
     else {
 
+        
         var d = svg.selectAll(".bar").data(variances)
         d.enter()
             .append("rect")
@@ -428,7 +448,7 @@ function rescaleTimeseries() {
     for (let id in eegLineIds) {
         var key = eegLineIds[id]
         var data = eegDataRecord.map(row => [row.timestamp, row[key], row.valid])
-        
+
         svg.select("#" + key)
             .transition()
             .attr("d", function (d) { return eegLine(data) })
@@ -453,11 +473,11 @@ setInterval(function () {
         if (lastEEGdata == null) {
             console.log("First eeg data: diff = " + timeDiff)
             lastEEGdata = clone(eegdata)
-         
+
 
         }
 
-        
+
         if (timeDiff > (1000 * 60)) {
             if (eegStatus == true) {
                 console.error("--> EEG data is old (" + (timeDiff / 1000 / 60) + " minutes)")
@@ -469,7 +489,7 @@ setInterval(function () {
                 console.error("-> Muse is disconnected")
                 eegStatus = false
                 lastEEGdata = clone(eegdata)
-                
+
             }
 
 
@@ -480,6 +500,7 @@ setInterval(function () {
             if (lastEEGdata == null) {
                 console.log("First eeg data")
                 lastEEGdata = clone(eegdata)
+                lastEEGdata.android_connected = true
                 if (timeDiff > (1000 * 60)) {
                     eegStatus = false
                     console.log("EEG data is old")
@@ -493,16 +514,17 @@ setInterval(function () {
             else {
 
 
-
+                lastEEGdata.android_connected = true
                 // Data hasn't changed
                 if (eegdata.timestamp == lastEEGdata.timestamp) {
                     if (eegStatus == true) {
                         console.log("Last timestamp was the same")
-
+                        
 
                         if (timeDiff > (1000 * 2.1)) {
 
                             eegStatus = false // flag so that console isn't flooded with messages
+                            androidStatus = false
                             if (timeDiff > (1000 * 120)) {
                                 console.log("----> Data is old (" + Math.round(timeDiff / 1000 / 60) + " minutes)")
 
@@ -524,9 +546,9 @@ setInterval(function () {
                 // Everything is good - record new datapoint
                 else {
                     lastEEGdata = clone(eegdata)
-                    
+                    androidStatus = true
                     eegStatus = true
-                    
+
 
                 }
 
@@ -555,10 +577,7 @@ setInterval(function () {
 
         eegDataRecord.push(lastEEGdata)
         updateVarianceGraph(lastEEGdata)
-
-
-
-
+        updateMuseStatus(lastEEGdata)
 
     }
     else {
@@ -566,6 +585,10 @@ setInterval(function () {
         if (eegStatus == true) {
             console.log("No live EEG data")
             eegStatus = false
+            lastEEGdata = {}
+            lastEEGdata.muse_connected = false
+            lastEEGdata.android_connected = false
+            lastEEGdata.valid = false
             d3.select("#eegicon").style("opacity", 0.2)
             d3.select("#eegicon_text").text("Waiting for Muse...").style("opacity", 0.5)
         }
@@ -740,6 +763,19 @@ function buildModeSelector(div) {
     })
 
 }
+function buildMuseStatus() {
+    var svg = d3.select("#muse_status_svg")
+        .attr("width", '300px')
+        .attr("height", '60px')
+
+    svg.append("circle")
+        .attr("cx", "70")
+        .attr("cy", "30")
+        .attr("r", "10")
+        .attr("fill", "grey")
+        .attr("id", "muse_status_android")
+
+}
 function resetGamepadRecord() {
     buttonTimeSeries = []
     buttonClickCounts = {}
@@ -748,7 +784,7 @@ function resetGamepadRecord() {
     pushNotice("Resetting...")
     updateBarChart(null)
     updateTimeSeries(null)
-    
+
 }
 function buildIndicators(div) {
     var table = div.append('table')
@@ -792,6 +828,11 @@ function buildIndicators(div) {
         .attr("id", "eegicon_text")
         .text("Waiting for Muse...")
         .style("opacity", 0.5)
+
+    museRow.append('td')
+        .append('svg')
+        .attr("id", "muse_status_svg")
+    buildMuseStatus()
 }
 
 function buildPage() {
