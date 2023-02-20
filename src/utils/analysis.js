@@ -29,7 +29,7 @@ var means = []
 var maxes = []
 var principals = []
 var modelType = "cosine" // How to measure variances
-var standardizeType = "ratio" // Method to standardize a vector
+var standardizeType = "normal" // raw, ratio, or normal
 var distanceType = "combined"
 var eucAdjust = 0.8           // How much to adjust the Euclidean measurement compared with cos. 0.8 seems good to even out the cos data, anything more is far too dramatic
 
@@ -126,6 +126,9 @@ export function getRelativeVector(rawVector) {
         case "ratio":
             vector = vectorRatio(rawVector) // standardize by dividing each band by tp10/tp9 and af7/af8, etc
             break;
+        case "normal":
+            vector = vectorNormalRatio(rawVector) // Normalize by taking the % of total channel power for each band, then divide just like ratio type
+            break;
 
     }
 
@@ -146,6 +149,25 @@ export function vectorRaw(row) {
     })
     return vector
 
+}
+
+function vectorNormalRatio(row)
+{
+    // Just like 'ratio' type, but first normalizes the channels data - this helps to avoid drifting channel powers
+    var normal = {}
+    channels.forEach(channel => {
+        var totalPower = d3.sum( bands.map(band => row[band + "_" + channel]))
+        bands.forEach(band =>
+            {
+                var key = band + "_" + channel
+                var normalValue = row[key] / totalPower
+                normal[key] = normalValue
+            })
+
+    })
+    
+    var ratio = vectorRatio(normal)
+    return ratio
 }
 export function vectorRatio(row) {
     var vector = []

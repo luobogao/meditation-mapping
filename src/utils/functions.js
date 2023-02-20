@@ -1,4 +1,6 @@
+
 const d3 = require("d3");
+
 const moment = require("moment")
 
 debug = false
@@ -85,6 +87,7 @@ export function parseTime(str) {
     }
 
 }
+
 export function parsePx(attribute) {
     if (attribute == null) {
         console.error("Attribute has not be set yet, cannot parse")

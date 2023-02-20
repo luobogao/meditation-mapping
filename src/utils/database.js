@@ -49,7 +49,7 @@ export function listenEEG(uid) {
         //console.log("found data:")
         //console.log(snapshot.val())
         eegdata = snapshot.val()
-        
+
     })
 }
 
@@ -130,6 +130,15 @@ export function addWaypoint(waypoint) {
     }
 
 }
+export function addMarker(eegdata, markerName) {
+    var date = new Date()
+    var millis = date.getTime()
+    var userid = auth.currentUser.uid
+    var entry = {user: userid, marker: markerName, addedTime: millis, vector: eegdata}
+    var promise = addDoc(collection(db, "markers"), entry)
+    return promise
+
+}
 export function deleteWaypoint(waypoint) {
     // Warning: does NOT delete the firebase entry, it just sets "delete = true"
     if (!anonymous) {
@@ -140,7 +149,11 @@ export function deleteWaypoint(waypoint) {
     }
 
 }
-
+export function getAllMarkers() {
+    var q = query(collection(db, "markers"))
+    var promise = getDocs(q)
+    return promise
+}
 export function getAllWaypoints() {
     var q = query(collection(db, "waypoints"), where("delete", "!=", true))
     var promise = getDocs(q)
@@ -152,7 +165,7 @@ export function updateWaypoint(waypoint) {
         var date = new Date()
         var millis = date.getTime()
         waypoint.updatedTime = millis
-        var promise = updateDoc(doc(db, "waypoints", waypoint.id), {notes: waypoint.notes, label: waypoint.label, updateTime: millis, updatedBy: auth.currentUser.uid})
+        var promise = updateDoc(doc(db, "waypoints", waypoint.id), { notes: waypoint.notes, label: waypoint.label, updateTime: millis, updatedBy: auth.currentUser.uid })
         return promise
     }
 

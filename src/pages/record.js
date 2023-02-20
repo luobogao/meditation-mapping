@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
+
 import { clone } from "../utils/functions";
-import { eegdata } from "../utils/database";
+import { eegdata, addMarker, getAllMarkers, auth } from "../utils/database";
 import { ZoomTransform } from "d3";
 const d3 = require("d3");
 
@@ -12,19 +13,34 @@ var d = new Date()
 var lastActivity = d.getTime() // If user doesn't engage with page for a while, data is stopped
 const userTimeout = 1000 * 60 * 2
 
+// Status
+var eegStatus = true  // Set to true when data from realtimedb seems to be live, set to false when last timestamp is old
+var androidStatus = false
+var museConnected = false
+var dataGood = false
+var deactiveOpacity = 0.3
+
+// Timers
+var lastGoodData = 0
+var lastAudioPlay = 0
+
 // Theme
 var theme = "light"
-var backgroundLight = "grey"
+var backgroundLight = "white"
+
+// Gamepad
+var gp;
+var vibratingTime = 0
 
 // EEG data from Realtime database
 var eegInterval1, eegInterval2 = null // Intervals to monitor EEG data from realdtime db
 var lastEEGdata = null // last data, as copied from 'database' page
 var eegChartDelay = 2
 var eegDataRecord = [] // All data recorded
-var eegStatus = true  // Set to true when data from realtimedb seems to be live, set to false when last timestamp is old
-var androidStatus = false
-var museConnected = false
 var eegLineIds = ["tp10_gamma", "tp9_gamma", "af7_gamma", "af8_gamma"]
+
+// Markers
+var markers = []
 
 // Gamepad settings
 var gamepadInterval = null  // Holds the interval which watches for gamepad button presses
@@ -32,25 +48,26 @@ var foundGamepad = false
 var tagDelay = 2    // Move the tags back this many seconds (otherwise they don't appear immediately)
 
 // Variance Chart
-var maxVariance = 500
-var varianceChartHeight = 200
+var maxVariance = 150
+var varianceChartHeight = 150
+var varianceChartMargin = 5
 var varianceChartWidth = 200
 var varianceX = d3.scaleBand()
     .padding(1)
     .domain([0, 1, 2, 3])
-    .range([10, varianceChartWidth - 20])
+    .range([5, varianceChartWidth - 5])
 
 
 var varianceY = d3.scaleLog()
     .domain([1, 10000])
-    .range([varianceChartHeight - 20, 5])
+    .range([varianceChartHeight - 5, 5])
 
 
 
 var minTimeClick = 1000 // Minimum time between clicks
 const textSize = 22
 const barChartHeight = 120
-const timeseriesHeight = 300
+const timeseriesHeight = 200
 const timeseriesWidth = 900
 var buttonClickCounts = {}
 var buttonTimeSeries = []
@@ -220,83 +237,125 @@ function pushNotice(message) {
 }
 
 function clickedGamepadButton(id) {
-    var code = buttonMap[id]
-    var mode = d3.select("#mode-select").property("value")
-    var name = buttonMapOut[mode][code]
-    var color = buttonColors[name]
 
-    if (foundGamepad == false) {
-        foundGamepad = true
-        name = "Start"
-        code = ""
-
+    if (museConnected == true && dataGood == false) {
+        console.error("Can't log - Bad Data")
     }
     else {
+        var date = new Date()
+        var millis = date.getTime()
+        lastActivity = millis
 
-    }
+        var mode = d3.select("#mode-select").property("value")
+        var code = buttonMap[id]
+        var name = buttonMapOut[mode][code]
+        var color = buttonColors[name]
 
-    // Add +1 to the total count for this button name
-    if (buttonClickCounts[name] != null) {
-        buttonClickCounts[name] = buttonClickCounts[name] + 1
-    }
-    else {
-        buttonClickCounts[name] = 1
-    }
+        btn_history.push({ timestamp: millis, id: id, value: id, tag: name, color: color })
 
-    // Bar Chart
-    var btns = Object.entries(buttonClickCounts)
-    updateBarChart(btns)
 
-    // Time Series
-    var date = new Date()
-    var millis = date.getTime()
-    lastActivity = millis
+        if (foundGamepad == false) {
+            foundGamepad = true
+            name = "Start"
+            code = ""
 
-    // Check if the user has come back to page after a long time - if yes, reset any existing data
-    if (buttonTimeSeries.length > 0) {
-        var lastMillis = buttonTimeSeries.slice(-1)[0].millis
-        var timeDiff_btn = millis - lastMillis
-        var timeDiff_start = millis - timestart
-        if (timeDiff_btn > (1000 * 60 * 30) || timeDiff_start > (1000 * 60 * 60 * 4)) {
-            resetGamepadRecord()
+        }
+        else {
+
+        }
+
+        // Add +1 to the total count for this button name
+        if (buttonClickCounts[name] != null) {
+            buttonClickCounts[name] = buttonClickCounts[name] + 1
+        }
+        else {
+            buttonClickCounts[name] = 1
+        }
+
+        // Bar Chart
+        var btns = Object.entries(buttonClickCounts)
+        updateBarChart(btns)
+
+        // Time Series
+
+        // Check if the user has come back to page after a long time - if yes, reset any existing data
+        if (buttonTimeSeries.length > 0) {
+            var lastMillis = buttonTimeSeries.slice(-1)[0].millis
+            var timeDiff_btn = millis - lastMillis
+            var timeDiff_start = millis - timestart
+            if (timeDiff_btn > (1000 * 60 * 30) || timeDiff_start > (1000 * 60 * 60 * 4)) {
+                resetGamepadRecord()
+            }
+
+        }
+        // Add a new timeseries entry
+        var adjustedTimestamp = millis - (1000 * tagDelay) // Subtract some seconds for two reasons: 1) Adjust for user reaction, 2) the SVG cuts of last few seconds
+        var newClick = { millis: adjustedTimestamp, button: name, color: color }
+        buttonTimeSeries.push(newClick)
+
+        // Update chart
+        updateTimeSeries(buttonTimeSeries)
+
+        var marker = { vector: eegdata, marker: name, user: auth.currentUser.uid }
+        markers.push(marker)
+        if (museConnected == true) {
+
+            if (dataGood == true) {
+                var p = addMarker(eegdata, name)
+                p.then((doc) => {
+                    console.log("Logged marker")
+
+                }
+                )
+            }
+
         }
 
     }
-    // Add a new timeseries entry
-    var adjustedTimestamp = millis - (1000 * tagDelay) // Subtract some seconds for two reasons: 1) Adjust for user reaction, 2) the SVG cuts of last few seconds
-    var newClick = { millis: adjustedTimestamp, button: name, color: color }
-    buttonTimeSeries.push(newClick)
-
-    // Update chart
-    updateTimeSeries(buttonTimeSeries)
 
 
 }
 function updateMuseStatus() {
+    if (androidStatus == false) {
+        d3.select("#muse_status_svg").style("opacity", deactiveOpacity)
+    }
+    else {
 
-    d3.select("#muse_status_android")
-        .attr("fill", function () {
+        d3.select("#muse_status_svg").style("opacity", 1)
+        d3.select("#muse_status_android")
+            .attr("fill", function () {
 
-            if (androidStatus == true) {
+                if (androidStatus == true) {
 
-                return "green"
-            }
-            else return "grey"
-        })
-    d3.select("#muse_status_muse")
-        .attr("fill", function () {
+                    return "green"
+                }
+                else return "none"
+            })
+        d3.select("#muse_status_muse")
+            .attr("fill", function () {
 
-            if (androidStatus == true && museConnected == true) {
+                if (androidStatus == true && museConnected == true) {
 
-                return "green"
-            }
-            else return "grey"
-        })
+                    return "green"
+                }
+                else return "none"
+            })
+        d3.select("#muse_status_data")
+            .attr("fill", function () {
+
+                if (androidStatus == true && museConnected == true && dataGood == true) {
+
+                    return "green"
+                }
+                else return "none"
+            })
+    }
+
 }
 function updateTimeSeries(timeseries) {
     var svg = d3.select("#timechartsvg")
     if (timeseries == null || timeseries.length == 0) {
-        svg.selectAll("*").remove()
+
     }
     else {
         var d = svg.selectAll(".circle")
@@ -322,13 +381,91 @@ function updateTimeSeries(timeseries) {
     }
 
 }
-function saveGamepadCSV(history) {
-    var string = "data:text/csv;charset=utf-8,timestampGamepad,button\r\n"
-    history.forEach(entry => {
-        string = string + entry.millis + "," + entry.button + "\r\n"
+function saveCSV() {
+    var stringOut = "data:text/csv;charset=utf-8,timestamp,af7_alpha,af7_beta,af7_delta,af7_gamma,af7_theta,af8_alpha,af8_beta,af8_delta,af8_gamma,af8_theta,tp10_alpha,tp10_beta,tp10_delta,tp10_gamma,tp10_theta,tp9_alpha,tp9_beta,tp9_delta,tp9_gamma,tp9_theta,af7_variance,af8_variance,tp9_variance,tp10_variance,tag\r\n"
+
+    var keys = [
+        "timestamp",
+        "af7_alpha",
+        "af7_beta",
+        "af7_delta",
+        "af7_gamma",
+        "af7_theta",
+
+        "af8_alpha",
+        "af8_beta",
+        "af8_delta",
+        "af8_gamma",
+        "af8_theta",
+
+        "tp10_alpha",
+        "tp10_beta",
+        "tp10_delta",
+        "tp10_gamma",
+        "tp10_theta",
+
+        "tp9_alpha",
+        "tp9_beta",
+        "tp9_delta",
+        "tp9_gamma",
+        "tp9_theta",
+
+        "af7_variance",
+        "af8_variance",
+        "tp9_variance",
+        "tp10_variance",
+
+        "tag"
+
+    ]
+    var badDataTags = [
+
+        "af7_variance",
+        "af8_variance",
+        "tp9_variance",
+        "tp10_variance",
+
+        "tag"]
+
+    console.log(keys.join(","))
+    var buttonTimestampsUsed = []
+    eegDataRecord.forEach(entry => {
+        var timestamp = entry.timestamp
+        var btn_matches = btn_history.filter(btn => btn.timestamp >= timestamp && btn.timestamp < timestamp + 1000)
+        var tag = ""
+        if (btn_matches.length >= 1) {
+            var button = btn_matches[0]
+            if (!buttonTimestampsUsed.includes(button.timestamp)) {
+                tag = button.tag
+                console.log("found btn: " + tag)
+                buttonTimestampsUsed.push(button.timestamp)
+
+            }
+
+        }
+        entry.tag = tag
+
+        var csvString = ""
+        if (entry.valid == false) {
+            csvString = timestamp + ",,,,,,,,,,,,,,,,,,,,,"
+            badDataTags.forEach(key => {
+                csvString = csvString + entry[key] + ","
+            })
+        }
+        else {
+            keys.forEach(key => {
+                csvString = csvString + entry[key] + ","
+            })
+
+        }
+
+        csvString += "\r\n"
+        stringOut += csvString
     })
 
-    var encodeduri = encodeURI(string)
+
+
+    var encodeduri = encodeURI(stringOut)
     window.open(encodeduri)
 }
 function updateBarChart(btns) {
@@ -387,28 +524,39 @@ function updateVarianceGraph(data) {
 
     var svg = d3.select("#variance_svg")
 
+
     // Bar charts showing variance of each Muse electrode
     var variances = [data.tp9_variance, data.af7_variance, data.af8_variance, data.tp10_variance]
-    if (data.muse_connected == false) {
 
+    if (variances.some((value) => isNaN(value)) || museConnected == false) {
+        svg.style("display", "none")
 
     }
     else {
 
+        svg.style("display", "flex")
+
+        variances = variances.map(v => {
+            if (v > 10000) return 1000
+            else if (v < 10) return 10
+            else return v
+        })
 
         var d = svg.selectAll(".bar").data(variances)
+
         d.enter()
             .append("rect")
             .attr("class", "bar")
             //.attr("width", varianceX.bandwidth())
-            .attr("width", "30px")
+            .attr("width", "20px")
+            .attr("y", function (d) { return varianceY(d) })
             .attr("x", function (d, i) { return varianceX(i) })
 
         d.enter()
             .append("text")
             .text(function (d, i) { return ["TP9", "AF7", "AF8", "TP10"][i] })
             .attr("x", function (d, i) { return varianceX(i) })
-            .attr("y", varianceChartHeight - 20)
+            .attr("y", varianceChartHeight - varianceChartMargin)
 
         d.transition()
             .style("fill", function (d) {
@@ -417,8 +565,15 @@ function updateVarianceGraph(data) {
                 else if (d < 1000) return "orange"
                 else return "red"
             })
-            .attr("y", function (d) { return varianceY(d) })
-            .attr("height", function (d, i) { return varianceChartHeight - varianceY(d) - 40 })
+            .attr("y", function (d, i) {
+
+                return varianceY(d)
+
+            })
+            .attr("height", function (d, i) {
+                var height = varianceChartHeight - varianceY(d) - varianceChartMargin - 20
+                return height
+            })
             .duration(eegInterval)
             .ease(d3.easeLinear)
 
@@ -484,6 +639,7 @@ function stopListeners() {
         clearInterval(gamepadInterval)
         recording = false
         console.log("USER TIMEOUT")
+
         var res = window.confirm("Restart?")
         if (res == true) {
             watchEEG()
@@ -555,12 +711,12 @@ function watchEEG() {
                 }
                 else {
 
-                    
-                    
+
+
                     // Data hasn't changed
                     if (eegdata.timestamp == lastEEGdata.timestamp) {
                         console.log("Last timestamp was the same")
-                        
+
                         if (eegStatus == true) {
 
 
@@ -592,11 +748,11 @@ function watchEEG() {
                     else {
 
                         lastEEGdata = clone(eegdata)
-                        
+
                         androidStatus = true
 
                         if (lastEEGdata.muse_connected == true) {
-                    
+
                             museConnected = true
                         }
                         else museConnected = false
@@ -610,38 +766,61 @@ function watchEEG() {
 
             }
             if (androidStatus == true) {
+                d3.select("#muse_status_android").style("fill", "green")
+                d3.select("#eegicon").style("opacity", 1)
                 if (museConnected == true) {
-                    
+
                     lastActivity = millis
+                    d3.select("#muse_status_muse").style("fill", "green")
+
+                    // Check variance
 
                     if (lastEEGdata.tp10_variance > maxVariance ||
                         lastEEGdata.tp9_variance > maxVariance ||
                         lastEEGdata.af7_variance > maxVariance ||
                         lastEEGdata.af8_variance > maxVariance
                     ) {
-                        d3.select("#eegicon_text").text("BAD MUSE CONNECTION").style("opacity", 1).style("color", "red")
+                        d3.select("#eegicon_text").text("BAD DATA").style("opacity", 1).style("color", "red")
+                        d3.select("#muse_status_data").style("fill", "red")
+                        dataGood = false
+                        lastEEGdata.valid = false
+                        vibrateGamepad()
+                        if ((millis - lastGoodData) > (1000 * 6)) {
+                            d3.select("#eegicon_text").text("PLEASE ADJUST HEADBAND").style("opacity", 1).style("color", "red")
+                            playWarning()
+                        }
                     }
                     else {
                         d3.select("#eegicon_text").text("MUSE DATA GOOD").style("opacity", 1).style("color", "black")
+                        d3.select("#muse_status_data").style("fill", "green")
+                        d3.select("#eegicon_text").text("MUSE STREAMING").style("opacity", 1).style("color", "black")
+                        lastGoodData = millis
+                        dataGood = true
                     }
 
                 }
                 else {
-                    d3.select("#eegicon").style("opacity", 1)
-                    d3.select("#eegicon_text").text("App is scanning for Muse...").style("opacity", 0.5).style("color", "black")
+
+                    d3.select("#muse_status_muse").style("fill", "none")
+                    d3.select("#muse_status_data").style("fill", "none")
+                    d3.select("#eegicon_text").text("SCANNING FOR MUSE").style("opacity", 1).style("color", "black")
+
+
                 }
 
             }
             else {
-                d3.select("#eegicon").style("opacity", 0.2)
-                d3.select("#eegicon_text").text("Waiting...").style("opacity", 0.5).style("color", "black")
+                d3.select("#eegicon").style("opacity", deactiveOpacity)
+                d3.select("#muse_status_android").style("fill", "none")
+                d3.select("#muse_status_muse").style("fill", "none")
+                d3.select("#muse_status_data").style("fill", "none")
+                d3.select("#eegicon_text").text("Waiting...").style("opacity", deactiveOpacity).style("color", "black")
             }
 
 
             eegDataRecord.push(lastEEGdata)
-            eegDataRecord = eegDataRecord.slice(-1000)
             updateVarianceGraph(lastEEGdata)
-            
+
 
         }
         // Bad data
@@ -654,7 +833,7 @@ function watchEEG() {
                 lastEEGdata.muse_connected = false
                 lastEEGdata.android_connected = false
                 lastEEGdata.valid = false
-                d3.select("#eegicon").style("opacity", 0.2)
+                d3.select("#eegicon").style("opacity", deactiveOpacity)
                 d3.select("#eegicon_text").text("Waiting for Muse...").style("opacity", 0.5)
             }
 
@@ -677,7 +856,21 @@ function setupEEGgraph() {
         .attr("stroke-width", 5)
 
 }
+function playWarning() {
+    var d = new Date()
+    var millis = d.getTime()
+    var timeSince = millis - lastAudioPlay
+    if (timeSince > (1000 * 10)) {
+        var audio = new Audio(
+            'https://media.geeksforgeeks.org/wp-content/uploads/20190531135120/beep.mp3');
+        audio.play();
+        lastAudioPlay = millis
+    }
 
+}
+function vibrateGamepad() {
+    // Not yet implemented in browsers
+}
 function watchGamepad() {
     clearInterval(gamepadInterval)
     gamepadInterval = setInterval(function () {
@@ -693,7 +886,7 @@ function watchGamepad() {
             stopListeners()
         }
 
-        var gp = navigator.getGamepads()[0];
+        gp = navigator.getGamepads()[0];
         if (gp != null) {
             for (var b = 0; b < button_count; b++) {
                 var button = gp.buttons[b]
@@ -704,8 +897,7 @@ function watchGamepad() {
                     if (last_btn != b || (millis - last_btn_time) > minTimeClick) {
                         last_btn_time = millis
                         last_btn = b
-                        btn_history.push({ timestamp: millis, btn: b, value: button.value })
-                        console.log("button: " + b)
+
                         clickedGamepadButton(b)
 
                     }
@@ -839,31 +1031,48 @@ function buildMuseStatus() {
         .attr("cx", "70")
         .attr("cy", "40")
         .attr("r", "10")
-        .attr("fill", "grey")
+        .attr("fill", "none")
+        .attr("stroke", "black")
         .attr("id", "muse_status_android")
 
-    svg.append("text").text("Android App")
-        .attr("x", "25px")
+    svg.append("text").text("App")
+        .attr("x", "52px")
         .attr("y", "15px")
 
     // Muse Connected
     svg.append("circle")
-        .attr("cx", "200")
+        .attr("cx", "150")
         .attr("cy", "40")
+        .attr("stroke", "black")
         .attr("r", "10")
-        .attr("fill", "grey")
+        .attr("fill", "none")
         .attr("id", "muse_status_muse")
 
     svg.append("text").text("Muse")
-        .attr("x", "175px")
+        .attr("x", "125px")
         .attr("y", "15px")
+
+
+    // Data Good
+    svg.append("circle")
+        .attr("cx", "230")
+        .attr("cy", "40")
+        .attr("stroke", "black")
+        .attr("r", "10")
+        .attr("fill", "none")
+        .attr("id", "muse_status_data")
+
+    svg.append("text").text("Data")
+        .attr("x", "210px")
+        .attr("y", "15px")
+
 
 }
 function resetGamepadRecord() {
     buttonTimeSeries = []
     buttonClickCounts = {}
 
-    d3.select("#timechartsvg").selectAll("*").remove()
+
     pushNotice("Resetting...")
     updateBarChart(null)
     updateTimeSeries(null)
@@ -879,17 +1088,17 @@ function buildIndicators(div) {
         .append("img")
         .attr('width', 80)
         .attr("id", "gamepadicon")
-        .style('opacity', 0.2)
+        .style('opacity', deactiveOpacity)
         .attr('height', 80)
         .attr("alt", "")
         .attr("src", "gamepad_icon.svg")
 
     gamepadRow.append('td')
-        .style("min-width", "400px")
+        .style("min-width", "300px")
         .append("div")
         .attr("id", "gamepadtext")
         .text("Waiting for gamepad...")
-        .style("opacity", 0.5)
+        .style("opacity", deactiveOpacity)
 
     var selectorDiv = gamepadRow.append("td")
         .append("div")
@@ -901,7 +1110,7 @@ function buildIndicators(div) {
     museRow.append("td").append("img")
         .attr('width', 80)
         .attr("id", "eegicon")
-        .style('opacity', 0.2)
+        .style('opacity', deactiveOpacity)
         .attr('height', 80)
         .attr("alt", "")
         .attr("src", "eeg_icon.svg")
@@ -910,22 +1119,32 @@ function buildIndicators(div) {
         .append("div")
         .attr("id", "eegicon_text")
         .text("Waiting for Muse...")
-        .style("opacity", 0.5)
+        .style("opacity", deactiveOpacity)
 
     museRow.append('td')
         .append('svg')
         .attr("id", "muse_status_svg")
+        .style("opacity", deactiveOpacity)
+
+    museRow.append('td')
+        .append('svg')
+        .attr("id", "variance_svg")
+        .style("opacity", 1)
+
+
     buildMuseStatus()
 }
 
+
+
 function buildPage() {
+
     var header = d3.select("#header")
-        .style("background", backgroundLight)
         .style("display", "flex")
         .style("justify-content", "space-between")
 
     var container = d3.select("#charts")
-        .style("background", backgroundLight)
+
     container.style("margin", "20px")
 
     header.append("h1").text("Live Recording")
@@ -936,7 +1155,6 @@ function buildPage() {
         .style('font-size', "35px")
         .style("margin-right", "10px")
         .style("min-width", "30px")
-        .style("background", backgroundLight)
         .style("cursor", "pointer")
         .style("margin", "10px")
         .attr("id", "theme_toggle").text("☼")
@@ -944,23 +1162,24 @@ function buildPage() {
             if (theme == "light") {
                 theme = "dark"
                 d3.select(this).text("🌙")
-                .style('font-size', "20px")
+                    .style('font-size', "20px")
                 d3.selectAll("div").style("background", "darkgrey")
             }
             else {
                 theme = "light"
 
                 d3.select(this).text("☼")
-                .style('font-size', "35px")
-                d3.selectAll("div").style("background", "grey")
+                    .style('font-size', "35px")
+                d3.selectAll("div").style("background", backgroundLight)
 
             }
 
         })
-        
+
+    
 
     var indicators = container.append("div")
-        .style("background", backgroundLight)
+
 
     buildIndicators(indicators)
 
@@ -972,14 +1191,12 @@ function buildPage() {
         .attr("id", "barchartsvg")
         .attr("width", varianceChartWidth + "px")
         .attr("height", varianceChartHeight + "px")
-        .append("g")
-        .attr("id", "variance_svg")
-        .attr("width", varianceChartWidth - 2)
-        .attr("height", varianceChartHeight - 2)
-        .attr("transform", "translate(2, 2)")
+
 
     // TIMESERIES
     container.append("svg")
+        .style("border", "1px solid black")
+        .style("border-radius", "5px")
         .attr("width", timeseriesWidth + 20)
         .attr("height", timeseriesHeight + "px")
         .append("g")
@@ -992,7 +1209,7 @@ function buildPage() {
         .text("Save CSV")
         .style("font-size", textSize + "px")
         .on("click", function () {
-            saveGamepadCSV(buttonTimeSeries)
+            saveCSV()
         })
 
     options.append("button")
@@ -1028,6 +1245,15 @@ function buildPage() {
 
     // Set theme
     d3.selectAll("div").style("background", backgroundLight)
+
+    // Download existing markers
+    getAllMarkers().then((snapshot) => {
+
+        snapshot.forEach((doc) => {
+            var marker = doc.data()
+            markers.push(marker)
+        })
+    })
 
 }
 
