@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
-
 import { clone } from "../utils/functions";
-import { eegdata, addMarker, getAllMarkers, auth } from "../utils/database";
+import { login, eegdata, addMarker, getAllMarkers, auth, buildAuthContainer } from "../utils/database";
 import { ZoomTransform } from "d3";
 const d3 = require("d3");
 
@@ -11,7 +10,7 @@ const eegInterval = 500 // Milliseconds to wait before querying next eeg data (s
 var recording = true
 var d = new Date()
 var lastActivity = d.getTime() // If user doesn't engage with page for a while, data is stopped
-const userTimeout = 1000 * 60 * 2
+const userTimeout = 1000 * 60 * 60
 
 // Status
 var eegStatus = true  // Set to true when data from realtimedb seems to be live, set to false when last timestamp is old
@@ -26,10 +25,11 @@ var lastAudioPlay = 0
 
 // Theme
 var theme = "light"
-var backgroundLight = "white"
+var backgroundLight = "lightgrey"
 
 // Gamepad
 var gp;
+var minTimeClick = 1000 // Minimum time between clicks
 var vibratingTime = 0
 
 // EEG data from Realtime database
@@ -37,18 +37,24 @@ var eegInterval1, eegInterval2 = null // Intervals to monitor EEG data from real
 var lastEEGdata = null // last data, as copied from 'database' page
 var eegChartDelay = 2
 var eegDataRecord = [] // All data recorded
-var eegLineIds = ["tp10_gamma", "tp9_gamma", "af7_gamma", "af8_gamma"]
+var eegLineIds = ["tp10_gamma_normal", "tp9_gamma_normal", "af7_gamma_normal", "af8_gamma_normal"]
 
 // Markers
 var markers = []
+var tagOffset = 0
+var tagTextOffset = 20
 
 // Gamepad settings
 var gamepadInterval = null  // Holds the interval which watches for gamepad button presses
 var foundGamepad = false
 var tagDelay = 2    // Move the tags back this many seconds (otherwise they don't appear immediately)
 
+// Button Bar Chart
+const textSize = 22
+const barChartHeight = 120
+
 // Variance Chart
-var maxVariance = 150
+var maxVariance = 200
 var varianceChartHeight = 150
 var varianceChartMargin = 5
 var varianceChartWidth = 200
@@ -56,19 +62,16 @@ var varianceX = d3.scaleBand()
     .padding(1)
     .domain([0, 1, 2, 3])
     .range([5, varianceChartWidth - 5])
-
-
 var varianceY = d3.scaleLog()
     .domain([1, 10000])
     .range([varianceChartHeight - 5, 5])
 
+// Time Series
+const timeseriesMargin = 10
+const timeseriesHeight = window.innerHeight - (2 * timeseriesMargin)
+const timeseriesWidth = window.innerWidth - (2 * timeseriesMargin)
 
-
-var minTimeClick = 1000 // Minimum time between clicks
-const textSize = 22
-const barChartHeight = 120
-const timeseriesHeight = 200
-const timeseriesWidth = 900
+// Gamepad settings
 var buttonClickCounts = {}
 var buttonTimeSeries = []
 var button_count = 0
@@ -180,7 +183,7 @@ var buttonColors =
     "JHANAS": "blue",
     "ÑANAS": "darkblue",
     "CONTRACTED": "red",
-    "EXPANDED": "pu.duration(500)rple",
+    "EXPANDED": "purple",
     "BEGINNING PHENOMENON": "green",
     "END PHENOMENON": "red",
     "NEUTRAL": "blue"
@@ -208,9 +211,9 @@ var circleX = d3.scaleLinear()
     .range([50, timeseriesWidth])
 
 // EEG data
-var eegY = d3.scaleLog()
-    .domain([0.01, 100])
-    .range([timeseriesHeight, 10])
+var eegY = d3.scaleLinear()
+    .domain([-0.2, 0.5])
+    .range([timeseriesHeight, timeseriesMargin + 300])
 
 var eegLine = d3.line()
     .x(function (d, i) { return circleX(d[0]); })
@@ -280,7 +283,7 @@ function clickedGamepadButton(id) {
 
         // Check if the user has come back to page after a long time - if yes, reset any existing data
         if (buttonTimeSeries.length > 0) {
-            var lastMillis = buttonTimeSeries.slice(-1)[0].millis
+            var lastMillis = buttonTimeSeries.slice(-1)[0].timestamp
             var timeDiff_btn = millis - lastMillis
             var timeDiff_start = millis - timestart
             if (timeDiff_btn > (1000 * 60 * 30) || timeDiff_start > (1000 * 60 * 60 * 4)) {
@@ -290,7 +293,7 @@ function clickedGamepadButton(id) {
         }
         // Add a new timeseries entry
         var adjustedTimestamp = millis - (1000 * tagDelay) // Subtract some seconds for two reasons: 1) Adjust for user reaction, 2) the SVG cuts of last few seconds
-        var newClick = { millis: adjustedTimestamp, button: name, color: color }
+        var newClick = {timestamp: adjustedTimestamp, button: name, color: color }
         buttonTimeSeries.push(newClick)
 
         // Update chart
@@ -355,118 +358,138 @@ function updateMuseStatus() {
 function updateTimeSeries(timeseries) {
     var svg = d3.select("#timechartsvg")
     if (timeseries == null || timeseries.length == 0) {
-
+        svg.selectAll(".tag").remove() 
     }
     else {
         var d = svg.selectAll(".circle")
             .data(timeseries)
 
+
         d.enter().append("circle")
-            .attr("class", "circle")
-            .attr("cx", function (d, i) { return circleX(d.millis) })
-            .attr("cy", 30)
+            .attr("class", "circle tag")
+            .attr("cx", function (d, i) { return circleX(d.timestamp) })
+            .attr("cy", tagOffset)
             .attr("r", "10")
             .attr("fill", function (d) { return d.color })
 
         d.enter().append("text")
-            .attr("class", "text")
+            .attr("class", "text tag")
             .style("font-size", "14px")
             .text(function (d) { return d.button })
             .attr("x", 0)
             .attr("y", 0)
             .attr("transform", function (d, i) {
-                return "translate(" + circleX(d.millis) + ", " + 50 + "), rotate(-45)"
+                return "translate(" + circleX(d.timestamp) + ", " + (tagOffset + tagTextOffset) + "), rotate(-45)"
             })
             .style("text-anchor", "end")
     }
 
 }
 function saveCSV() {
-    var stringOut = "data:text/csv;charset=utf-8,timestamp,af7_alpha,af7_beta,af7_delta,af7_gamma,af7_theta,af8_alpha,af8_beta,af8_delta,af8_gamma,af8_theta,tp10_alpha,tp10_beta,tp10_delta,tp10_gamma,tp10_theta,tp9_alpha,tp9_beta,tp9_delta,tp9_gamma,tp9_theta,af7_variance,af8_variance,tp9_variance,tp10_variance,tag\r\n"
 
-    var keys = [
-        "timestamp",
-        "af7_alpha",
-        "af7_beta",
-        "af7_delta",
-        "af7_gamma",
-        "af7_theta",
+    var stringOut = ""
+    // EEG + Tags
+    if (eegDataRecord.length > 30) {
+        console.log("Saving EEG + Tags")
+        stringOut = "data:text/csv;charset=utf-8,timestamp,af7_alpha,af7_beta,af7_delta,af7_gamma,af7_theta,af8_alpha,af8_beta,af8_delta,af8_gamma,af8_theta,tp10_alpha,tp10_beta,tp10_delta,tp10_gamma,tp10_theta,tp9_alpha,tp9_beta,tp9_delta,tp9_gamma,tp9_theta,af7_variance,af8_variance,tp9_variance,tp10_variance,tag\r\n"
 
-        "af8_alpha",
-        "af8_beta",
-        "af8_delta",
-        "af8_gamma",
-        "af8_theta",
+        var keys = [
+            "timestamp",
+            "af7_alpha",
+            "af7_beta",
+            "af7_delta",
+            "af7_gamma",
+            "af7_theta",
 
-        "tp10_alpha",
-        "tp10_beta",
-        "tp10_delta",
-        "tp10_gamma",
-        "tp10_theta",
+            "af8_alpha",
+            "af8_beta",
+            "af8_delta",
+            "af8_gamma",
+            "af8_theta",
 
-        "tp9_alpha",
-        "tp9_beta",
-        "tp9_delta",
-        "tp9_gamma",
-        "tp9_theta",
+            "tp10_alpha",
+            "tp10_beta",
+            "tp10_delta",
+            "tp10_gamma",
+            "tp10_theta",
 
-        "af7_variance",
-        "af8_variance",
-        "tp9_variance",
-        "tp10_variance",
+            "tp9_alpha",
+            "tp9_beta",
+            "tp9_delta",
+            "tp9_gamma",
+            "tp9_theta",
 
-        "tag"
+            "af7_variance",
+            "af8_variance",
+            "tp9_variance",
+            "tp10_variance",
 
-    ]
-    var badDataTags = [
+            "tag"
 
-        "af7_variance",
-        "af8_variance",
-        "tp9_variance",
-        "tp10_variance",
+        ]
+        var badDataTags = [
 
-        "tag"]
+            "af7_variance",
+            "af8_variance",
+            "tp9_variance",
+            "tp10_variance",
 
-    console.log(keys.join(","))
-    var buttonTimestampsUsed = []
-    eegDataRecord.forEach(entry => {
-        var timestamp = entry.timestamp
-        var btn_matches = btn_history.filter(btn => btn.timestamp >= timestamp && btn.timestamp < timestamp + 1000)
-        var tag = ""
-        if (btn_matches.length >= 1) {
-            var button = btn_matches[0]
-            if (!buttonTimestampsUsed.includes(button.timestamp)) {
-                tag = button.tag
-                console.log("found btn: " + tag)
-                buttonTimestampsUsed.push(button.timestamp)
+            "tag"]
+
+        var buttonTimestampsUsed = []
+        eegDataRecord.forEach(entry => {
+            var timestamp = entry.timestamp
+            var btn_matches = btn_history.filter(btn => btn.timestamp >= timestamp && btn.timestamp < timestamp + 1000)
+            var tag = ""
+            if (btn_matches.length >= 1) {
+                var button = btn_matches[0]
+                if (!buttonTimestampsUsed.includes(button.timestamp)) {
+                    tag = button.tag
+                    console.log("found btn: " + tag)
+                    buttonTimestampsUsed.push(button.timestamp)
+
+                }
+
+            }
+            entry.tag = tag
+
+            var csvString = ""
+            if (entry.valid == false) {
+                csvString = timestamp + ",,,,,,,,,,,,,,,,,,,,,"
+                badDataTags.forEach(key => {
+                    csvString = csvString + entry[key] + ","
+                })
+            }
+            else {
+                keys.forEach(key => {
+                    csvString = csvString + entry[key] + ","
+                })
 
             }
 
-        }
-        entry.tag = tag
+            csvString += "\r\n"
+            stringOut += csvString
+        })
 
-        var csvString = ""
-        if (entry.valid == false) {
-            csvString = timestamp + ",,,,,,,,,,,,,,,,,,,,,"
-            badDataTags.forEach(key => {
-                csvString = csvString + entry[key] + ","
+
+    }
+    else if (buttonTimeSeries.length > 0) {
+        console.log("Saving Tags only")
+        stringOut = "data:text/csv;charset=utf-8,timestamp,button,color\r\n"
+        buttonTimeSeries.forEach(row =>
+            {
+                stringOut += row.timestamp + "," + row.button + "," + row.color + "\r\n"
             })
-        }
-        else {
-            keys.forEach(key => {
-                csvString = csvString + entry[key] + ","
-            })
-
-        }
-
-        csvString += "\r\n"
-        stringOut += csvString
-    })
+    }
+    else {
+        window.alert("No Data!")
+    }
+    if (stringOut.length > 10) {
+        var encodeduri = encodeURI(stringOut)
+        window.open(encodeduri)
+    }
 
 
-
-    var encodeduri = encodeURI(stringOut)
-    window.open(encodeduri)
 }
 function updateBarChart(btns) {
     var svg = d3.select("#barchartsvg")
@@ -518,6 +541,23 @@ function updateBarChart(btns) {
             .text(function (d) { return d[1] })
     }
 
+
+}
+function modifyEEG(entry) {
+    // Takes a json directly from firebase post, then adds some data like ratios
+    const channels = ["tp10", "tp9", "af7", "af8"]
+    const bands = ["delta", "theta", "alpha", "beta", "gamma"]
+    var normal = {}
+    channels.forEach(channel => {
+        var totalPower = d3.sum(bands.map(band => Math.pow(10, entry[channel + "_" + band])))
+        bands.forEach(band => {
+            var key = channel + "_" + band
+            var normalValue = Math.pow(10, entry[key]) / totalPower
+            entry[key + "_normal"] = normalValue
+        })
+
+    })
+    return entry
 
 }
 function updateVarianceGraph(data) {
@@ -600,7 +640,7 @@ function rescaleTimeseries() {
 
     svg.selectAll(".circle")
         .transition()
-        .attr("cx", function (d, i) { return circleX(d.millis) })
+        .attr("cx", function (d, i) { return circleX(d.timestamp) })
         .ease(d3.easeLinear)
         .duration(eegInterval)
 
@@ -614,7 +654,7 @@ function rescaleTimeseries() {
     svg.selectAll(".text")
         .transition()
         .attr("transform", function (d, i) {
-            return "translate(" + circleX(d.millis) + ", " + 50 + "), rotate(-45)"
+            return "translate(" + circleX(d.timestamp) + ", " + (tagOffset + tagTextOffset) + "), rotate(-45)"
         })
         .ease(d3.easeLinear)
         .duration(eegInterval)
@@ -767,6 +807,8 @@ function watchEEG() {
             }
             if (androidStatus == true) {
                 d3.select("#muse_status_android").style("fill", "green")
+                d3.select("#muse_status_svg").style("display", "flex")
+                d3.select("#variance_svg").style("display", "flex")
                 d3.select("#eegicon").style("opacity", 1)
                 if (museConnected == true) {
 
@@ -814,10 +856,10 @@ function watchEEG() {
                 d3.select("#muse_status_android").style("fill", "none")
                 d3.select("#muse_status_muse").style("fill", "none")
                 d3.select("#muse_status_data").style("fill", "none")
-                d3.select("#eegicon_text").text("Waiting...").style("opacity", deactiveOpacity).style("color", "black")
+                d3.select("#eegicon_text").text("Waiting for Muse...").style("opacity", deactiveOpacity).style("color", "black")
             }
 
-
+            lastEEGdata = modifyEEG(lastEEGdata)
             eegDataRecord.push(lastEEGdata)
             updateVarianceGraph(lastEEGdata)
 
@@ -852,7 +894,12 @@ function setupEEGgraph() {
         .enter().append('path').attr("id", function (d) { return d })
         .attr("class", "eegline")
         .attr("fill", "none")
-        .attr("stroke", "black")
+        .attr("stroke", function (d, i) {
+            if (i == 0) return "red"
+            else if (i == 1) return "blue"
+            else if (i == 2) return "green"
+            else return "black"
+        })
         .attr("stroke-width", 5)
 
 }
@@ -952,7 +999,7 @@ function watchGamepad() {
 
                         var millis = date.getTime()
                         if ((millis - last_axes_time) > minTimeClick) {
-                            console.log("pad: " + pad + " " + a + " " + dir)
+
                             last_axes_time = millis
                             last_axes = id
                             clickedGamepadButton(id)
@@ -1071,6 +1118,7 @@ function buildMuseStatus() {
 function resetGamepadRecord() {
     buttonTimeSeries = []
     buttonClickCounts = {}
+    eegDataRecord = []
 
 
     pushNotice("Resetting...")
@@ -1125,20 +1173,22 @@ function buildIndicators(div) {
         .append('svg')
         .attr("id", "muse_status_svg")
         .style("opacity", deactiveOpacity)
+        .style("display", "none")
 
     museRow.append('td')
         .append('svg')
         .attr("id", "variance_svg")
+        .style("display", "none")
         .style("opacity", 1)
 
 
     buildMuseStatus()
 }
 
-
-
 function buildPage() {
 
+
+    d3.select("#root").style("height", window.innerHeight + "px")
     var header = d3.select("#header")
         .style("display", "flex")
         .style("justify-content", "space-between")
@@ -1176,7 +1226,7 @@ function buildPage() {
 
         })
 
-    
+
 
     var indicators = container.append("div")
 
@@ -1195,15 +1245,17 @@ function buildPage() {
 
     // TIMESERIES
     container.append("svg")
-        .style("border", "1px solid black")
-        .style("border-radius", "5px")
-        .attr("width", timeseriesWidth + 20)
-        .attr("height", timeseriesHeight + "px")
+        .style("position", "absolute")
+        .style("left", "10px")
+        .style("top", "500px")
+        .attr("width", timeseriesWidth)
+        .attr("height", timeseriesHeight)
         .append("g")
         .attr("id", "timechartsvg")
-        .attr("width", timeseriesWidth)
-        .attr("height", timeseriesHeight - 10)
-        .attr("transform", "translate(10, 10)")
+        .attr("width", timeseriesWidth - (2 * timeseriesMargin))
+        .attr("height", timeseriesHeight - (2 * timeseriesMargin))
+        .attr("transform", "translate(" + timeseriesMargin + ", " + timeseriesMargin + ")")
+
 
     options.append("button")
         .text("Save CSV")
@@ -1212,6 +1264,7 @@ function buildPage() {
             saveCSV()
         })
 
+
     options.append("button")
         .style("margin-left", "30px")
         .text("Reset")
@@ -1219,6 +1272,19 @@ function buildPage() {
         .on("click", function () {
             resetGamepadRecord()
         })
+
+    options.append("button")
+        .text("Sign In")
+        .style("margin-left", "100px")
+        .attr("class", "signin")
+        .style("font-size", textSize + "px")
+        .on("click", function () {
+
+            login()
+        })
+
+    buildAuthContainer(d3.select("#main-container"))
+
     setupEEGgraph()
     window.addEventListener("gamepadconnected", function (e) {
         var gp = navigator.getGamepads()[e.gamepad.index];
@@ -1265,11 +1331,12 @@ export default function Record() {
 
 
     return (
-        <div>
+        <div id="main-container">
             <div id="header"></div>
             <div id="charts"></div>
             <div id="options"></div>
         </div>
+
     );
 };
 

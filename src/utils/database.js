@@ -7,7 +7,7 @@ import * as firebaseui from "firebaseui"
 import "firebaseui/dist/firebaseui.css"
 import firebase from "firebase/compat/app"
 
-import { processCSV, buildAuthContainer, anonymous } from '../pages/live';
+import { processCSV, anonymous } from '../pages/map';
 
 const d3 = require("d3");
 
@@ -52,15 +52,34 @@ export function listenEEG(uid) {
 
     })
 }
+export function buildAuthContainer(div) {
+
+    var newdiv = div
+        .append("div")
+        .attr("id", "firebase-auth-container")
+        .style("position", "absolute")
+        .style("left", 0)
+        .style("top", 0)
+        .style("bottom", 0)
+        .style("right", 0)
+        .style("margin", "auto auto auto auto")
+        .style("width", "400px")
+        .style("height", "400px")
+        .style("opacity", 0.9)
+    return newdiv
+
+}
+
 
 export function login() {
-    buildAuthContainer()
-
+    
+    buildAuthContainer(d3.select("#main-container"))
     const ui = firebaseui.auth.AuthUI.getInstance() || new firebaseui.auth.AuthUI(auth)
     ui.start("#firebase-auth-container", {
         callbacks: {
             signInSuccessWithAuthResult: function (authResult, redirectUrl) {
                 console.log("---> Successful sign in")
+                d3.select("#firebase-auth-container").remove()
                 return false
             }
         },

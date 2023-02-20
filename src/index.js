@@ -9,7 +9,7 @@ import { getAnalytics } from "firebase/analytics";
 import About from "./pages/about"
 import Home from "./pages/home"
 import Layout from "./pages/layout"
-import Live from "./pages/live"
+import Map from "./pages/map"
 import Record from "./pages/record"
 
 
@@ -21,7 +21,7 @@ root.render(<BrowserRouter>
     <Route path="/" element={<Layout />}>
       <Route index element={<Home />} />
       <Route path="about" element={<About />} />
-      <Route path="live" element={<Live />} />
+      <Route path="map" element={<Map />} />
       <Route path="record" element={<Record />} />
     </Route>
   </Routes>

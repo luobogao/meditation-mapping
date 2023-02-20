@@ -1,4 +1,4 @@
-import { state, updateAllCharts, rebuildChart, users } from "../pages/live";
+import { state, updateAllCharts, rebuildChart, users } from "../pages/map";
 
 const d3 = require("d3");
 export function popUp(event, html) {

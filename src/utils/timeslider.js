@@ -1,5 +1,5 @@
 import { parsePx } from "./functions"
-import { state } from "../pages/live";
+import { state } from "../pages/map";
 import { sliderBottom } from 'd3-simple-slider';
 const d3 = require("d3");
 

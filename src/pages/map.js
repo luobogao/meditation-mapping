@@ -5,7 +5,7 @@ import "firebaseui/dist/firebaseui.css"
 import { addCheckbox, buildChartSelectors, buildResolutionSelectors, buildUserSelectors } from "../utils/ui";
 import { unique } from "../utils/functions";
 import { updateTimeseries, buildSimilarityChart, updateSimilarityChart } from "../utils/minicharts";
-import { auth, login, updateUsername, listenEEG, getAllWaypoints, downloadCSV } from "../utils/database"
+import { auth, login, updateUsername, listenEEG, getAllWaypoints, downloadCSV, buildAuthContainer } from "../utils/database"
 import { onAuthStateChanged, signInAnonymously } from "firebase/auth"
 import { waypoints_muse, waypoints_mindlink } from "../utils/vectors";
 import { dot, getRelativeVector, pca, runModel, measureDistance, cosineSimilarity, euclideanDistance, combinedDistance } from "../utils/analysis";
@@ -78,19 +78,35 @@ onAuthStateChanged(auth, (fbuser) => {
         console.log("Authenticated user:")
         console.log(user.displayName)
         d3.select("#user").text("Logged in as: " + user.email)
-        d3.select("#signin").text("Sign Out")
-        
+
+
         // Automatically start listening for realtime db updates for this user (data from Muse probably)
         listenEEG(user.uid)
+
+        d3.selectAll(".signin")
+            .text("Sign Out")
+            .on("click", function () {
+                console.log("Signing out...")
+                auth.signOut()
+                d3.select("#user").text("")
+                d3.selectAll(".signin").text("Sign In")
+                .on("click", function()
+                {
+                    buildAuthContainer(d3.select("#main-container"))
+                    login()
+                })
+            })
 
         // No display name - prompt user to choose one
         if (user.displayName == null) {
             d3.select("#welcome").remove()
             console.log("No user name yet")
-            var container = buildAuthContainer()
+            var container = buildAuthContainer(d3.select("#main-container"))
 
             container.selectAll("*").remove()
             container.style("background", "grey").style("border-radius", "5px").style("height", "220px")
+                .style("width", "400px")
+
             var div = container.append("div").style("margin", "20px").style("display", "flex").style("flex-direction", "column")
             div.append("text").text("Please choose a Username:").style("color", "white").style("margin-bottom", "10px")
             div.append("input").attr("type", "text").attr("id", "username-input").on("change", function (d) {
@@ -111,12 +127,7 @@ onAuthStateChanged(auth, (fbuser) => {
             state.userName = user.displayName
             d3.select("#user").text("Logged in: " + user.displayName)
             d3.select("#firebase-auth-container").remove()
-            d3.select("#signin").on("click", function () {
-                console.log("Signing out...")
-                auth.signOut()
-                d3.select("#user").text("")
-                d3.select("#signin").text("Login")
-            })
+
             // Download all waypoints
             var text = d3.select("#welcome-auth")
             if (text != null) {
@@ -133,12 +144,15 @@ onAuthStateChanged(auth, (fbuser) => {
         console.log("Not logged in")
         user = null
         email = null
-        d3.select("#signin").text("Login").on("click", function () {
+        d3.select("#signin").text("Sign In").on("click", function () {
+            buildAuthContainer(d3.select("#main-container"))
             login()
         })
 
         signInAnonymously(auth).then(() => {
             console.log("---> Logged in anonymously")
+            d3.selectAll(".signin").text("Sign In")
+            d3.select("#firebase-auth-container").remove()
             var text = d3.select("#welcome-auth")
             if (text != null) {
                 text.style("display", "flex").text("Logged in Anonymously")
@@ -175,7 +189,7 @@ function downloadWaypoints() {
 
 
         })
-        
+
         if (waypoints.length == 0 || users.length == 0) {
             alert("Could not download data from server...")
             return
@@ -339,31 +353,30 @@ function buildBrowseFile(div, label, widthpx, color, textColor, id) {
 
 export function rebuildChart() {
     waypoints = waypoints.filter(waypoint => waypoint.remove != true)
-    
+
     state.zoom = 1
 
     // Remove waypoints from users de-selected by user
     waypoints.forEach(waypoint => {
         waypoint.match = state.selected_users.includes(waypoint.user)
     })
-    waypoints.forEach(waypoint => 
-        {
-            if (waypoint.hide == true) waypoint.match = false
-        })
-    
+    waypoints.forEach(waypoint => {
+        if (waypoint.hide == true) waypoint.match = false
+    })
+
     var filtered_waypoints_user = waypoints.filter(e => e.match == true)
-    
+
 
     if (userDataLoaded == false) {
         // Only plot the waypoints - user hasn't loaded data yet
-        
+
         let vectors = waypoints.filter(w => w.match == true).map(e => getRelativeVector(e.vector))
         buildModel(vectors)
         updateChartWaypoints()
         return
     }
 
-    
+
     if (filtered_waypoints_user.length == 0) {
         alert("No Waypoints?")
         return
@@ -425,8 +438,7 @@ export function rebuildChart() {
                 .slice(0, maxWaypoints)
                 .map(e => e[0])
     }
-    else
-    {
+    else {
         // Use ALL waypoints
         filtered_waypoint_ids = filtered_waypoints_user.map(e => e.id)
     }
@@ -568,23 +580,6 @@ function buildModel(vectors) {
 
 
 }
-export function buildAuthContainer() {
-
-    var div = d3.select("#main-container")
-        .append("div")
-        .attr("id", "firebase-auth-container")
-        .style("position", "absolute")
-        .style("left", 0)
-        .style("top", 0)
-        .style("bottom", 0)
-        .style("right", 0)
-        .style("margin", "auto auto auto auto")
-        .style("width", "400px")
-        .style("height", "400px")
-        .style("opacity", 0.9)
-    return div
-
-}
 
 function setup() {
     d3.select("#main-container").style("display", "flex")
@@ -607,7 +602,7 @@ function setup() {
         .style("bottom", "10px")
         .style("left", "20px")
 
-    d3.select("#signin").style("width", "150px")
+    d3.select("#signin").attr("class", "signin").style("width", "150px")
 
 
     d3.selectAll("#popup, #menu")
