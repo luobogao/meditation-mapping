@@ -5,8 +5,8 @@ const d3 = require("d3");
 const math = require("mathjs");
 
 const channels = ["TP9", "TP10", "AF7", "AF8"]
-const bands = ["Delta", "Theta", "Alpha", "Beta", "Gamma"
-]
+const bands = ["Delta", "Theta", "Alpha", "Beta", "Gamma"]
+
 const band_channels = []
 bands.forEach(band => {
     channels.forEach(channel => {

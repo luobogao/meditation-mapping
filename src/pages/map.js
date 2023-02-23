@@ -11,7 +11,7 @@ import { waypoints_muse, waypoints_mindlink } from "../utils/vectors";
 import { dot, getRelativeVector, pca, runModel, measureDistance, cosineSimilarity, euclideanDistance, combinedDistance } from "../utils/analysis";
 import { zoom, updateChartWaypoints, updateChartUser } from "../utils/charts"
 import { signInWithEmailAndPassword } from "firebase/auth";
-
+import { eegRecordStandard } from "./record";
 
 
 export var userDataLoaded = false
@@ -81,7 +81,10 @@ onAuthStateChanged(auth, (fbuser) => {
 
 
         // Automatically start listening for realtime db updates for this user (data from Muse probably)
+        //var kaio = "Nr9PQxsLcKg0EXAacJNmkAce3263"
         listenEEG(user.uid)
+        //listenEEG(kaio)
+        
 
         d3.selectAll(".signin")
             .text("Sign Out")
@@ -90,11 +93,10 @@ onAuthStateChanged(auth, (fbuser) => {
                 auth.signOut()
                 d3.select("#user").text("")
                 d3.selectAll(".signin").text("Sign In")
-                .on("click", function()
-                {
-                    buildAuthContainer(d3.select("#main-container"))
-                    login()
-                })
+                    .on("click", function () {
+
+                        login()
+                    })
             })
 
         // No display name - prompt user to choose one
@@ -145,7 +147,7 @@ onAuthStateChanged(auth, (fbuser) => {
         user = null
         email = null
         d3.select("#signin").text("Sign In").on("click", function () {
-            buildAuthContainer(d3.select("#main-container"))
+
             login()
         })
 
@@ -642,6 +644,7 @@ function setup() {
     buildRealtime()
 
 
+
 }
 function buildRealtime() {
 
@@ -864,6 +867,7 @@ export default function Live() {
                     </div>
                 </div>
                 <div id="browse-div"></div>
+                
             </div>
             <svg id="chartsvg"></svg>
             <div id="popup"></div>

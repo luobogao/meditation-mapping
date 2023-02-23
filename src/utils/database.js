@@ -1,6 +1,7 @@
 import { getFirestore, collection, getDocs, setDoc, doc, deleteDoc, updateDoc, query, where, addDoc } from 'firebase/firestore/lite';
 import { getStorage, ref as storageRef, getBlob } from "firebase/storage"
 import { getDatabase, ref as dbref, onValue } from "firebase/database"
+import { startRecording } from '../pages/record';
 import { initializeApp } from "firebase/app";
 import { getAuth, onAuthStateChanged, updateProfile } from "firebase/auth"
 import * as firebaseui from "firebaseui"
@@ -41,152 +42,165 @@ export const db = getFirestore(app)
 
 export const auth = getAuth(app)
 
-export function listenEEG(uid) {
-    const eegref = dbref(database, "live-muse/" + uid)
-    console.log("Listening for data on user: " + uid)
+export function listenLiveUsers() {
+    const eegref = dbref(database, "live-muse")
     onValue(eegref, (snapshot) => {
-        d3.select("#realtime-div").text("LIVE CONNECTION")
-        //console.log("found data:")
-        //console.log(snapshot.val())
-        eegdata = snapshot.val()
 
-    })
-}
-export function buildAuthContainer(div) {
-
-    var newdiv = div
-        .append("div")
-        .attr("id", "firebase-auth-container")
-        .style("position", "absolute")
-        .style("left", 0)
-        .style("top", 0)
-        .style("bottom", 0)
-        .style("right", 0)
-        .style("margin", "auto auto auto auto")
-        .style("width", "400px")
-        .style("height", "400px")
-        .style("opacity", 0.9)
-    return newdiv
-
-}
+        var users = snapshot.val()
+        console.log("Live Users:")
+        console.log(users)
 
 
-export function login() {
-    
-    buildAuthContainer(d3.select("#main-container"))
-    const ui = firebaseui.auth.AuthUI.getInstance() || new firebaseui.auth.AuthUI(auth)
-    ui.start("#firebase-auth-container", {
-        callbacks: {
-            signInSuccessWithAuthResult: function (authResult, redirectUrl) {
-                console.log("---> Successful sign in")
-                d3.select("#firebase-auth-container").remove()
-                return false
-            }
-        },
-        signInOptions: [
-            {
-                provider: firebase.auth.EmailAuthProvider.PROVIDER_ID,
-                requireDisplayName: false
-            }
-        ],
-        privacyPolicyUrl: "<privacy url>"
-    }, [])
+    })}
+
+export function listenEEG(uid) {
+        const eegref = dbref(database, "live-muse/" + uid)
+        console.log("Listening for data on user: " + uid)
+        onValue(eegref, (snapshot) => {
+            d3.select("#realtime-div").text("LIVE CONNECTION")
+            //console.log("found data:")
+            //console.log(snapshot.val())
+            eegdata = snapshot.val()
+            startRecording()
 
 
-}
-export function updateUsername() {
-    var newUsername = d3.select("#username-input").node().value
-    var dialog = d3.select("#firebase-auth-container")
-    if (newUsername.length > 2) {
-        console.log("changed: " + newUsername)
-
-        updateProfile(auth.currentUser, { displayName: newUsername }).then(() => {
-            console.log("Profile updated!")
-            d3.select("#user").text("Logged in: " + newUsername)
-            dialog.selectAll('*').remove()
-            dialog.style("display", "none")
-            registerUser()
         })
-            .catch((error) => {
-                console.error("Error updating!")
-                d3.select("#user").text("FAILED TO UPDATE")
-                dialog.append("text").text("FAILED TO UPDATE")
+    }
+    export function buildAuthContainer(div) {
 
-            })
+        var newdiv = div
+            .append("div")
+            .attr("id", "firebase-auth-container")
+            .style("position", "absolute")
+            .style("left", 0)
+            .style("top", 0)
+            .style("bottom", 0)
+            .style("right", 0)
+            .style("margin", "auto auto auto auto")
+            .style("width", "400px")
+            .style("height", "400px")
+            .style("opacity", 0.9)
+        return newdiv
+
     }
 
-}
-export function downloadCSV(path) {
-    var pathReference = storageRef(storage, "Self-Inquiry - BEST.csv")
-    getBlob(pathReference).then((blob) => {
-        blob.text().then((string) => {
-            console.log("---> Downloaded CSV")
-            processCSV(string)
 
+    export function login() {
+
+        buildAuthContainer(d3.select("#main-container"))
+        const ui = firebaseui.auth.AuthUI.getInstance() || new firebaseui.auth.AuthUI(auth)
+        ui.start("#firebase-auth-container", {
+            callbacks: {
+                signInSuccessWithAuthResult: function (authResult, redirectUrl) {
+                    console.log("---> Successful sign in")
+                    d3.select("#firebase-auth-container").remove()
+                    return false
+                }
+            },
+            signInOptions: [
+                {
+                    provider: firebase.auth.EmailAuthProvider.PROVIDER_ID,
+                    requireDisplayName: false
+                }
+            ],
+            privacyPolicyUrl: "<privacy url>"
+        }, [])
+
+
+    }
+    export function updateUsername() {
+        var newUsername = d3.select("#username-input").node().value
+        var dialog = d3.select("#firebase-auth-container")
+        if (newUsername.length > 2) {
+            console.log("changed: " + newUsername)
+
+            updateProfile(auth.currentUser, { displayName: newUsername }).then(() => {
+                console.log("Profile updated!")
+                d3.select("#user").text("Logged in: " + newUsername)
+                dialog.selectAll('*').remove()
+                dialog.style("display", "none")
+                registerUser()
+            })
+                .catch((error) => {
+                    console.error("Error updating!")
+                    d3.select("#user").text("FAILED TO UPDATE")
+                    dialog.append("text").text("FAILED TO UPDATE")
+
+                })
+        }
+
+    }
+    export function downloadCSV(path) {
+        var pathReference = storageRef(storage, "Self-Inquiry - BEST.csv")
+        getBlob(pathReference).then((blob) => {
+            blob.text().then((string) => {
+                console.log("---> Downloaded CSV")
+                processCSV(string)
+
+            })
         })
-    })
-}
-function registerUser() {
-    var user = auth.currentUser
-    addDoc(collection(db, "users"), { id: user.uid, userName: user.displayName, userID: user.uid })
-}
+    }
+    function registerUser() {
+        var user = auth.currentUser
+        addDoc(collection(db, "users"), { id: user.uid, userName: user.displayName, userID: user.uid })
+    }
 
-export function addWaypoint(waypoint) {
+    export function addWaypoint(waypoint) {
 
-    if (!anonymous) {
+        if (!anonymous) {
+            var date = new Date()
+            var millis = date.getTime()
+            var userid = auth.currentUser.uid
+
+            if (waypoint.notes == undefined) waypoint.notes = null
+            var entry = {
+                user: waypoint.user, addedBy: userid, label: waypoint.label, vector: waypoint.vector,
+                notes: waypoint.notes, delete: false, addedTime: millis, resolution: waypoint.resolution
+            }
+
+            var promise = addDoc(collection(db, "waypoints"), entry)
+            return promise
+        }
+
+    }
+    export function addMarker(eegdata, markerName) {
         var date = new Date()
         var millis = date.getTime()
         var userid = auth.currentUser.uid
+        var entry = { user: userid, marker: markerName, addedTime: millis, vector: eegdata }
+        var promise = addDoc(collection(db, "markers"), entry)
+        return promise
 
-        if (waypoint.notes == undefined) waypoint.notes = null
-        var entry = {
-            user: waypoint.user, addedBy: userid, label: waypoint.label, vector: waypoint.vector,
-            notes: waypoint.notes, delete: false, addedTime: millis, resolution: waypoint.resolution
+    }
+    export function deleteWaypoint(waypoint) {
+        // Warning: does NOT delete the firebase entry, it just sets "delete = true"
+        if (!anonymous) {
+            console.log("Deleting: " + waypoint.id)
+            //var promise = deleteDoc(doc(db, "waypoints", waypoint.id))
+            var promise = updateDoc(doc(db, "waypoints", waypoint.id), { delete: true })
+            return promise
         }
 
-        var promise = addDoc(collection(db, "waypoints"), entry)
+    }
+    export function getAllMarkers() {
+        var q = query(collection(db, "markers"))
+        var promise = getDocs(q)
+        return promise
+    }
+    export function getAllWaypoints() {
+        var q = query(collection(db, "waypoints"), where("delete", "!=", true))
+        var promise = getDocs(q)
         return promise
     }
 
-}
-export function addMarker(eegdata, markerName) {
-    var date = new Date()
-    var millis = date.getTime()
-    var userid = auth.currentUser.uid
-    var entry = {user: userid, marker: markerName, addedTime: millis, vector: eegdata}
-    var promise = addDoc(collection(db, "markers"), entry)
-    return promise
+    export function updateWaypoint(waypoint) {
+        if (!anonymous) {
+            var date = new Date()
+            var millis = date.getTime()
+            waypoint.updatedTime = millis
+            var promise = updateDoc(doc(db, "waypoints", waypoint.id), { notes: waypoint.notes, label: waypoint.label, updateTime: millis, updatedBy: auth.currentUser.uid })
+            return promise
+        }
 
-}
-export function deleteWaypoint(waypoint) {
-    // Warning: does NOT delete the firebase entry, it just sets "delete = true"
-    if (!anonymous) {
-        console.log("Deleting: " + waypoint.id)
-        //var promise = deleteDoc(doc(db, "waypoints", waypoint.id))
-        var promise = updateDoc(doc(db, "waypoints", waypoint.id), { delete: true })
-        return promise
     }
-
-}
-export function getAllMarkers() {
-    var q = query(collection(db, "markers"))
-    var promise = getDocs(q)
-    return promise
-}
-export function getAllWaypoints() {
-    var q = query(collection(db, "waypoints"), where("delete", "!=", true))
-    var promise = getDocs(q)
-    return promise
-}
-
-export function updateWaypoint(waypoint) {
-    if (!anonymous) {
-        var date = new Date()
-        var millis = date.getTime()
-        waypoint.updatedTime = millis
-        var promise = updateDoc(doc(db, "waypoints", waypoint.id), { notes: waypoint.notes, label: waypoint.label, updateTime: millis, updatedBy: auth.currentUser.uid })
-        return promise
-    }
-
-}
 

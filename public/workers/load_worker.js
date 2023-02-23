@@ -228,6 +228,8 @@ function processDataMuse(rows) {
     returnObj.averageMax = averageMax
     returnObj.raw = raw
 
+    console.log(averageLowRes.slice(-10)[0])
+
     // Find the first and last timestamp for timeseries chart x-axis
     const first_seconds = standardRows[0].seconds
     const last_seconds = standardRows.slice(-1)[0].seconds

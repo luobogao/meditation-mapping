@@ -4,6 +4,8 @@ import { login, eegdata, addMarker, getAllMarkers, auth, buildAuthContainer } fr
 import { ZoomTransform } from "d3";
 const d3 = require("d3");
 
+const testing = true
+
 const fontFamily = "Roboto, sans-serif"
 
 const eegInterval = 500 // Milliseconds to wait before querying next eeg data (should match the android app)
@@ -11,6 +13,13 @@ var recording = true
 var d = new Date()
 var lastActivity = d.getTime() // If user doesn't engage with page for a while, data is stopped
 const userTimeout = 1000 * 60 * 60
+
+// Export
+var averageEEGseconds = 10 // Number of seconds to average the raw EEG export 
+
+// Muse constants
+const channelsMuse = ["tp10", "tp9", "af7", "af8"]
+const bandsMuse = ["delta", "theta", "alpha", "beta", "gamma"]
 
 // Status
 var eegStatus = true  // Set to true when data from realtimedb seems to be live, set to false when last timestamp is old
@@ -26,6 +35,7 @@ var lastAudioPlay = 0
 // Theme
 var theme = "light"
 var backgroundLight = "lightgrey"
+var backgroundDark = "#3F3F3F"
 
 // Gamepad
 var gp;
@@ -37,6 +47,7 @@ var eegInterval1, eegInterval2 = null // Intervals to monitor EEG data from real
 var lastEEGdata = null // last data, as copied from 'database' page
 var eegChartDelay = 2
 var eegDataRecord = [] // All data recorded
+export var eegRecordStandard = [] // Data saved with a standard format that the rest of the website can use
 var eegLineIds = ["tp10_gamma_normal", "tp9_gamma_normal", "af7_gamma_normal", "af8_gamma_normal"]
 
 // Markers
@@ -54,7 +65,7 @@ const textSize = 22
 const barChartHeight = 120
 
 // Variance Chart
-var maxVariance = 200
+var maxVariance = 2000
 var varianceChartHeight = 150
 var varianceChartMargin = 5
 var varianceChartWidth = 200
@@ -68,7 +79,7 @@ var varianceY = d3.scaleLog()
 
 // Time Series
 const timeseriesMargin = 10
-const timeseriesHeight = window.innerHeight - (2 * timeseriesMargin)
+const timeseriesHeight = window.innerHeight - (2 * timeseriesMargin) - 500
 const timeseriesWidth = window.innerWidth - (2 * timeseriesMargin)
 
 // Gamepad settings
@@ -188,6 +199,12 @@ var buttonColors =
     "END PHENOMENON": "red",
     "NEUTRAL": "blue"
 }
+var museModels = 
+[
+    {id: "MU_02", name: "Muse 2016"},
+    {id: "MU_05", name: "Muse S"}
+
+]
 
 var maxBarXdefault = 10
 var maxBarX = maxBarXdefault
@@ -213,7 +230,7 @@ var circleX = d3.scaleLinear()
 // EEG data
 var eegY = d3.scaleLinear()
     .domain([-0.2, 0.5])
-    .range([timeseriesHeight, timeseriesMargin + 300])
+    .range([timeseriesHeight, timeseriesMargin])
 
 var eegLine = d3.line()
     .x(function (d, i) { return circleX(d[0]); })
@@ -221,7 +238,23 @@ var eegLine = d3.line()
     .defined(((d, i) => d[2]))
     .curve(d3.curveMonotoneX) // apply smoothing to the line
 
+var recordingStatus = 0
+export function startRecording() {
 
+
+    if (recordingStatus == 0) {
+        recordingStatus = 1
+    }
+    else if (recordingStatus == 1) {
+        recordingStatus = 2
+        console.log("STARTING RECORDING")
+    }
+    else
+    {
+        recordEEG()
+    }
+
+}
 
 function pushNotice(message) {
     var div = d3.select('#charts')
@@ -293,7 +326,7 @@ function clickedGamepadButton(id) {
         }
         // Add a new timeseries entry
         var adjustedTimestamp = millis - (1000 * tagDelay) // Subtract some seconds for two reasons: 1) Adjust for user reaction, 2) the SVG cuts of last few seconds
-        var newClick = {timestamp: adjustedTimestamp, button: name, color: color }
+        var newClick = { timestamp: adjustedTimestamp, button: name, color: color }
         buttonTimeSeries.push(newClick)
 
         // Update chart
@@ -358,7 +391,7 @@ function updateMuseStatus() {
 function updateTimeSeries(timeseries) {
     var svg = d3.select("#timechartsvg")
     if (timeseries == null || timeseries.length == 0) {
-        svg.selectAll(".tag").remove() 
+        svg.selectAll(".tag").remove()
     }
     else {
         var d = svg.selectAll(".circle")
@@ -437,9 +470,47 @@ function saveCSV() {
             "tag"]
 
         var buttonTimestampsUsed = []
-        eegDataRecord.forEach(entry => {
+        var step = Math.round(averageEEGseconds / 2)
+        for (let i = 0; i < eegDataRecord.length - step - 1; i += step) {
+            var entry = eegDataRecord[i]
+            var averageEntry = {}
             var timestamp = entry.timestamp
-            var btn_matches = btn_history.filter(btn => btn.timestamp >= timestamp && btn.timestamp < timestamp + 1000)
+            averageEntry.timestamp = timestamp
+
+            // Iterate over this average-N sized sublist and average all entries
+
+            let bands = bandsMuse.concat(["variance"])
+            channelsMuse.forEach(channel => {
+                bands.forEach(band => {
+                    let key = channel + "_" + band
+                    let valueArr = []
+                    for (let s = 0; s < step; s += 1) {
+                        var entry2 = eegDataRecord[i + s]
+                        if (entry2.valid == true) {
+
+                            let value = entry2[key]
+
+                            valueArr.push(value)
+                        }
+
+                    }
+                    if (valueArr.length > (step * 0.8)) {
+                        var avg = d3.mean(valueArr)
+                        if (band == "variance") {
+                            avg = d3.max(valueArr)
+                        }
+                        averageEntry[key] = avg
+                    }
+                    else {
+                        // There is bad data in the last N points, skipping
+                        entry.valid = false
+                    }
+
+                })
+            })
+
+            // Find any matching buttons
+            var btn_matches = btn_history.filter(btn => btn.timestamp >= timestamp && btn.timestamp < timestamp + (1000 * step))
             var tag = ""
             if (btn_matches.length >= 1) {
                 var button = btn_matches[0]
@@ -452,6 +523,7 @@ function saveCSV() {
 
             }
             entry.tag = tag
+            averageEntry.tag = tag
 
             var csvString = ""
             if (entry.valid == false) {
@@ -462,24 +534,21 @@ function saveCSV() {
             }
             else {
                 keys.forEach(key => {
-                    csvString = csvString + entry[key] + ","
+                    csvString = csvString + averageEntry[key] + ","
                 })
 
             }
 
             csvString += "\r\n"
             stringOut += csvString
-        })
-
-
+        }
     }
     else if (buttonTimeSeries.length > 0) {
         console.log("Saving Tags only")
         stringOut = "data:text/csv;charset=utf-8,timestamp,button,color\r\n"
-        buttonTimeSeries.forEach(row =>
-            {
-                stringOut += row.timestamp + "," + row.button + "," + row.color + "\r\n"
-            })
+        buttonTimeSeries.forEach(row => {
+            stringOut += row.timestamp + "," + row.button + "," + row.color + "\r\n"
+        })
     }
     else {
         window.alert("No Data!")
@@ -545,18 +614,30 @@ function updateBarChart(btns) {
 }
 function modifyEEG(entry) {
     // Takes a json directly from firebase post, then adds some data like ratios
-    const channels = ["tp10", "tp9", "af7", "af8"]
-    const bands = ["delta", "theta", "alpha", "beta", "gamma"]
-    var normal = {}
-    channels.forEach(channel => {
-        var totalPower = d3.sum(bands.map(band => Math.pow(10, entry[channel + "_" + band])))
-        bands.forEach(band => {
-            var key = channel + "_" + band
-            var normalValue = Math.pow(10, entry[key]) / totalPower
-            entry[key + "_normal"] = normalValue
-        })
 
-    })
+    var normal = {}
+    normal["TimeStamp"] = entry.timestamp
+    if (entry != null && entry.valid == true) {
+
+        channelsMuse.forEach(channel => {
+            var totalPower = d3.sum(bandsMuse.map(band => Math.pow(10, entry[channel + "_" + band])))
+            bandsMuse.forEach(band => {
+                var key = channel + "_" + band
+                var normalValue = Math.pow(10, entry[key]) / totalPower
+                entry[key + "_normal"] = normalValue
+
+
+                var bandStandard = band.charAt(0).toUpperCase() + band.slice(1)
+                var channelStandard = channel.toUpperCase()
+                var keyStandard = channelStandard + "_" + bandStandard
+                normal[keyStandard] = parseFloat(entry[key].toFixed(4))
+
+            })
+
+        })
+    }
+
+    eegRecordStandard.push(normal)
     return entry
 
 }
@@ -675,14 +756,13 @@ function rescaleTimeseries() {
 function stopListeners() {
 
     if (recording != false) {
-        stopEEG()
+        
         clearInterval(gamepadInterval)
         recording = false
         console.log("USER TIMEOUT")
 
         var res = window.confirm("Restart?")
         if (res == true) {
-            watchEEG()
             watchGamepad()
             resetGamepadRecord()
             var d = new Date()
@@ -693,197 +773,192 @@ function stopListeners() {
 
 
 }
-function stopEEG() {
-    clearInterval(eegInterval1)
-    clearInterval(eegInterval2)
 
-}
-function watchEEG() {
-    // Monitor EEG data
-    clearInterval(eegInterval1)
-    eegInterval1 = setInterval(function () { rescaleTimeseries() }, 100)
+function recordEEG() {
 
-    // Record EEG
-    clearInterval(eegInterval2)
-    eegInterval2 = setInterval(function () {
+    if (eegdata != null) {
+        var date = new Date()
+        var millis = date.getTime()
+        var timeDiff = millis - eegdata.timestamp
 
-        if (eegdata != null) {
-            var date = new Date()
-            var millis = date.getTime()
-            var timeDiff = millis - eegdata.timestamp
-
-            // Stop the EEG listening if there hasn't been any updates in a while
-            if ((millis - lastActivity) > (1000 * userTimeout)) {
-                stopListeners()
-            }
+        // Stop the EEG listening if there hasn't been any updates in a while
+        if ((millis - lastActivity) > (1000 * userTimeout)) {
+            stopListeners()
+        }
 
 
-            if (lastEEGdata == null) {
-                console.log("First eeg data: diff = " + timeDiff)
-                lastEEGdata = clone(eegdata)
-
-
-            }
-
-
-            if (timeDiff > (1000 * 60)) {
-                if (eegStatus == true) {
-                    console.error("--> EEG data is old (" + (timeDiff / 1000 / 60) + " minutes)")
-                    eegStatus = false
-                }
-            }
-
-            else {
-
-                if (lastEEGdata == null) {
-                    console.log("First eeg data")
-                    lastEEGdata = clone(eegdata)
-                    lastEEGdata.android_connected = true
-                    if (timeDiff > (1000 * 60)) {
-                        eegStatus = false
-                        console.log("EEG data is old")
-                    }
-                    else {
-                        eegStatus = true
-                    }
-
-
-                }
-                else {
-
-
-
-                    // Data hasn't changed
-                    if (eegdata.timestamp == lastEEGdata.timestamp) {
-                        console.log("Last timestamp was the same")
-
-                        if (eegStatus == true) {
-
-
-
-                            if (timeDiff > (1000 * 2.1)) {
-
-                                eegStatus = false // flag so that console isn't flooded with messages
-                                androidStatus = false
-                                museConnected = false
-                                if (timeDiff > (1000 * 120)) {
-                                    console.log("----> Data is old (" + Math.round(timeDiff / 1000 / 60) + " minutes)")
-
-                                }
-                                else if (timeDiff > (1000 * 60 * 60 * 24)) {
-                                    console.log("----> Data is old (" + Math.round(timeDiff / 1000 / 60 / 60 / 24) + " days)")
-                                }
-
-
-                                else {
-                                    console.log("----> MUSE LOST - Data is old (" + Math.round(timeDiff / 1000) + " seconds)")
-
-                                }
-
-                            }
-                        }
-
-                    }
-                    // Everything is good - record new datapoint
-                    else {
-
-                        lastEEGdata = clone(eegdata)
-
-                        androidStatus = true
-
-                        if (lastEEGdata.muse_connected == true) {
-
-                            museConnected = true
-                        }
-                        else museConnected = false
-                        eegStatus = true
-
-
-                    }
-
-                }
-
-
-            }
-            if (androidStatus == true) {
-                d3.select("#muse_status_android").style("fill", "green")
-                d3.select("#muse_status_svg").style("display", "flex")
-                d3.select("#variance_svg").style("display", "flex")
-                d3.select("#eegicon").style("opacity", 1)
-                if (museConnected == true) {
-
-                    lastActivity = millis
-                    d3.select("#muse_status_muse").style("fill", "green")
-
-                    // Check variance
-
-                    if (lastEEGdata.tp10_variance > maxVariance ||
-                        lastEEGdata.tp9_variance > maxVariance ||
-                        lastEEGdata.af7_variance > maxVariance ||
-                        lastEEGdata.af8_variance > maxVariance
-                    ) {
-                        d3.select("#eegicon_text").text("BAD DATA").style("opacity", 1).style("color", "red")
-                        d3.select("#muse_status_data").style("fill", "red")
-                        dataGood = false
-                        lastEEGdata.valid = false
-                        vibrateGamepad()
-                        if ((millis - lastGoodData) > (1000 * 6)) {
-                            d3.select("#eegicon_text").text("PLEASE ADJUST HEADBAND").style("opacity", 1).style("color", "red")
-                            playWarning()
-                        }
-                    }
-                    else {
-                        d3.select("#eegicon_text").text("MUSE DATA GOOD").style("opacity", 1).style("color", "black")
-                        d3.select("#muse_status_data").style("fill", "green")
-                        d3.select("#eegicon_text").text("MUSE STREAMING").style("opacity", 1).style("color", "black")
-                        lastGoodData = millis
-                        dataGood = true
-                    }
-
-                }
-                else {
-
-                    d3.select("#muse_status_muse").style("fill", "none")
-                    d3.select("#muse_status_data").style("fill", "none")
-                    d3.select("#eegicon_text").text("SCANNING FOR MUSE").style("opacity", 1).style("color", "black")
-
-
-                }
-
-            }
-            else {
-                d3.select("#eegicon").style("opacity", deactiveOpacity)
-                d3.select("#muse_status_android").style("fill", "none")
-                d3.select("#muse_status_muse").style("fill", "none")
-                d3.select("#muse_status_data").style("fill", "none")
-                d3.select("#eegicon_text").text("Waiting for Muse...").style("opacity", deactiveOpacity).style("color", "black")
-            }
-
-            lastEEGdata = modifyEEG(lastEEGdata)
-            eegDataRecord.push(lastEEGdata)
-            updateVarianceGraph(lastEEGdata)
+        if (lastEEGdata == null) {
+            console.log("First eeg data: diff = " + timeDiff)
+            lastEEGdata = clone(eegdata)
 
 
         }
-        // Bad data
+
+
+        if (timeDiff > (1000 * 60)) {
+            if (eegStatus == true) {
+                console.error("--> EEG data is old (" + (timeDiff / 1000 / 60) + " minutes)")
+                eegStatus = false
+            }
+        }
+
         else {
 
-            if (eegStatus == true) {
-                console.log("No live EEG data")
-                eegStatus = false
-                lastEEGdata = {}
-                lastEEGdata.muse_connected = false
-                lastEEGdata.android_connected = false
-                lastEEGdata.valid = false
-                d3.select("#eegicon").style("opacity", deactiveOpacity)
-                d3.select("#eegicon_text").text("Waiting for Muse...").style("opacity", 0.5)
+            if (lastEEGdata == null) {
+                console.log("First eeg data")
+                lastEEGdata = clone(eegdata)
+                lastEEGdata.android_connected = true
+                if (timeDiff > (1000 * 60)) {
+                    eegStatus = false
+                    console.log("EEG data is old")
+                }
+                else {
+                    eegStatus = true
+                }
+
+
+            }
+            else {
+
+
+
+                // Data hasn't changed
+                if (eegdata.timestamp == lastEEGdata.timestamp) {
+                    console.log("Last timestamp was the same")
+
+                    if (eegStatus == true) {
+
+
+
+                        if (timeDiff > (1000 * 2.1)) {
+
+                            eegStatus = false // flag so that console isn't flooded with messages
+                            androidStatus = false
+                            museConnected = false
+                            if (timeDiff > (1000 * 120)) {
+                                console.log("----> Data is old (" + Math.round(timeDiff / 1000 / 60) + " minutes)")
+
+                            }
+                            else if (timeDiff > (1000 * 60 * 60 * 24)) {
+                                console.log("----> Data is old (" + Math.round(timeDiff / 1000 / 60 / 60 / 24) + " days)")
+                            }
+
+
+                            else {
+                                console.log("----> MUSE LOST - Data is old (" + Math.round(timeDiff / 1000) + " seconds)")
+
+                            }
+
+                        }
+                    }
+
+                }
+                // Everything is good - record new datapoint
+                else {
+
+                    lastEEGdata = clone(eegdata)
+
+                    androidStatus = true
+
+                    if (lastEEGdata.muse_connected == true) {
+
+                        museConnected = true
+                    }
+                    else museConnected = false
+                    eegStatus = true
+
+
+                }
+
+            }
+
+
+        }
+        lastEEGdata.valid = true
+        if (androidStatus == true) {
+            d3.select("#muse_status_android").style("fill", "green")
+            d3.select("#muse_status_svg").style("display", "flex")
+            d3.select("#variance_svg").style("display", "flex")
+            d3.select("#eegicon").style("opacity", 1)
+            if (museConnected == true) {
+
+                lastActivity = millis
+                d3.select("#muse_status_muse").style("fill", "green")
+
+                // Check variance
+
+                if (lastEEGdata.tp10_variance > maxVariance ||
+                    lastEEGdata.tp9_variance > maxVariance ||
+                    lastEEGdata.af7_variance > maxVariance ||
+                    lastEEGdata.af8_variance > maxVariance
+                ) {
+                    d3.select("#eegicon_text").text("BAD DATA").style("opacity", 1).style("color", "red")
+                    d3.select("#muse_status_data").style("fill", "red")
+                    dataGood = false
+                    if (testing == false)
+                    {
+                        lastEEGdata.valid = false
+                    }
+                    
+                    
+                    vibrateGamepad()
+                    if ((millis - lastGoodData) > (1000 * 6)) {
+                        d3.select("#eegicon_text").text("PLEASE ADJUST HEADBAND").style("opacity", 1).style("color", "red")
+                        playWarning()
+                    }
+                }
+                else {
+                    d3.select("#eegicon_text").text("MUSE DATA GOOD").style("opacity", 1).style("color", "black")
+                    d3.select("#muse_status_data").style("fill", "green")
+                    d3.select("#eegicon_text").text("MUSE STREAMING").style("opacity", 1).style("color", "black")
+                    lastGoodData = millis
+                    dataGood = true
+                }
+
+            }
+            else {
+
+                d3.select("#muse_status_muse").style("fill", "none")
+                d3.select("#muse_status_data").style("fill", "none")
+                d3.select("#eegicon_text").text("SCANNING FOR MUSE").style("opacity", 1).style("color", "black")
+
+
             }
 
         }
-        updateMuseStatus()
+        else {
+            d3.select("#eegicon").style("opacity", deactiveOpacity)
+            d3.select("#muse_status_android").style("fill", "none")
+            d3.select("#muse_status_muse").style("fill", "none")
+            d3.select("#muse_status_data").style("fill", "none")
+            d3.select("#eegicon_text").text("Waiting for Muse...").style("opacity", deactiveOpacity).style("color", "black")
+        }
+
+        lastEEGdata = modifyEEG(lastEEGdata)
+        eegDataRecord.push(lastEEGdata)
+        updateVarianceGraph(lastEEGdata)
 
 
-    }, eegInterval)
+    }
+    // Bad data
+    else {
+
+        if (eegStatus == true) {
+            console.log("No live EEG data")
+            eegStatus = false
+            lastEEGdata = {}
+            lastEEGdata.muse_connected = false
+            lastEEGdata.android_connected = false
+            lastEEGdata.valid = false
+            d3.select("#eegicon").style("opacity", deactiveOpacity)
+            d3.select("#eegicon_text").text("Waiting for Muse...").style("opacity", 0.5)
+        }
+
+    }
+    updateMuseStatus()
+
+
+
 
 }
 
@@ -908,10 +983,9 @@ function playWarning() {
     var millis = d.getTime()
     var timeSince = millis - lastAudioPlay
     if (timeSince > (1000 * 10)) {
-        var audio = new Audio(
-            'https://media.geeksforgeeks.org/wp-content/uploads/20190531135120/beep.mp3');
-        audio.play();
-        lastAudioPlay = millis
+        //var audio = new Audio('https://media.geeksforgeeks.org/wp-content/uploads/20190531135120/beep.mp3');
+        //audio.play();
+        //lastAudioPlay = millis
     }
 
 }
@@ -1023,13 +1097,13 @@ document.addEventListener("visibilitychange", function () {
     if (document.hidden) {
         console.log("HIDDEN")
         tabVisibile = false
-        stopEEG()
+        
         clearInterval(gamepadInterval)
     }
     else {
         console.log("RETURNED")
         tabVisibile = true
-        watchEEG()
+        
         watchGamepad()
 
     }
@@ -1187,6 +1261,7 @@ function buildIndicators(div) {
 
 function buildPage() {
 
+    setInterval(function(){rescaleTimeseries()}, 100)
 
     d3.select("#root").style("height", window.innerHeight + "px")
     var header = d3.select("#header")
@@ -1213,7 +1288,8 @@ function buildPage() {
                 theme = "dark"
                 d3.select(this).text("🌙")
                     .style('font-size', "20px")
-                d3.selectAll("div").style("background", "darkgrey")
+                d3.selectAll("div").style("background", backgroundDark)
+                d3.selectAll("text").style("color", "#dcdccc")
             }
             else {
                 theme = "light"
@@ -1221,6 +1297,7 @@ function buildPage() {
                 d3.select(this).text("☼")
                     .style('font-size', "35px")
                 d3.selectAll("div").style("background", backgroundLight)
+                d3.selectAll("text").style("color", "black")
 
             }
 
@@ -1283,6 +1360,7 @@ function buildPage() {
             login()
         })
 
+    
     buildAuthContainer(d3.select("#main-container"))
 
     setupEEGgraph()
@@ -1307,8 +1385,7 @@ function buildPage() {
         }
 
     });
-    watchEEG()
-
+    
     // Set theme
     d3.selectAll("div").style("background", backgroundLight)
 
@@ -1320,6 +1397,10 @@ function buildPage() {
             markers.push(marker)
         })
     })
+
+
+
+
 
 }
 
