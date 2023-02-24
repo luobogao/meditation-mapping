@@ -5,8 +5,8 @@ import "firebaseui/dist/firebaseui.css"
 import { addCheckbox, buildChartSelectors, buildResolutionSelectors, buildUserSelectors } from "../utils/ui";
 import { unique } from "../utils/functions";
 import { updateTimeseries, buildSimilarityChart, updateSimilarityChart } from "../utils/minicharts";
-import { auth, login, updateUsername, listenEEG, getAllWaypoints, downloadCSV, buildAuthContainer } from "../utils/database"
-import { onAuthStateChanged, signInAnonymously } from "firebase/auth"
+import { anonymous, auth, login, updateUsername, listenEEG, getAllWaypoints, downloadCSV, buildAuthContainer, firstLoad } from "../utils/database"
+
 import { waypoints_muse, waypoints_mindlink } from "../utils/vectors";
 import { dot, getRelativeVector, pca, runModel, measureDistance, cosineSimilarity, euclideanDistance, combinedDistance } from "../utils/analysis";
 import { zoom, updateChartWaypoints, updateChartUser } from "../utils/charts"
@@ -39,8 +39,8 @@ const backgroundColor = "#d9d9d9"
 export var waypoints
 export var users;
 export var user;  // Firebase user
-export var anonymous = true
-var firstLoad = true
+
+
 var fr;
 
 export const miniChartSize = 200
@@ -67,114 +67,17 @@ export var state =
 }
 
 var email = null
-onAuthStateChanged(auth, (fbuser) => {
-
-    if (fbuser && fbuser.email == null) {
-        anonymous = true
-    }
-    if (fbuser && fbuser.email != null) {
-        user = fbuser
-        anonymous = false
-        console.log("Authenticated user:")
-        console.log(user.displayName)
-        d3.select("#user").text("Logged in as: " + user.email)
-
-
-        // Automatically start listening for realtime db updates for this user (data from Muse probably)
-        //var kaio = "Nr9PQxsLcKg0EXAacJNmkAce3263"
-        listenEEG(user.uid)
-        //listenEEG(kaio)
-        
-
-        d3.selectAll(".signin")
-            .text("Sign Out")
-            .on("click", function () {
-                console.log("Signing out...")
-                auth.signOut()
-                d3.select("#user").text("")
-                d3.selectAll(".signin").text("Sign In")
-                    .on("click", function () {
-
-                        login()
-                    })
-            })
-
-        // No display name - prompt user to choose one
-        if (user.displayName == null) {
-            d3.select("#welcome").remove()
-            console.log("No user name yet")
-            var container = buildAuthContainer(d3.select("#main-container"))
-
-            container.selectAll("*").remove()
-            container.style("background", "grey").style("border-radius", "5px").style("height", "220px")
-                .style("width", "400px")
-
-            var div = container.append("div").style("margin", "20px").style("display", "flex").style("flex-direction", "column")
-            div.append("text").text("Please choose a Username:").style("color", "white").style("margin-bottom", "10px")
-            div.append("input").attr("type", "text").attr("id", "username-input").on("change", function (d) {
-
-
-            })
-            div.append("text").text("Should be just your first name, or any one-word username. This will be the name other users see if you submit a meditation 'waypoint'").style("color", "white").style("margin-top", "10px")
-            div.append("button").style("position", "absolute").style("bottom", "10px").style("right", "10px").text("OK")
-                .on("click", function () {
-                    d3.select("#firebase-auth-container").remove()
-                    updateUsername()
-
-                })
-        }
-
-        // Found display name, good to go
-        else {
-            state.userName = user.displayName
-            d3.select("#user").text("Logged in: " + user.displayName)
-            d3.select("#firebase-auth-container").remove()
-
-            // Download all waypoints
-            var text = d3.select("#welcome-auth")
-            if (text != null) {
-                text.style("display", "flex").text("Logged in as: " + user.displayName)
-            }
-            if (firstLoad) downloadWaypoints()
-        }
 
 
 
-    }
-    // Not authenticated yet - launch login
-    else {
-        console.log("Not logged in")
-        user = null
-        email = null
-        d3.select("#signin").text("Sign In").on("click", function () {
-
-            login()
-        })
-
-        signInAnonymously(auth).then(() => {
-            console.log("---> Logged in anonymously")
-            d3.selectAll(".signin").text("Sign In")
-            d3.select("#firebase-auth-container").remove()
-            var text = d3.select("#welcome-auth")
-            if (text != null) {
-                text.style("display", "flex").text("Logged in Anonymously")
-            }
-            if (firstLoad) downloadWaypoints()
-
-        })
-
-    }
-})
-
-
-function downloadWaypoints() {
+export function downloadWaypoints() {
 
 
     var showWelcome = false
     if (firstLoad == true && anonymous) {
         showWelcome = true
     }
-    firstLoad = false
+    
     // Reset waypoints
     waypoints = []
     users = []
