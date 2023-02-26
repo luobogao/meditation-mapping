@@ -3,6 +3,7 @@ import { unique, getEveryNth } from "./functions";
 import { popUp, popUpremove } from "./ui";
 var opacityUser = 1
 
+// THIS FILE MAKES A SMALL CHART IN THE WAYPOINT POPUP
 
 const d3 = require("d3");
 

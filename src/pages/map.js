@@ -2,13 +2,14 @@ import React, { useState, useEffect } from "react";
 import * as firebaseui from "firebaseui"
 import { buildTimeslider } from "../utils/timeslider";
 import "firebaseui/dist/firebaseui.css"
+import { findPolynomial } from "../utils/regression";
 import { addCheckbox, buildChartSelectors, buildResolutionSelectors, buildUserSelectors } from "../utils/ui";
 import { unique } from "../utils/functions";
 import { updateTimeseries, buildSimilarityChart, updateSimilarityChart } from "../utils/minicharts";
 import { anonymous, auth, login, updateUsername, listenEEG, getAllWaypoints, downloadCSV, buildAuthContainer, firstLoad } from "../utils/database"
 
 import { waypoints_muse, waypoints_mindlink } from "../utils/vectors";
-import { dot, getRelativeVector, pca, runModel, measureDistance, cosineSimilarity, euclideanDistance, combinedDistance } from "../utils/analysis";
+import { dot, getRelativeVector, pca,findSlope, runModel, measureDistance, cosineSimilarity, euclideanDistance, combinedDistance } from "../utils/analysis";
 import { zoom, updateChartWaypoints, updateChartUser } from "../utils/charts"
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { eegRecordStandard } from "./record";
@@ -271,7 +272,7 @@ export function rebuildChart() {
 
     var filtered_waypoints_user = waypoints.filter(e => e.match == true)
 
-
+    // Tests for data quality
     if (userDataLoaded == false) {
         // Only plot the waypoints - user hasn't loaded data yet
 
@@ -280,13 +281,10 @@ export function rebuildChart() {
         updateChartWaypoints()
         return
     }
-
-
     if (filtered_waypoints_user.length == 0) {
         alert("No Waypoints?")
         return
     }
-
     if (state.avg10.length < 8) {
         alert("Averaged data is too short: " + state.avg10.length)
         return
@@ -331,8 +329,6 @@ export function rebuildChart() {
         return b[1] - a[1]
     })
 
-    var bestWaypointMatch = distances[0][0]
-
     // Select waypoint IDs to use
     var filtered_waypoint_ids
     if (state.limitMatches) {
@@ -347,7 +343,6 @@ export function rebuildChart() {
         // Use ALL waypoints
         filtered_waypoint_ids = filtered_waypoints_user.map(e => e.id)
     }
-
 
     if (filtered_waypoint_ids.length == 0) {
         alert("zero waypoints selected!")
@@ -371,6 +366,7 @@ export function rebuildChart() {
     let vectors = state.highRes.map(e => getRelativeVector(e.vector))
     buildModel(vectors)
 
+    // Find similarity to each waypoint for each row
     function addWaypointDistances(rows) {
         rows.forEach(row => {
             var relativeVector = getRelativeVector(row.vector)
@@ -400,6 +396,26 @@ export function rebuildChart() {
     addWaypointDistances(state.highRes)
     addWaypointDistances(state.avg10)
     addWaypointDistances(state.averageMax)
+
+    // Make an array of similarities in each waypoint
+    function waypointMatches(rows, name)
+    {
+        waypoints.forEach(waypoint =>
+            {
+                var matchesTimeseries = []
+                for (let x in rows.length)
+                {
+                    var dist = measureDistance(rows[x].relative_vector, waypoint.relative_vector)
+                    matchesTimeseries.push({x: x, y: dist})
+                }
+                
+                waypoint[name] = matchesTimeseries
+                console.log(waypoint.label)
+                console.log(matchesTimeseries)
+                console.log(findPolynomial(matchesTimeseries))
+            })
+    }
+    waypointMatches(state.lowRes, "lowRes")
 
     // Add distances to each waypoint
     waypoints.forEach(waypoint => {

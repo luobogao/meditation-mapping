@@ -29,6 +29,7 @@ var androidStatus = false
 var museConnected = false
 var dataGood = false
 var deactiveOpacity = 0.3
+const iconSize = 50
 
 // Timers
 var lastGoodData = 0
@@ -51,8 +52,8 @@ var eegChartDelay = 2
 var eegDataRecord = [] // All data recorded
 export var eegRecordStandard = [] // Data saved with a standard format that the rest of the website can use
 //var eegLineIds = ["tp10_gamma_normal", "tp9_gamma_normal", "af7_gamma_normal", "af8_gamma_normal"]
-//var eegLineIds = ["tp10_gamma", "tp9_gamma", "af7_gamma", "af8_gamma"]
-var eegLineIds = ["tp10_gamma_delta", "tp9_gamma_delta", "af7_gamma_delta", "af8_gamma_delta"]
+var eegLineIds = ["tp10_gamma", "tp9_gamma", "af7_gamma", "af8_gamma"]
+
 
 // Markers
 var markers = []
@@ -73,21 +74,29 @@ var graphInterval = null
 
 // Variance Chart
 var maxVariance = 2000
-var varianceChartHeight = 150
-var varianceChartMargin = 5
-var varianceChartWidth = 200
+var varianceBarWidth = 15
+var varianceChartHeight = 80
+var varianceChartMargin = 3
+var varianceChartWidth = 120
 var varianceX = d3.scaleBand()
     .padding(1)
     .domain([0, 1, 2, 3])
-    .range([5, varianceChartWidth - 5])
+    .range([varianceChartMargin, varianceChartWidth - varianceChartMargin])
 var varianceY = d3.scaleLog()
     .domain([1, 10000])
+    .range([varianceChartHeight - varianceChartMargin, varianceChartMargin])
+
+// Acceleration Chart
+var accelerationChartWidth = 80
+var accelerationChartHeight = 80
+var accelerationY = d3.scaleLog()
+    .domain([1, 1000])
     .range([varianceChartHeight - 5, 5])
 
 // Time Series
 const timeseriesMargin = 10
-const timeseriesHeight = window.innerHeight - (2 * timeseriesMargin) - 500
-const timeseriesWidth = window.innerWidth - (2 * timeseriesMargin)
+const timeseriesHeight = 300
+const timeseriesWidth = (window.innerWidth / 2)
 
 // Gamepad settings
 var buttonClickCounts = {}
@@ -135,8 +144,8 @@ var buttonMapOut =
         5: "SMELLING",
         6: "DON’T KNOW",
         7: "ONOMATOPOEIA",
-        8: "POSITIVE",
-        9: "NEGATIVE",
+        8: "START",
+        9: "STOP",
         10: "JHANAS",
         11: "ÑANAS",
         12: "CONTRACTED",
@@ -314,6 +323,11 @@ function clickedGamepadButton(id) {
         var code = buttonMap[id]
         var name = buttonMapOut[mode][code]
         var color = buttonColors[name]
+
+        if (name == "START") 
+        {
+            resetRecord()
+        }
 
         btn_history.push({ timestamp: millis, id: id, value: id, tag: name, color: color })
 
@@ -646,6 +660,7 @@ function modifyEEG(entry) {
 
     var normal = {}
     normal["TimeStamp"] = entry.timestamp
+    normal.acceleration = entry.total_acceleration
     if (entry != null && entry.valid == true) {
 
         channelsMuse.forEach(channel => {
@@ -701,16 +716,16 @@ function updateVarianceGraph(data) {
         d.enter()
             .append("rect")
             .attr("class", "bar")
-            //.attr("width", varianceX.bandwidth())
-            .attr("width", "20px")
+            .attr("width", varianceBarWidth + "px")
             .attr("y", function (d) { return varianceY(d) })
             .attr("x", function (d, i) { return varianceX(i) })
 
         d.enter()
             .append("text")
+            .style("font-size", "12px")
             .text(function (d, i) { return ["TP9", "AF7", "AF8", "TP10"][i] })
-            .attr("x", function (d, i) { return varianceX(i) })
-            .attr("y", varianceChartHeight - varianceChartMargin)
+            .attr("x", function (d, i) { return varianceX(i) - 5 })
+            .attr("y", varianceChartHeight - 5)
 
         d.transition()
             .style("fill", function (d) {
@@ -725,7 +740,7 @@ function updateVarianceGraph(data) {
 
             })
             .attr("height", function (d, i) {
-                var height = varianceChartHeight - varianceY(d) - varianceChartMargin - 20
+                var height = varianceChartHeight - varianceY(d) - varianceChartMargin - 15
                 return height
             })
             .duration(eegInterval)
@@ -734,8 +749,50 @@ function updateVarianceGraph(data) {
 
     }
 
+}
+function updateAccelerationGraph(data) {
+    var svg = d3.select("#acceleration_svg")
+    svg.style("display", "flex")
+    var d = svg.selectAll(".bar").data([data])
+    
+    d.enter()
+        .append("rect")
+        .attr("class", "bar")
+        .attr("width", "20px")
+        .attr("y", function (d) { return accelerationY(10) - 15})
+        .attr("fill", "red")
+        .attr("x", "20px")
 
+    d.enter().append("text").text("MOTION")
+    .style("font-size", "12px")
+    .attr("x", "7px")
+    .attr("y", accelerationChartHeight - 5)
 
+    d.transition()
+        .attr("y", function (d, i) {
+            var acc = d.total_acceleration
+            if (acc < 10 ) acc = 10
+            var h = accelerationY(acc) - 15
+            
+            return h
+        })
+        .attr("height", function (d, i) {
+            var acc = d.total_acceleration
+            if (acc < 10 ) acc = 10
+            
+            return accelerationY(1) - accelerationY(acc)
+            
+        })
+        .attr("fill", function(d)
+        {
+            var acc = d.total_acceleration
+            if (acc < 10) acc = 10
+            if (acc < 30) return "green"
+            else if (acc < 100) return "orange"
+            else return "red"
+        })
+        .duration(eegInterval)
+        .ease(d3.easeLinear)
 
 }
 function rescaleTimeseries() {
@@ -746,8 +803,14 @@ function rescaleTimeseries() {
     var date = new Date()
     var millis = date.getTime()
 
+    // Choose new range to view - scroll the time
     timeend = millis - (1000 * eegChartDelay) // Offset 
     timestart = timeend - (1000 * 30)
+    
+    // TODO: use zero for interval if this is first data
+    var thisInterval = eegInterval
+    
+    // Make an new axis with the new time range
     circleX = d3.scaleLinear()
         .domain([timestart, timeend])
         .range([50, timeseriesWidth])
@@ -756,13 +819,13 @@ function rescaleTimeseries() {
         .transition()
         .attr("cx", function (d, i) { return circleX(d.timestamp) })
         .ease(d3.easeLinear)
-        .duration(eegInterval)
+        .duration(thisInterval)
 
     svg.selectAll(".eeg")
         .transition()
         .attr("cx", function (d, i) { return circleX(d.timestamp) })
         .ease(d3.easeLinear)
-        .duration(eegInterval)
+        .duration(thisInterval)
 
 
     svg.selectAll(".text")
@@ -771,7 +834,7 @@ function rescaleTimeseries() {
             return "translate(" + circleX(d.timestamp) + ", " + (tagOffset + tagTextOffset) + "), rotate(-45)"
         })
         .ease(d3.easeLinear)
-        .duration(eegInterval)
+        .duration(thisInterval)
 
     for (let id in eegLineIds) {
         var key = eegLineIds[id]
@@ -781,7 +844,7 @@ function rescaleTimeseries() {
             .transition()
             .attr("d", function (d) { return eegLine(data) })
             .ease(d3.easeLinear)
-            .duration(eegInterval)
+            .duration(thisInterval)
 
     }
 
@@ -808,6 +871,7 @@ function stopListeners() {
 }
 function lostApp() {
     if (androidStatus == true) {
+        console.error("Lost connection to Android App")
         androidStatus = false
         eegStatus = false // flag so that console isn't flooded with messages
         androidStatus = false
@@ -826,7 +890,6 @@ function lostApp() {
 function foundApp() {
     if (androidStatus == false) {
         androidStatus = true
-        // Called when lost connection to android app
         d3.select("#muse_status_android").style("fill", "green")
         d3.select("#muse_status_muse").style("fill", "none")
         d3.select("#muse_status_data").style("fill", "none")
@@ -897,7 +960,7 @@ function recordEEG() {
 
                         if (timeDiff > (1000 * 2.1)) {
 
-                            
+
                             lostApp()
                             if (timeDiff > (1000 * 120)) {
                                 console.log("----> Data is old (" + Math.round(timeDiff / 1000 / 60) + " minutes)")
@@ -929,7 +992,7 @@ function recordEEG() {
                         museConnected = true
                     }
                     else museConnected = false
-                    
+
                 }
 
             }
@@ -938,8 +1001,8 @@ function recordEEG() {
         }
         lastEEGdata.valid = true
         if (androidStatus == true) {
-            
-            
+
+
             if (museConnected == true) {
 
                 lastActivity = millis
@@ -992,6 +1055,7 @@ function recordEEG() {
         lastEEGdata = modifyEEG(lastEEGdata)
         eegDataRecord.push(lastEEGdata)
         updateVarianceGraph(lastEEGdata)
+        updateAccelerationGraph(lastEEGdata)
 
 
     }
@@ -1180,10 +1244,10 @@ function buildModeSelector(div) {
 }
 function buildMuseStatus(museRow) {
     museRow.append("td").append("img")
-        .attr('width', 80)
+        .attr('width', iconSize)
         .attr("id", "eegicon")
         .style('opacity', deactiveOpacity)
-        .attr('height', 80)
+        .attr('height', iconSize)
         .attr("alt", "")
         .attr("src", "eeg_icon.svg")
 
@@ -1199,12 +1263,6 @@ function buildMuseStatus(museRow) {
         .attr("id", "muse_status_svg")
         .style("opacity", deactiveOpacity)
         .style("display", "none")
-
-    museRow.append('td')
-        .append('svg')
-        .attr("id", "variance_svg")
-        .style("display", "none")
-        .style("opacity", 1)
 
     var svg = d3.select("#muse_status_svg")
         .attr("width", '300px')
@@ -1253,8 +1311,22 @@ function buildMuseStatus(museRow) {
         .attr("x", "210px")
         .attr("y", "15px")
 
+    museRow.append('td')
+        .attr("width", varianceChartWidth)
+        .append('svg')
+        .attr("id", "variance_svg")
+        .attr("height", varianceChartHeight)
+        .attr("width", varianceChartWidth)
+        .style("display", "none")
+        .style("opacity", 1)
 
-
+    museRow.append('td')
+        .append('svg')
+        .attr("id", "acceleration_svg")
+        .attr("width", accelerationChartWidth)
+        .attr("height", accelerationChartHeight)
+        .style("display", "flex")
+        .style("opacity", 1)
 
 }
 function buildLiveUsersRow(div) {
@@ -1281,13 +1353,14 @@ function buildIndicators(div) {
     var museRow = table.append("tr")
     var liveUsersRow = div.append("div")
 
+    
     gamepadRow
         .append("td")
         .append("img")
-        .attr('width', 80)
+        .attr('width', iconSize)
         .attr("id", "gamepadicon")
         .style('opacity', deactiveOpacity)
-        .attr('height', 80)
+        .attr('height', iconSize)
         .attr("alt", "")
         .attr("src", "gamepad_icon.svg")
 
@@ -1363,22 +1436,20 @@ function buildPage() {
 
 
     buildIndicators(indicators)
+    var charts = container.append("div").attr("id", "allcharts")
+    .style("display", "flex")
 
     // BAR CHART
-    container.append("svg")
-        .attr("width", "1000px")
-        .attr("height", varianceChartHeight + "px")
-        .append("g")
+    charts.append("svg")
+    .style("border", "1px solid black")
         .attr("id", "barchartsvg")
         .attr("width", varianceChartWidth + "px")
         .attr("height", varianceChartHeight + "px")
 
 
     // TIMESERIES
-    container.append("svg")
-        .style("position", "absolute")
-        .style("left", "10px")
-        .style("top", "500px")
+    charts.append("svg")
+    .style("border", "1px solid black")
         .attr("width", timeseriesWidth)
         .attr("height", timeseriesHeight)
         .append("g")
