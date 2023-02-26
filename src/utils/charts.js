@@ -728,6 +728,8 @@ function adjustLabels() {
 }
 export function updateChartUser(data) {
 
+    console.log("data")
+    console.log(data)
     clearInterval(rotateOpening)
 
     var vectors = data.map(e => getRelativeVector(e.vector))
@@ -767,12 +769,18 @@ export function updateChartUser(data) {
         var xi = entry[0]
         var yi = entry[1]
         var zi = entry[2]
+
         index++
 
-        userCircles.push({ x: xi, y: yi, z: zi, moment: moment })
+        userCircles.push({ x: xi, y: yi, z: zi, moment: moment})
 
     })
     cameraProject(userCircles)
+    for (let i in userCircles)
+    {
+        userCircles[i].cluster = data[i].cluster
+    }
+    console.log(userCircles)
 
     // svg.append("path")
     //     .attr("fill", "none")
@@ -804,7 +812,15 @@ export function updateChartUser(data) {
 
 
         .attr("opacity", userOpacity)
-        .attr("fill", userPointColor)
+        //.attr("fill", userPointColor)
+        .attr("fill", function(d){
+            if (d.cluster == 0) return "blue"
+            else if (d.cluster == 1) return "red"
+            else if (d.cluster == 2) return "green"
+            else if (d.cluster == 3) return "orange"
+            else if (d.cluster == 4) return "purple"
+            else return "black"
+        })
         .on("contextmenu", function (event, d) {
             event.preventDefault()
 

@@ -3,16 +3,16 @@ import * as firebaseui from "firebaseui"
 import { buildTimeslider } from "../utils/timeslider";
 import "firebaseui/dist/firebaseui.css"
 import { findPolynomial } from "../utils/regression";
-import { addCheckbox, buildChartSelectors, buildResolutionSelectors, buildUserSelectors } from "../utils/ui";
-import { unique } from "../utils/functions";
+import { addCheckbox, buildChartSelectors, buildClusterCounts, buildResolutionSelectors, buildUserSelectors } from "../utils/ui";
+import { arraysEqual, unique } from "../utils/functions";
 import { updateTimeseries, buildSimilarityChart, updateSimilarityChart } from "../utils/minicharts";
 import { anonymous, auth, login, updateUsername, listenEEG, getAllWaypoints, downloadCSV, buildAuthContainer, firstLoad } from "../utils/database"
-
 import { waypoints_muse, waypoints_mindlink } from "../utils/vectors";
-import { dot, getRelativeVector, pca,findSlope, runModel, measureDistance, cosineSimilarity, euclideanDistance, combinedDistance } from "../utils/analysis";
+import { dot, getRelativeVector, pca, findSlope, runModel, measureDistance, cosineSimilarity, euclideanDistance, combinedDistance } from "../utils/analysis";
 import { zoom, updateChartWaypoints, updateChartUser } from "../utils/charts"
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { eegRecordStandard } from "./record";
+import kmeans from "kmeansjs";
 
 
 export var userDataLoaded = false
@@ -54,6 +54,7 @@ export var state =
     "device": "Muse",
     "selected_users": [],
     "resolution": 10,
+    "clusters": 1,
     "zoom": 1, // increasing this value will change the y-min of distance graphs
     "showAllWaypoints": false, // Shows all waypoints (as red) even when not matching
     "chartType": "pca", // PCA, Cosine, or Euclidean
@@ -78,7 +79,7 @@ export function downloadWaypoints() {
     if (firstLoad == true && anonymous) {
         showWelcome = true
     }
-    
+
     // Reset waypoints
     waypoints = []
     users = []
@@ -298,7 +299,8 @@ export function rebuildChart() {
     }
 
     // Find nearby waypoints to user's data - use every 60 seconds
-    var userVectors = state.lowRes.map(e => getRelativeVector(e.vector))
+    state.highRes.forEach(entry => entry.relative_vector = getRelativeVector(entry.vector))
+    var userVectors = state.highRes.map(e => e.relative_vector)
     var distanceIds = {}
     userVectors.forEach(uservector => {
 
@@ -322,6 +324,28 @@ export function rebuildChart() {
 
         })
     })
+
+    // K-means
+    var kmeansResult
+
+    kmeans(userVectors, state.clusters, function (err, res) {
+        kmeansResult = res
+        console.log(res)
+    })
+    state.highRes.forEach(entry => {
+        for (let i in kmeansResult) {
+            var vectors = kmeansResult[i]
+            vectors.forEach(vector => {
+                if (arraysEqual(vector, entry.relative_vector)) {
+                    entry.cluster = i
+                }
+
+            })
+
+        }
+    })
+
+
 
     // Sort the waypoint matches by distance
     var distances = Object.entries(distanceIds)
@@ -398,22 +422,18 @@ export function rebuildChart() {
     addWaypointDistances(state.averageMax)
 
     // Make an array of similarities in each waypoint
-    function waypointMatches(rows, name)
-    {
-        waypoints.forEach(waypoint =>
-            {
-                var matchesTimeseries = []
-                for (let x in rows.length)
-                {
-                    var dist = measureDistance(rows[x].relative_vector, waypoint.relative_vector)
-                    matchesTimeseries.push({x: x, y: dist})
-                }
-                
-                waypoint[name] = matchesTimeseries
-                console.log(waypoint.label)
-                console.log(matchesTimeseries)
-                console.log(findPolynomial(matchesTimeseries))
-            })
+    function waypointMatches(rows, name) {
+        waypoints.forEach(waypoint => {
+            var matchesTimeseries = []
+            for (let x in rows.length) {
+                var dist = measureDistance(rows[x].relative_vector, waypoint.relative_vector)
+                matchesTimeseries.push({ x: x, y: dist })
+            }
+
+            waypoint[name] = matchesTimeseries
+
+
+        })
     }
     waypointMatches(state.lowRes, "lowRes")
 
@@ -479,6 +499,7 @@ function buildPage() {
     console.log(dot([1, 1, 1], [2, 3, 10]))
     //getData(db)
     setup()
+
 
 }
 
@@ -655,6 +676,8 @@ function buildRightSidebar() {
         .style("flex-direction", "column")
         .attr("class", "user-selectors")
 
+    var clustersContainer = otherSelectors.append("div").style("display", "flex").style("flex-direction", "row")
+    buildClusterCounts(clustersContainer)
 
     var resolutionContainer = otherSelectors.append("div").style("display", "flex").style("flex-direction", "row")
     buildResolutionSelectors(resolutionContainer)
@@ -786,7 +809,7 @@ export default function Live() {
                     </div>
                 </div>
                 <div id="browse-div"></div>
-                
+
             </div>
             <svg id="chartsvg"></svg>
             <div id="popup"></div>

@@ -77,23 +77,21 @@ export function addMenu(event, type) {
 
     return div
 }
-export function moveMenu()
-{
+export function moveMenu() {
     // Checks if menu is still entirely within window
     // Timeout necessary to give DOM chance to display
     setTimeout(function () {
         var bounds = d3.select("#menu").node().getBoundingClientRect()
         var minY = bounds.y + bounds.height
-        
-        if (minY > (window.innerHeight - 30))
-        {
+
+        if (minY > (window.innerHeight - 30)) {
             console.log("overflow!")
             d3.select("#menu").style("top", (window.innerHeight - bounds.height - 30) + "px")
         }
-        
+
     }, 10)
 
-    
+
 }
 export function popUpremove() {
     d3.select("#popup")
@@ -230,6 +228,65 @@ export function buildResolutionSelectors(div) {
             state.resolution = 60
 
             updateAllCharts()
+        })
+
+}
+
+export function buildClusterCounts(div) {
+    var cluster1, cluster2, cluster3, cluster4 = false
+    switch (state.clusters) {
+        case 1:
+            cluster1 = true
+            break;
+        case 2:
+            cluster2 = true
+            break;
+        case 3:
+            cluster3 = true
+            break
+        case 4:
+            cluster4 = true
+            break
+
+    }
+    var c1box = addCheckbox(div, "1", cluster1, "12px", "radio")
+    var c2box = addCheckbox(div, "2", cluster2, "12px", "radio")
+    var c3box = addCheckbox(div, "3", cluster3, "12px", "radio")
+    var c4box = addCheckbox(div, "4", cluster4, "12px", "radio")
+
+    c1box
+        .attr("class", "clusters-checkbox")
+        .on("click", function () {
+            d3.selectAll(".clusters-checkbox").property("checked", false)
+            d3.select(this).property("checked", true)
+            state.clusters = 1
+            rebuildChart()
+        })
+    c2box
+        .attr("class", "clusters-checkbox")
+        .on("click", function () {
+            d3.selectAll(".clusters-checkbox").property("checked", false)        
+            d3.select(this).property("checked", true)
+            state.clusters = 2
+            rebuildChart()
+        })
+    c3box
+        .attr("class", "clusters-checkbox")
+        .on("click", function () {
+            d3.selectAll(".clusters-checkbox").property("checked", false)        
+            d3.select(this).property("checked", true)
+            state.clusters = 3
+            rebuildChart()
+            
+        })
+    c4box
+        .attr("class", "clusters-checkbox")
+        .on("click", function () {
+            d3.selectAll(".clusters-checkbox").property("checked", false)        
+            d3.select(this).property("checked", true)
+            state.clusters = 4
+            rebuildChart()
+            
         })
 
 }
