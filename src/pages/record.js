@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { clone } from "../utils/functions";
+import { clone, getEveryNth} from "../utils/functions";
 import { login, eegdata, addMarker, getAllMarkers, auth, buildAuthContainer } from "../utils/database";
 import { ZoomTransform } from "d3";
 const d3 = require("d3");
@@ -44,6 +44,7 @@ var backgroundDark = "#3F3F3F"
 var gp;
 var minTimeClick = 1000 // Minimum time between clicks
 var vibratingTime = 0
+var tagChartWidth = 300
 
 // EEG data from Realtime database
 var lastEEGdata = null // last data, as copied from 'database' page
@@ -96,7 +97,7 @@ var accelerationY = d3.scaleLog()
 // Time Series
 const timeseriesMargin = 10
 const timeseriesHeight = 300
-const timeseriesWidth = (window.innerWidth / 2)
+const timeseriesWidth = (window.innerWidth / 3)
 
 // Gamepad settings
 var buttonClickCounts = {}
@@ -225,13 +226,12 @@ var museModels =
 var maxBarXdefault = 10
 var maxBarX = maxBarXdefault
 var barWidth = d3.scaleLinear()
-    .range([0, 400])
     .domain([0, maxBarX])
-
-
+    .range([0, 100])
+    
 var barY = d3.scaleLinear()
-    .range([0, 400])
     .domain([0, 20])
+    .range([0, 400])
 
 
 var date = new Date()
@@ -311,7 +311,8 @@ function clickedGamepadButton(id) {
     if (graphInterval == null) {
         startGraphInterval()
     }
-    if (museConnected == true && dataGood == false) {
+    var disableLog = false
+    if (museConnected == true && dataGood == false && disableLog) {
         console.error("Can't log - Bad Data")
     }
     else {
@@ -324,8 +325,7 @@ function clickedGamepadButton(id) {
         var name = buttonMapOut[mode][code]
         var color = buttonColors[name]
 
-        if (name == "START") 
-        {
+        if (name == "START") {
             resetRecord()
         }
 
@@ -621,15 +621,17 @@ function updateBarChart(btns) {
         if (newMaxX > (maxBarX * 0.75)) {
             maxBarX = maxBarX * 1.33
             barWidth = d3.scaleLinear()
-                .range([0, 400])
                 .domain([0, maxBarX])
+                .range([0, 100])
+               
 
         }
 
-
+        var tagXOffset = 170
         d.attr("width", function (d, i) { return barWidth(d[1]) })
 
-        nums.attr("x", function (d, i) { return barWidth(d[1]) + 210 })
+        nums
+            //.attr("x", function (d, i) { return barWidth(d[1]) + tagXOffset })
             .text(function (d) { return d[1] })
 
         d.enter()
@@ -649,18 +651,19 @@ function updateBarChart(btns) {
         d.enter().append("text")
             .attr("class", "text num")
             .attr("y", function (d, i) { return barY(i) + 20 })
-            .attr("x", function (d, i) { return barWidth(d[1]) + 210 })
+            .attr("x", function (d, i) { return barWidth(d[1]) + tagXOffset })
             .text(function (d) { return d[1] })
     }
 
 
 }
-function modifyEEG(entry) {
+function modifyEEG(entry, history) {
     // Takes a json directly from firebase post, then adds some data like ratios
 
     var normal = {}
     normal["TimeStamp"] = entry.timestamp
     normal.acceleration = entry.total_acceleration
+    var last10 = history.slice(-10)
     if (entry != null && entry.valid == true) {
 
         channelsMuse.forEach(channel => {
@@ -680,12 +683,23 @@ function modifyEEG(entry) {
                 var keyStandard = channelStandard + "_" + bandStandard
                 normal[keyStandard] = parseFloat(entry[key].toFixed(4))
 
+                var historyAvgArr = []
+                last10.forEach(entry => 
+                    {                        
+                        historyAvgArr.push(entry[key])
+                    })
+                var historyAvg = d3.mean(historyAvgArr)
+                if (isNaN(historyAvg)) historyAvg = 1
+                entry[key + "_avg10"] = historyAvg
+
             })
 
         })
     }
 
     eegRecordStandard.push(normal)
+    
+    
     return entry
 
 }
@@ -754,37 +768,37 @@ function updateAccelerationGraph(data) {
     var svg = d3.select("#acceleration_svg")
     svg.style("display", "flex")
     var d = svg.selectAll(".bar").data([data])
-    
+
     d.enter()
         .append("rect")
         .attr("class", "bar")
         .attr("width", "20px")
-        .attr("y", function (d) { return accelerationY(10) - 15})
+        .attr("y", function (d) { return accelerationY(10) - 15 })
         .attr("fill", "red")
         .attr("x", "20px")
 
     d.enter().append("text").text("MOTION")
-    .style("font-size", "12px")
-    .attr("x", "7px")
-    .attr("y", accelerationChartHeight - 5)
+        .attr("class", "text")
+        .style("font-size", "12px")
+        .attr("x", "7px")
+        .attr("y", accelerationChartHeight - 5)
 
     d.transition()
         .attr("y", function (d, i) {
             var acc = d.total_acceleration
-            if (acc < 10 ) acc = 10
+            if (acc < 10) acc = 10
             var h = accelerationY(acc) - 15
-            
+
             return h
         })
         .attr("height", function (d, i) {
             var acc = d.total_acceleration
-            if (acc < 10 ) acc = 10
-            
+            if (acc < 10) acc = 10
+
             return accelerationY(1) - accelerationY(acc)
-            
+
         })
-        .attr("fill", function(d)
-        {
+        .attr("fill", function (d) {
             var acc = d.total_acceleration
             if (acc < 10) acc = 10
             if (acc < 30) return "green"
@@ -797,56 +811,61 @@ function updateAccelerationGraph(data) {
 }
 function rescaleTimeseries() {
 
-    // Move the graph every second
-    var svg = d3.select("#timechartsvg")
+    function moveBy(svgid, duration, avg, skipN) {
+        // Move the graph every second
+        var svg = d3.select("#" + svgid)
 
-    var date = new Date()
-    var millis = date.getTime()
+        var date = new Date()
+        var millis = date.getTime()
 
-    // Choose new range to view - scroll the time
-    timeend = millis - (1000 * eegChartDelay) // Offset 
-    timestart = timeend - (1000 * 30)
-    
-    // TODO: use zero for interval if this is first data
-    var thisInterval = eegInterval
-    
-    // Make an new axis with the new time range
-    circleX = d3.scaleLinear()
-        .domain([timestart, timeend])
-        .range([50, timeseriesWidth])
+        // Choose new range to view - scroll the time
+        timeend = millis - (1000 * eegChartDelay) // Offset 
+        timestart = timeend - (1000 * duration)
 
-    svg.selectAll(".circle")
-        .transition()
-        .attr("cx", function (d, i) { return circleX(d.timestamp) })
-        .ease(d3.easeLinear)
-        .duration(thisInterval)
+        // TODO: use zero for interval if this is first data
+        var thisInterval = eegInterval
 
-    svg.selectAll(".eeg")
-        .transition()
-        .attr("cx", function (d, i) { return circleX(d.timestamp) })
-        .ease(d3.easeLinear)
-        .duration(thisInterval)
+        // Make an new axis with the new time range
+        circleX = d3.scaleLinear()
+            .domain([timestart, timeend])
+            .range([50, timeseriesWidth])
 
-
-    svg.selectAll(".text")
-        .transition()
-        .attr("transform", function (d, i) {
-            return "translate(" + circleX(d.timestamp) + ", " + (tagOffset + tagTextOffset) + "), rotate(-45)"
-        })
-        .ease(d3.easeLinear)
-        .duration(thisInterval)
-
-    for (let id in eegLineIds) {
-        var key = eegLineIds[id]
-        var data = eegDataRecord.filter(row => row.timestamp > (millis - (1000 * 60 * 10))).map(row => [row.timestamp, row[key], row.valid])
-
-        svg.select("#" + key)
+        svg.selectAll(".circle")
             .transition()
-            .attr("d", function (d) { return eegLine(data) })
+            .attr("cx", function (d, i) { return circleX(d.timestamp) })
             .ease(d3.easeLinear)
             .duration(thisInterval)
 
+        svg.selectAll(".eeg")
+            .transition()
+            .attr("cx", function (d, i) { return circleX(d.timestamp) })
+            .ease(d3.easeLinear)
+            .duration(thisInterval)
+
+
+        svg.selectAll(".text")
+            .transition()
+            .attr("transform", function (d, i) {
+                return "translate(" + circleX(d.timestamp) + ", " + (tagOffset + tagTextOffset) + "), rotate(-45)"
+            })
+            .ease(d3.easeLinear)
+            .duration(thisInterval)
+
+        for (let id in eegLineIds) {
+            var key = eegLineIds[id] + avg
+            var data = getEveryNth(eegDataRecord.filter(row => row.timestamp > (millis - (1000 * duration * 1.5))).map(row => [row.timestamp, row[key], row.valid]), skipN)
+
+            svg.select("#" + key)
+                .transition()
+                .attr("d", function (d) { return eegLine(data) })
+                .ease(d3.easeLinear)
+                .duration(thisInterval)
+
+        }
+
     }
+    moveBy("timechartsvg", 60, "", 1)
+    moveBy("timechart2svg", (60 * 10), "_avg10", 10)
 
 }
 function stopListeners() {
@@ -1052,7 +1071,7 @@ function recordEEG() {
             lostApp()
         }
 
-        lastEEGdata = modifyEEG(lastEEGdata)
+        lastEEGdata = modifyEEG(lastEEGdata, eegDataRecord)
         eegDataRecord.push(lastEEGdata)
         updateVarianceGraph(lastEEGdata)
         updateAccelerationGraph(lastEEGdata)
@@ -1081,19 +1100,25 @@ function recordEEG() {
 
 }
 function setupEEGgraph() {
-    var svg = d3.select("#timechartsvg")
 
-    svg.selectAll(".eegline").data(eegLineIds)
-        .enter().append('path').attr("id", function (d) { return d })
-        .attr("class", "eegline")
-        .attr("fill", "none")
-        .attr("stroke", function (d, i) {
-            if (i == 0) return "red"
-            else if (i == 1) return "blue"
-            else if (i == 2) return "green"
-            else return "black"
-        })
-        .attr("stroke-width", 5)
+    function addTo(svgid, ex) {
+        var svg = d3.select("#" + svgid)
+
+        svg.selectAll(".eegline").data(eegLineIds)
+            .enter().append('path').attr("id", function (d) { return d + ex})
+            .attr("class", "eegline")
+            .attr("fill", "none")
+            .attr("stroke", function (d, i) {
+                if (i == 0) return "red"
+                else if (i == 1) return "blue"
+                else if (i == 2) return "green"
+                else return "black"
+            })
+            .attr("stroke-width", 5)
+    }
+    addTo("timechartsvg", "")
+    addTo("timechart2svg", "_avg10")
+
 
 }
 function playWarning() {
@@ -1353,7 +1378,7 @@ function buildIndicators(div) {
     var museRow = table.append("tr")
     var liveUsersRow = div.append("div")
 
-    
+
     gamepadRow
         .append("td")
         .append("img")
@@ -1437,19 +1462,20 @@ function buildPage() {
 
     buildIndicators(indicators)
     var charts = container.append("div").attr("id", "allcharts")
-    .style("display", "flex")
+        .style("display", "flex")
 
     // BAR CHART
     charts.append("svg")
-    .style("border", "1px solid black")
+        .style("border", "1px solid black")
         .attr("id", "barchartsvg")
-        .attr("width", varianceChartWidth + "px")
-        .attr("height", varianceChartHeight + "px")
+        .attr("width", tagChartWidth + "px")
+        .attr("height", timeseriesHeight + "px")
 
 
     // TIMESERIES
     charts.append("svg")
-    .style("border", "1px solid black")
+        .style("border", "1px solid black")
+        .style("margin-left", "10px")
         .attr("width", timeseriesWidth)
         .attr("height", timeseriesHeight)
         .append("g")
@@ -1457,6 +1483,19 @@ function buildPage() {
         .attr("width", timeseriesWidth - (2 * timeseriesMargin))
         .attr("height", timeseriesHeight - (2 * timeseriesMargin))
         .attr("transform", "translate(" + timeseriesMargin + ", " + timeseriesMargin + ")")
+
+    // TIMESERIES 2
+    charts.append("svg")
+    .style("margin-left", "10px")
+        .style("border", "1px solid black")
+        .attr("width", timeseriesWidth)
+        .attr("height", timeseriesHeight)
+        .append("g")
+        .attr("id", "timechart2svg")
+        .attr("width", timeseriesWidth - (2 * timeseriesMargin))
+        .attr("height", timeseriesHeight - (2 * timeseriesMargin))
+        .attr("transform", "translate(" + timeseriesMargin + ", " + timeseriesMargin + ")")
+
 
 
     options.append("button")
@@ -1512,7 +1551,13 @@ function buildPage() {
     });
 
     // Set theme
-    d3.selectAll("div").style("background", backgroundLight)
+    if (theme == "light") {
+        d3.selectAll("div").style("background", backgroundLight)
+    }
+    else {
+        d3.selectAll("div").style("background", backgroundDark)
+    }
+
 
     // Download existing markers
     getAllMarkers().then((snapshot) => {
