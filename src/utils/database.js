@@ -280,7 +280,7 @@ export function updateWaypoint(waypoint) {
         var date = new Date()
         var millis = date.getTime()
         waypoint.updatedTime = millis
-        var promise = updateDoc(doc(db, "waypoints", waypoint.id), { notes: waypoint.notes, label: waypoint.label, updateTime: millis, updatedBy: auth.currentUser.uid })
+        var promise = updateDoc(doc(db, "waypoints", waypoint.id), { notes: waypoint.notes, label: waypoint.label, updateTime: millis, updatedBy: auth.currentUser.uid, user: waypoint.user, file: waypoint.file})
         return promise
     }
 
@@ -293,6 +293,7 @@ onAuthStateChanged(auth, (fbuser) => {
         anonymous = true
     }
     if (fbuser && fbuser.email != null) {
+
         user = fbuser
         anonymous = false
         console.log("Authenticated user:")

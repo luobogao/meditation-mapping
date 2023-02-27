@@ -12,7 +12,8 @@ import { dot, getRelativeVector, pca, findSlope, runModel, measureDistance, cosi
 import { zoom, updateChartWaypoints, updateChartUser } from "../utils/charts"
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { eegRecordStandard } from "./record";
-import kmeans from "kmeansjs";
+import kmeans from '@jbeuckm/k-means-js'
+import { phamBestK } from '@jbeuckm/k-means-js'
 
 
 export var userDataLoaded = false
@@ -300,6 +301,7 @@ export function rebuildChart() {
 
     // Find nearby waypoints to user's data - use every 60 seconds
     state.highRes.forEach(entry => entry.relative_vector = getRelativeVector(entry.vector))
+    state.lowRes.forEach(entry => entry.relative_vector = getRelativeVector(entry.vector))
     var userVectors = state.highRes.map(e => e.relative_vector)
     var distanceIds = {}
     userVectors.forEach(uservector => {
@@ -325,27 +327,31 @@ export function rebuildChart() {
         })
     })
 
-    // K-means
-    var kmeansResult
+    function findClusters(data, meansKey) {
+        // K-means
+        var kmeansResult
+        var points = data.map(e => e.relative_vector)
 
-    kmeans(userVectors, state.clusters, function (err, res) {
-        kmeansResult = res
-        console.log(res)
-    })
-    state.highRes.forEach(entry => {
-        for (let i in kmeansResult) {
-            var vectors = kmeansResult[i]
-            vectors.forEach(vector => {
-                if (arraysEqual(vector, entry.relative_vector)) {
-                    entry.cluster = i
-                }
+        // Find best number of clusters
+        var maxKToTest = 10;
+        var result = phamBestK.findBestK(points, maxKToTest);
+        console.log("Best clusters: " + result.K)
+        
+        // Find Clusters
+        var kmeansResult = kmeans.cluster(points, result.K)
 
-            })
-
+        // Assign cluster numbers to every data point
+        for (let i in kmeansResult.assignments)
+        {
+            var clusterNumber = kmeansResult.assignments[i]
+            data[i].cluster = clusterNumber
         }
-    })
-
-
+        state[meansKey] = kmeansResult.means
+        
+    }
+    findClusters(state.lowRes, "lowResWaypoints")
+    findClusters(state.highRes, "highResWaypoints")
+    
 
     // Sort the waypoint matches by distance
     var distances = Object.entries(distanceIds)
@@ -676,9 +682,11 @@ function buildRightSidebar() {
         .style("flex-direction", "column")
         .attr("class", "user-selectors")
 
+    otherSelectors.append("text").text("Clusters:")
     var clustersContainer = otherSelectors.append("div").style("display", "flex").style("flex-direction", "row")
     buildClusterCounts(clustersContainer)
 
+    otherSelectors.append("text").text("Resolution:")
     var resolutionContainer = otherSelectors.append("div").style("display", "flex").style("flex-direction", "row")
     buildResolutionSelectors(resolutionContainer)
 

@@ -728,8 +728,7 @@ function adjustLabels() {
 }
 export function updateChartUser(data) {
 
-    console.log("data")
-    console.log(data)
+    
     clearInterval(rotateOpening)
 
     var vectors = data.map(e => getRelativeVector(e.vector))
@@ -780,8 +779,7 @@ export function updateChartUser(data) {
     {
         userCircles[i].cluster = data[i].cluster
     }
-    console.log(userCircles)
-
+    
     // svg.append("path")
     //     .attr("fill", "none")
     //     .attr("stroke", "black")
@@ -920,28 +918,54 @@ export function updateChartUser(data) {
 }
 function editWaypoint(waypoint, menu) {
     menu.selectAll("*").remove()
-    menu.append("div").text("User: " + state.userName)
+    console.log(user)
+
+    // User
+    menu.append("div").text("User:")
+    var user_select = menu.append("input").attr("type", "text").attr("value", waypoint.user).style("width", "220px")
+        .on("change", function (d) {
+            var selectedUser = d3.select(this).node().value
+            
+        })
+
+    
+    // Label
     menu.append("div").text("Label:").style("margin-top", "20px")
     var label = menu.append("input").attr("type", "text").attr("value", waypoint.label).style("width", "220px")
         .on("change", function (d) {
             var label = d3.select(this).node().value
             console.log(label)
         })
+
+    // File
+    menu.append("div").text("File:").style("margin-top", "20px")
+    var file = menu.append("input").attr("type", "text").attr("value", waypoint.file).style("width", "220px")
+        .on("change", function (d) {
+            
+        })
+
+
+    // Notes
     menu.append("div").text("Notes:").style("margin-top", "20px")
-    var notes = menu.append("textarea").attr("rows", 10).attr("cols", 30).text(waypoint.notes)
+    var notes = menu.append("textarea").attr("rows", 5).attr("cols", 30).text(waypoint.notes)
         .on("change", function (d) {
             var notes = d3.select(this).node().value
             console.log(label)
         })
+    // Submit
     menu.append("div").style("margin-top", "30px")
         .append("button").text("Submit")
         .on("click", function () {
             var l = label.node().value
             var n = notes.node().value
+            var u = user_select.node().value
+            var f = file.node().value
 
             if (l.length > 1) {
                 waypoint.label = l
                 waypoint.notes = n
+                waypoint.user = u
+                waypoint.file = f
                 waypoint.userid = user.uid
 
                 // Clean up the waypoint for posting
@@ -1040,14 +1064,15 @@ function rotate(pitch, yaw, roll) {
 
     var transform = [[Axx, Axy, Axz], [Ayx, Ayy, Ayz], [Azx, Azy, Azz]]
 
-    rotatethis(waypointCircles, "list", "waypoints")
+    // Rotate Waypoints
+    rotatethis(waypointCircles)
 
+    // Rotate User Points
     if (userCircles.length > 0) {
-        rotatethis(userCircles, "list", "test")
+        rotatethis(userCircles)
     }
-    function rotatethis(matrix, type, name) {
-        if (type == "list") {
 
+    function rotatethis(matrix, type) {
             var m = matrix.map(row => [row.x, row.y, row.z])
             var m2 = math.multiply(m, transform)
             for (let e = 0; e < m2.length; e++) {
@@ -1057,40 +1082,6 @@ function rotate(pitch, yaw, roll) {
                 matrix[e].y = m2[e][1]
                 matrix[e].z = m2[e][2]
             }
-
-
-
-
-
-        }
-
-
-        else if (type == "link") {
-            matrix.forEach(link => {
-                var m = link.map(pnt => [pnt.x, pnt.y, pnt.z])
-                var m2 = math.multiply(m, transform)
-                for (let e = 0; e < m2.length; e++) {
-                    link[e].x = m2[e][0]
-                    link[e].y = m2[e][1]
-                    link[e].z = m2[e][2]
-                }
-
-            })
-        }
-
-        // NO LONGER USED
-        else if (type == "obj") {
-
-            var m = matrix.map(row => [x.invert(row.x), y.invert(row.y), z.invert(row.z)])
-            var m2 = math.multiply(m, transform)
-            for (let e = 0; e < m2.length; e++) {
-                matrix[e].x = x(m2[e][0])
-                matrix[e].y = y(m2[e][1])
-                matrix[e].z = z(m2[e][2])
-            }
-
-
-        }
 
     }
 

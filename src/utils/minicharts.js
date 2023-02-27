@@ -288,7 +288,7 @@ export function updateTimeseries(svgid, data) {
 
 
     var miniY = d3.scaleLog()
-        .domain([minY, 1000])
+        .domain([minY, 10000])
         .range([height, 0])
 
 
