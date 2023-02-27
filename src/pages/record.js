@@ -1158,7 +1158,7 @@ function watchGamepad() {
                 if (isPressed) {
 
 
-                    if (last_btn != b || (millis - last_btn_time) > minTimeClick) {
+                    if (b != undefined && !isNaN(b) && last_btn != b || (millis - last_btn_time) > minTimeClick) {
                         last_btn_time = millis
                         last_btn = b
 
@@ -1231,7 +1231,7 @@ function watchGamepad() {
 
         }
 
-    }, 20)
+    }, 50)
 }
 function buildModeSelector(div) {
     let select = div.append("select")
