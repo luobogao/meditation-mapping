@@ -259,7 +259,7 @@ function buildBrowseFile(div, label, widthpx, color, textColor, id) {
 
 }
 
-export function rebuildChart() {
+export function rebuildChart(autoClusters = true) {
     waypoints = waypoints.filter(waypoint => waypoint.remove != true)
 
     state.zoom = 1
@@ -332,26 +332,30 @@ export function rebuildChart() {
         var kmeansResult
         var points = data.map(e => e.relative_vector)
 
-        // Find best number of clusters
-        var maxKToTest = 10;
-        var result = phamBestK.findBestK(points, maxKToTest);
-        console.log("Best clusters: " + result.K)
-        
+        var clusters = state.clusters
+        if (autoClusters == true) {
+            // Find best number of clusters
+            var maxKToTest = 10;
+            var result = phamBestK.findBestK(points, maxKToTest);
+            console.log("Best clusters: " + result.K)
+            clusters = result.K
+
+        }
+
         // Find Clusters
-        var kmeansResult = kmeans.cluster(points, result.K)
+        var kmeansResult = kmeans.cluster(points, clusters)
 
         // Assign cluster numbers to every data point
-        for (let i in kmeansResult.assignments)
-        {
+        for (let i in kmeansResult.assignments) {
             var clusterNumber = kmeansResult.assignments[i]
             data[i].cluster = clusterNumber
         }
         state[meansKey] = kmeansResult.means
-        
+
     }
     findClusters(state.lowRes, "lowResWaypoints")
     findClusters(state.highRes, "highResWaypoints")
-    
+
 
     // Sort the waypoint matches by distance
     var distances = Object.entries(distanceIds)

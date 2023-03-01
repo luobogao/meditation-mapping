@@ -29,7 +29,7 @@ var means = []
 var maxes = []
 var principals = []
 var modelType = "cosine" // How to measure variances
-var standardizeType = "ratio" // raw, ratio, or normal
+var standardizeType = "normal" // raw, ratio, or normal
 var distanceType = "combined"
 var eucAdjust = 0.8           // How much to adjust the Euclidean measurement compared with cos. 0.8 seems good to even out the cos data, anything more is far too dramatic
 
@@ -400,20 +400,4 @@ export function runModel(rows)
     
     return mappedCoordinates
 }
-
-export function findSlope(points) {
-    // Returns the slope of the line of best fit from a list of points
-    // Assumes that x is the index
-    const n = points.length;
-    let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
-    for (let x = 0; x < n; x++) {
-      var y = points[x];
-      sumX += x;
-      sumY += y;
-      sumXY += x * y;
-      sumX2 += x * x;
-    }
-    const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
-    return slope;
-  }
 

@@ -24,6 +24,7 @@ const channelsMuse = ["tp10", "tp9", "af7", "af8"]
 const bandsMuse = ["delta", "theta", "alpha", "beta", "gamma"]
 
 // Status
+var maxTimeDiff = 3
 var eegStatus = true  // Set to true when data from realtimedb seems to be live, set to false when last timestamp is old
 var androidStatus = false
 var museConnected = false
@@ -294,7 +295,7 @@ function startGraphInterval() {
             var d = new Date()
             var now = d.getTime()
             var timeDiff = (now - lastTime) / 1000
-            if (timeDiff > 2) {
+            if (timeDiff > maxTimeDiff) {
 
                 lostApp()
             }
@@ -395,6 +396,7 @@ function clickedGamepadButton(id) {
 }
 function updateMuseStatus() {
     if (androidStatus == false) {
+        console.log("android status is false")
         d3.select("#muse_status_svg").style("opacity", deactiveOpacity)
     }
     else {
@@ -891,7 +893,6 @@ function stopListeners() {
 function lostApp() {
     if (androidStatus == true) {
         console.error("Lost connection to Android App")
-        androidStatus = false
         eegStatus = false // flag so that console isn't flooded with messages
         androidStatus = false
         museConnected = false
@@ -977,8 +978,7 @@ function recordEEG() {
 
 
 
-                        if (timeDiff > (1000 * 2.1)) {
-
+                        if (timeDiff > (1000 * maxTimeDiff)) {
 
                             lostApp()
                             if (timeDiff > (1000 * 120)) {
@@ -1068,7 +1068,7 @@ function recordEEG() {
 
         }
         else {
-            lostApp()
+            
         }
 
         lastEEGdata = modifyEEG(lastEEGdata, eegDataRecord)
