@@ -49,7 +49,13 @@ export function validateData(data) {
         .style("margin", margin + "px")
         .attr("height", (height - sliderHeight - (4 * margin)) + "px")
 
+    graphSVG.append("rect")
+        .attr("width", (width - (2 * margin)) + "px")
+        .attr("height", (height - sliderHeight - (4 * margin)) + "px")
+        .attr("fill", "lightgrey");
+
     var lines = ["Gamma_TP10", "Gamma_TP9", "Gamma_AF7", "Gamma_AF8"]
+    var colors = ["blue", "green", "red", "purple"]
     dataLinesOriginal = lines.map(key => {
         var firstValue = data[0][key]
         return data.map(e => {
@@ -68,7 +74,7 @@ export function validateData(data) {
         .append("path")
         .attr("class", "line")
         .attr("fill", "none")
-        .attr("stroke", "black")
+        .attr("stroke", function (d, i) { return colors[i] })
         .attr("stroke-width", 3)
 
     updateValidChart(dataLines)
