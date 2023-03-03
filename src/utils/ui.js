@@ -1,5 +1,6 @@
 import { state, updateAllCharts, rebuildChart, users } from "../pages/map";
 
+
 const d3 = require("d3");
 export function popUp(event, html) {
     var x = event.pageX
@@ -25,6 +26,34 @@ export function popUp(event, html) {
     else return popup
 
 }
+
+export function notice() {
+    // Blanks out background then adds a foreground div
+    const width = 300
+    const height = 200
+    d3.select("body").append("div")
+        .style("width", window.innerWidth + "px")
+        .style("height", window.innerHeight + "px")
+        .style("background", "white")
+        .style("position", "absolute")
+        .style("left", 0)
+        .style("top", 0)
+        .style("opacity", 0.4)
+
+    var div = d3.select("body").append("div")
+        .style("width", width + "px")
+        .style("height", height + "px")
+        .style("background", "grey")
+        .style("border", "2px solid black")
+        .style("border-radius", "5px")
+        .style("position", "absolute")
+        .style("left", 0)
+        .style("top", 0)
+        .style("bottom", 0)
+        .style("right", 0)
+        .style("margin", "auto auto auto auto")
+}
+
 export function addCheckbox(div, name, checked, textSize, type = "checkbox") {
     var checkboxDiv = div.append("div")
         .style("font-size", "30px")
@@ -265,7 +294,7 @@ export function buildClusterCounts(div) {
     c2box
         .attr("class", "clusters-checkbox")
         .on("click", function () {
-            d3.selectAll(".clusters-checkbox").property("checked", false)        
+            d3.selectAll(".clusters-checkbox").property("checked", false)
             d3.select(this).property("checked", true)
             state.clusters = 2
             rebuildChart(false)
@@ -273,20 +302,20 @@ export function buildClusterCounts(div) {
     c3box
         .attr("class", "clusters-checkbox")
         .on("click", function () {
-            d3.selectAll(".clusters-checkbox").property("checked", false)        
+            d3.selectAll(".clusters-checkbox").property("checked", false)
             d3.select(this).property("checked", true)
             state.clusters = 3
             rebuildChart(false)
-            
+
         })
     c4box
         .attr("class", "clusters-checkbox")
         .on("click", function () {
-            d3.selectAll(".clusters-checkbox").property("checked", false)        
+            d3.selectAll(".clusters-checkbox").property("checked", false)
             d3.select(this).property("checked", true)
             state.clusters = 4
             rebuildChart(false)
-            
+
         })
 
 }

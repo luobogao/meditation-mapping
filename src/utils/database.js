@@ -1,4 +1,5 @@
 import { getFirestore, collection, getDocs, setDoc, doc, deleteDoc, updateDoc, query, where, addDoc } from 'firebase/firestore/lite';
+import {processCSV} from "./load"
 import { getStorage, ref as storageRef, getBlob } from "firebase/storage"
 import { arraysEqual } from './functions';
 import { getDatabase, ref as dbref, onValue, off, get } from "firebase/database"
@@ -8,7 +9,7 @@ import { getAuth, onAuthStateChanged, updateProfile, signInAnonymously } from "f
 import * as firebaseui from "firebaseui"
 import "firebaseui/dist/firebaseui.css"
 import firebase from "firebase/compat/app"
-import { processCSV, downloadWaypoints } from '../pages/map';
+import {downloadWaypoints } from '../pages/map';
 
 
 const d3 = require("d3");

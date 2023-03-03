@@ -1,19 +1,16 @@
 import React, { useState, useEffect } from "react";
-import * as firebaseui from "firebaseui"
 import { buildTimeslider } from "../utils/timeslider";
 import "firebaseui/dist/firebaseui.css"
-import { findPolynomial } from "../utils/regression";
 import { addCheckbox, buildChartSelectors, buildClusterCounts, buildResolutionSelectors, buildUserSelectors } from "../utils/ui";
 import { arraysEqual, unique } from "../utils/functions";
 import { updateTimeseries, buildSimilarityChart, updateSimilarityChart } from "../utils/minicharts";
 import { anonymous, auth, login, updateUsername, listenEEG, getAllWaypoints, downloadCSV, buildAuthContainer, firstLoad } from "../utils/database"
-import { waypoints_muse, waypoints_mindlink } from "../utils/vectors";
 import { dot, getRelativeVector, pca, findSlope, runModel, measureDistance, cosineSimilarity, euclideanDistance, combinedDistance } from "../utils/analysis";
 import { zoom, updateChartWaypoints, updateChartUser } from "../utils/charts"
-import { signInWithEmailAndPassword } from "firebase/auth";
-import { eegRecordStandard } from "./record";
 import kmeans from '@jbeuckm/k-means-js'
 import { phamBestK } from '@jbeuckm/k-means-js'
+import { buildBrowseFile } from "../utils/load";
+import { datastate } from "../utils/load";
 
 
 export var userDataLoaded = false
@@ -43,7 +40,7 @@ export var users;
 export var user;  // Firebase user
 
 
-var fr;
+
 
 export const miniChartSize = 200
 const miniChartMargin = 10
@@ -150,112 +147,6 @@ export function downloadWaypoints() {
     })
 
 
-
-}
-
-function receivedFile() {
-    // Callback from the "browse" button
-    // fr.result contains the string of the file that was uploading
-
-    let string = fr.result
-    console.log("--> Loaded file")
-    processCSV(string)
-
-
-}
-export function processCSV(string) {
-    d3.select("#loader").style("display", "flex")
-
-
-    if (string.substring(0, 30).includes("timestampMs")) {
-        state.device = "MindLink"
-
-    }
-    else {
-        state.device = "Muse"
-
-    }
-
-    var worker = new Worker("/workers/load_worker.js")
-    worker.postMessage(string);
-
-    worker.addEventListener('message', function (event) {
-
-        var data = JSON.parse(event.data)
-        state.raw = data.raw
-        state.lowRes = data.lowRes
-        state.highRes = data.highRes
-        state.avg10 = data.avg10
-        state.averageMax = data.averageMax
-        state.seconds_low = data.seconds_low
-        state.seconds_high = data.seconds_high
-        state.filename = data.filename
-        userDataLoaded = true
-        rebuildChart()
-    })
-}
-function buildBrowseFile(div, label, widthpx, color, textColor, id) {
-
-    var width = widthpx + "px"
-    let holder = div.append("div")
-        .style("position", "relative")
-        //.attr("font-family", fontFamily)
-        .attr("font-size", "20px")
-        .attr("id", id + "-all")
-        .style("width", width)
-
-    holder
-        .append("input")
-        .style("position", "relative")
-        .style("text-align", "right")
-        .style("opacity", 0)
-        .style("z-index", 2)
-        .attr("class", "browse-id")
-        .style("width", width)
-        .attr("type", "file")
-        .on("mouseover", function (d) {
-            d3.select(this).style("cursor", "pointer");
-            d3.select("#" + id)
-                .style("background", "grey")
-                .style("border-radius", "5px")
-
-        })
-
-        .on("mouseout", function (d) {
-            d3.select(this).style("cursor", "default");
-            d3.select("#" + id)
-                .style("border-radius", "5px")
-                .style("background", "#f0f0f0")
-        })
-
-        .on("change", function (evt) {
-            document.getElementById(id).click()
-
-            d3.select("#welcome").remove()
-            let file = evt.target.files[0]
-
-            fr = new FileReader()
-            fr.onload = receivedFile
-            fr.readAsText(file)
-
-
-
-
-        })
-
-
-    let fakefile = holder.append("div")
-        .style("position", "absolute")
-        .style("width", width)
-        .style("top", "0px")
-        .style("left", "0px")
-        .style("z-index", 1)
-
-    let btn = fakefile.append("button")
-        .style("font-size", "18px")
-        .style("width", width)
-        .attr("id", id)
-        .text(label)
 
 }
 
@@ -587,6 +478,20 @@ function setup() {
 
 
     buildBrowseFile(browse_btn, "UPLOAD", 80, "grey", "black", "t1")
+    browse_btn.append("button").text("LOAD")
+        .on("click", function () {
+
+            state.raw = datastate.raw
+            state.lowRes = datastate.lowRes
+            state.highRes = datastate.highRes
+            state.avg10 = datastate.avg10
+            state.averageMax = datastate.averageMax
+            state.seconds_low = datastate.seconds_low
+            state.seconds_high = datastate.seconds_high
+            state.filename = datastate.filename
+            userDataLoaded = true
+            rebuildChart()
+        })
     buildRightSidebar()
     buildBottomBar()
     buildTopBar()
@@ -791,12 +696,19 @@ function buildMiniCharts(div) {
 }
 
 export default function Live() {
+
+    const [userDataLoaded] = useState("")
+    useEffect(() => {
+        console.error("CHANGED")
+
+    }, [userDataLoaded])
+    
+
     useEffect(() => {
         buildPage()
 
     }, [])
-
-
+    
     return (
 
 
