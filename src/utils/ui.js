@@ -27,11 +27,12 @@ export function popUp(event, html) {
 
 }
 
-export function notice() {
+export function notice(message) {
     // Blanks out background then adds a foreground div
     const width = 300
     const height = 200
     d3.select("body").append("div")
+        .attr("class", "notice")
         .style("width", window.innerWidth + "px")
         .style("height", window.innerHeight + "px")
         .style("background", "white")
@@ -41,17 +42,26 @@ export function notice() {
         .style("opacity", 0.4)
 
     var div = d3.select("body").append("div")
+        .attr("class", "notice")
         .style("width", width + "px")
         .style("height", height + "px")
         .style("background", "grey")
         .style("border", "2px solid black")
         .style("border-radius", "5px")
         .style("position", "absolute")
+        .style("display", "flex")
+        .style("align-items", "center")
+        .style("justify-content", "center")
         .style("left", 0)
         .style("top", 0)
         .style("bottom", 0)
         .style("right", 0)
         .style("margin", "auto auto auto auto")
+
+    div.append("text")
+        .style("text-align", "center")
+        .style("font-size", "30px")
+        .text(message)
 }
 
 export function addCheckbox(div, name, checked, textSize, type = "checkbox") {

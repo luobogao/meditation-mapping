@@ -1,4 +1,5 @@
 
+import { validate, showLoadingValidate } from "../pages/validate";
 const d3 = require("d3");
 var fr; // file reader
 export var datastate = {}
@@ -37,7 +38,7 @@ export function processCSV(string) {
         
         console.log("----> DONE LOADING")
         
-        //validateData(data.lowRes)
+        validate(data.data)
 
     })
 }
@@ -77,6 +78,7 @@ export function buildBrowseFile(div, label, widthpx, color, textColor, id) {
         })
 
         .on("change", function (evt) {
+            showLoadingValidate()
             document.getElementById(id).click()
 
             d3.select("#welcome").remove()
