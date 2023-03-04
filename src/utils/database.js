@@ -238,7 +238,8 @@ export function addWaypoint(waypoint) {
         if (waypoint.notes == undefined) waypoint.notes = null
         var entry = {
             user: waypoint.user, addedBy: userid, label: waypoint.label, vector: waypoint.vector,
-            notes: waypoint.notes, delete: false, addedTime: millis, resolution: waypoint.resolution
+            notes: waypoint.notes, delete: false, addedTime: millis, resolution: waypoint.resolution,
+            version: "1.0"
         }
 
         var promise = addDoc(collection(db, "waypoints"), entry)

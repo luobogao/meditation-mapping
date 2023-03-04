@@ -68,7 +68,7 @@ self.addEventListener("message", function (e) {
     let headers = data.slice(-1)[0]
     let rows = data.slice(0, data.length - 1)
     console.log("--> Loaded " + rows.length + " rows...")
-    
+
     let keys = Object.keys(rows[0])
     if (keys.includes("timestampMs")) {
         processDataMindLink(rows, "data1")
@@ -97,7 +97,7 @@ function processDataMuse(rows) {
     // This object will hold all the resulting data, then be stringified and passed back to app
     var returnObj = {}
 
-    
+
     // Remove rows with blank data
     rows = rows.filter(row => row.Delta_TP9 || row.Theta_AF8 || row.Beta_AF7 || row.Gamma_TP10) // remove blank rows
 
@@ -185,7 +185,7 @@ function processDataMuse(rows) {
 
     // Remove last 10 seconds and first 10 seconds - user is probably moving during this time
     rows = rows.slice(10, rows.length - 10)
-    
+
     let last_timestamp = parseTime(rows.slice(-1)[0].TimeStamp)
     let total_seconds = Math.round((last_timestamp - first_timestamp) / 1000)
     let total_hours = total_seconds / 60 / 60
@@ -196,50 +196,20 @@ function processDataMuse(rows) {
         let row = rows.filter(r => r.seconds == s)[0]
 
         if (row) {
-            row.vector = getRootVector(row)
+            row.seconds = s
+            row.minutes = s / 60
+            row.percent = s / total_seconds
             standardRows.push(row)
         }
     }
-    
-    var lowResolution = 60   // average over 60 seconds
-    var highResolution = 10  // average over 10 seconds
-
-    // Long duration meditations should using longer rounding
-    if (total_hours > 0.8) {
-
-    }
 
     // Perform two different rounding operations with different average N
-    let raw = averageRows(clone(standardRows), 1)
-    let averageHighRes = averageRows(clone(standardRows), highResolution)
-    let averageLowRes = averageRows(clone(standardRows), lowResolution)
-    let average10 = averageRows(clone(standardRows), standardRows.length / 10)
-    let averageMax = averageRows(clone(standardRows), standardRows.length / 100)
+    averageRows(standardRows, 1)
+    averageRows(standardRows, 10)
+    averageRows(standardRows, 60)
 
-
-    if (averageLowRes.length < 3) {
-        console.error("Meditation session was too short: " + averageLowRes.length + " minutes")
-    }
-
-    returnObj.raw = clone(standardRows)
-    returnObj.lowRes = averageLowRes
-    returnObj.highRes = averageHighRes
-    returnObj.avg10 = average10
-    returnObj.averageMax = averageMax
-    returnObj.raw = raw
-
-
-    // Find the first and last timestamp for timeseries chart x-axis
-    const first_seconds = standardRows[0].seconds
-    const last_seconds = standardRows.slice(-1)[0].seconds
-    returnObj.seconds_low = first_seconds
-    returnObj.seconds_high = last_seconds
-
-    // Data is ready for plotting
-    averageLowRes.forEach(entry => {
-        //console.log(getRootVector(entry)) show all vectors
-    })
-
+    returnObj.data = standardRows
+    
     postMessage(JSON.stringify(returnObj))
 
 
@@ -249,48 +219,37 @@ function averageRows(rows, roundN) {
 
 
     console.log("----> Rounding with " + roundN + " in " + rows.length + " rows")
-    var firstSeconds = rows[0].seconds
-    var lastSeconds = rows.slice(-1)[0].seconds
-    var totalSeconds = lastSeconds - firstSeconds
-    var secondsPerN = totalSeconds / roundN
+
     roundN = Math.round(roundN)
 
-    // Less than ten second rounding or less than ten points - just return raw array, with the basics added
-    if (roundN < 10 || secondsPerN < 10) {
+    const roundN_half = Math.round(roundN / 2)
+    var start = roundN_half + 1
+    var end = rows.length - roundN_half
 
-        
-        rows.forEach(row => 
-            {
-                row.vector = getRootVector(row)
-                row.percent = (row.seconds - firstSeconds) / totalSeconds
-            }
-            )
-        return rows
+    if (roundN == 1) {
+        start = 0
+        end = rows.length
     }
-    else {
-        const roundN_half = Math.round(roundN / 2)
-        let newRows = []
 
-        for (let i = roundN_half + 1; i < rows.length - roundN_half; i = i + roundN) {
-            if (i < rows.length) {
-                let row = rows[i]
-                let newRow = {}
-                newRow.firstSeconds = firstSeconds
-                newRow.seconds = row.seconds
-                newRow.minutes = row.minutes
+    for (let i = roundN_half + 1; i < rows.length - roundN_half; i++) {
+        if (i < rows.length) {
+            let newRow = rows[i]
 
-                newRow.percent = (row.seconds - firstSeconds) / totalSeconds
+            newRow["avg" + roundN] = true  // used to filter later based on avgN
 
-                // Average each band + channel
-                bands.forEach(band => {
-                    channels.forEach(channel => {
-                        let avgArray = []
-                        const key = band + "_" + channel // "Gamma_TP10"
+            // Average each band + channel
+            bands.forEach(band => {
+                channels.forEach(channel => {
+                    let avgArray = []
+                    const key1 = band + "_" + channel
+                    const key = band + "_" + channel + "_avg" + roundN // eg: gamma_tp10_avg10
 
+                    if (roundN > 1) {
+                        // Average the last 'roundN' rows for each value
                         for (let a = i - roundN_half; a < i + roundN_half; a++) {
                             var row = rows[a]
 
-                            let val = row[key]
+                            let val = row[key1]
                             if (!isNaN(val)) {
                                 avgArray.push(val)
                             }
@@ -311,17 +270,21 @@ function averageRows(rows, roundN) {
                             newRow[key] = NaN
                         }
 
-                    })
+                    }
+                    // Averaging is 1 - just use the row's current value
+                    else 
+                    {
+                        newRow[key] = newRow[key1]
+                    }
+
+
                 })
+            })
 
-                newRow.vector = getRootVector(newRow) // Compute the averaged vector
-
-                newRows.push(newRow)
-
-            }
+            newRow["vector_avg" + roundN] = getRootVector(newRow) // Compute the averaged vector
         }
-        return newRows
     }
+
 
 }
 

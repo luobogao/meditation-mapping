@@ -9,7 +9,7 @@ export function buildTimeslider() {
 
 
     var width = parsePx(svg.attr("width"))
-    var data = state.raw
+    var data = state.data
     var minSeconds = data[0].seconds
     var maxSeconds = data.slice(-1)[0].seconds
     var totalSeconds = maxSeconds - minSeconds
@@ -29,10 +29,12 @@ export function buildTimeslider() {
         .width(width - (2 * margin))
         .on("drag", second => {
 
+            var percent = second / totalSeconds
+            
             let userPoints = d3.selectAll(".userpoints")
 
             userPoints
-                .style("opacity", function (d) {
+                .style("opacity", function (d, i) {
 
                     var decay = 2
                     switch (state.resolution) {
@@ -46,8 +48,9 @@ export function buildTimeslider() {
                             decay = 3.5;
                             break;
                     }
-                    var percent = second / totalSeconds
+                    decay = 3.5
                     var diff = Math.abs(d.moment.percent - percent)
+                    
                     var inverse = 100 - Math.pow(diff * 100, 2)
                     if (inverse < 0) inverse = 0
                     return inverse / 100
@@ -66,11 +69,11 @@ export function buildTimeslider() {
                             decay = 3.5;
                             break;
                     }
-                    var percent = second / totalSeconds
+                    decay = 3.5
                     var diff = Math.abs(d.moment.percent - percent)
                     var inverse = 100 - Math.pow(diff * 100, 2)
                     if (inverse < 0) inverse = 0
-                    return (inverse / 5) + "px"
+                    return (inverse / 20) + "px"
                 })
             
 

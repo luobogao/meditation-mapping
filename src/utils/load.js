@@ -33,15 +33,8 @@ export function processCSV(string) {
     worker.addEventListener('message', function (event) {
 
         var data = JSON.parse(event.data)
-        datastate.raw = data.raw
-        datastate.lowRes = data.lowRes
-        datastate.highRes = data.highRes
-        datastate.avg10 = data.avg10
-        datastate.averageMax = data.averageMax
-        datastate.seconds_low = data.seconds_low
-        datastate.seconds_high = data.seconds_high
-        datastate.filename = data.filename
-        datastate.updated = true
+        datastate.data = data.data
+        
         console.log("----> DONE LOADING")
         
         //validateData(data.lowRes)
