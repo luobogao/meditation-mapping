@@ -237,6 +237,7 @@ function averageRows(rows, roundN) {
 
             newRow["avg" + roundN] = true  // used to filter later based on avgN
 
+            var valueAvgArr = [] // Array used to later measure the variance of all band powers at this moment (used later to find a good 'starting point')
             // Average each band + channel
             bands.forEach(band => {
                 channels.forEach(channel => {
@@ -261,6 +262,7 @@ function averageRows(rows, roundN) {
                             let max = round(d3.quantile(avgArray, 0.95))
                             let min = round(d3.quantile(avgArray, 0.05))
                             newRow[key] = avg
+                            valueAvgArr.push(avg)
                             newRow[key + "_min"] = min
                             newRow[key + "_max"] = max
 
@@ -280,6 +282,7 @@ function averageRows(rows, roundN) {
 
                 })
             })
+            newRow["momentVariance"] = d3.variance(valueAvgArr)
 
             newRow["vector_avg" + roundN] = getRootVector(newRow) // Compute the averaged vector
         }

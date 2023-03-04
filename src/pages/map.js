@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { buildTimeslider } from "../utils/timeslider";
 import "firebaseui/dist/firebaseui.css"
 import { addCheckbox, buildChartSelectors, buildClusterCounts, buildResolutionSelectors, buildUserSelectors } from "../utils/ui";
@@ -32,7 +33,7 @@ const maxWaypoints = 5  // Take top N waypoints sorted by cosine distance to use
 const d3 = require("d3");
 const sidebarWidth = 300
 const chartMargin = 10
-export const chartWidth = window.innerWidth - sidebarWidth - 250
+export const chartWidth = window.innerWidth - sidebarWidth
 export const chartHeight = window.innerHeight
 export var mode3d = true
 const backgroundColor = "#d9d9d9"
@@ -199,7 +200,7 @@ export function rebuildChart(autoClusters = true) {
         var kmeansResult
         var points = state.data.map(e => e["relative_vector_avg" + avg]).filter(e => e != null)
         if (points.length == 0) console.error("Only null vectors found in data!")
-        
+
 
         var clusters = state.clusters
         if (autoClusters == true) {
@@ -409,6 +410,20 @@ function buildModel(vectors) {
 
 function setup() {
     d3.select("#main-container").style("display", "flex")
+        .style("flex-direction", "column")
+        .style("font-family", "Cabin")
+
+    d3.select("#nav")
+        .style("background", backgroundColor)
+        .style("border-bottom", "1px solid grey")
+
+    d3.select("#navdiv")
+        .style("margin", "5px")
+        .style("background", backgroundColor)
+        .style("display", "flex")
+        .style("justify-content", "space-between")
+
+    d3.select("#body").style("display", "flex")
         .style("flex-direction", "row")
         .style("font-family", "Cabin")
 
@@ -637,7 +652,7 @@ function buildTopBar() {
     bar.style("position", "absolute")
         .attr("class", "user-selectors")
         .style("display", "none")
-        .style("top", 0 + "px")
+        .style("top", 50 + "px")
         .style("left", sidebarWidth + "px")
         .style("right", sidebarWidth + "px")
         .style("justify-content", "center")
@@ -694,33 +709,23 @@ export default function Live() {
         <main id="main-container">
             <link href="https://fonts.googleapis.com/css?family=Cabin" rel="stylesheet"></link>
 
-            <div id="sidebar-left" className="sidebar">
-
-                <div style={{ margin: 10 }}>
-                    <h3>The</h3>
-                    <h1 style={{ marginLeft: "20px", marginTop: "-10px", marginBottom: "-10px" }}>Mapping Meditation</h1>
-                    <h3 style={{ textAlign: "right" }}>Project</h3>
-                    <div className="subtitle">100% Free and Open-Source</div>
-                    <div className="subtitle">Dedicated to All Sentient Beings</div>
-                    <div id="realtime-container">
-                        <div id="realtime-div"></div>
-                        <button id="realtime-record">Record</button>
-                    </div>
-                    <div id="auth-container">
-                        <div id="user"></div>
-                        <button id="signin">Sign In</button>
-                    </div>
+            <div id="nav">
+                <div id="navdiv">
+                    <Link to="/validate">LOAD</Link>
+                    <button id="signin"></button>
                 </div>
-                <div id="browse-div"></div>
 
             </div>
-            <svg id="chartsvg"></svg>
-            <div id="popup"></div>
-            <div id="menu"></div>
-            <div id="sidebar-right" className="sidebar"></div>
-            <div id="bottom-bar"></div>
-            <div id="top-bar"></div>
-            <div id="welcome"></div>
+            <div id="body">
+                <svg id="chartsvg"></svg>
+                <div id="popup"></div>
+                <div id="menu"></div>
+                <div id="sidebar-right" className="sidebar"></div>
+                <div id="bottom-bar"></div>
+                <div id="top-bar"></div>
+                <div id="welcome"></div>
+            </div>
+
         </main>
     );
 }

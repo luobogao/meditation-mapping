@@ -9,14 +9,17 @@ import { bands, channels } from "../utils/muse"
 const d3 = require("d3");
 
 // data
-var rawData;
+var workingData, rawData;
 
 // Style
 var chartBackground = "lightgrey"
 var selectedStartSecond = 0
 const margin = 10
 var width = (window.innerWidth / 2) - (margin * 4)
-var height = width
+var height = (width / 2)
+
+// Moment Variance chart
+var yV, lineV, momentVarSVG;
 
 // Relative Chart
 var x, y, line, graphSVG, dataLines, dataLinesOriginal
@@ -27,12 +30,12 @@ var colors = ["blue", "blue", "blue", "blue", "red", "red", "red", "red"]
 
 // Ratio Charts
 var xR, yR, lineR, svgR
-var ratios = [["Gamma_TP10", "Gamma_TP9"], ["Gamma_AF8", "Gamma_AF7"],  ["Gamma_TP10", "Gamma_AF8"],  ["Gamma_TP9", "Gamma_AF7"],
-["Delta_TP10", "Delta_TP9"], ["Delta_AF8", "Delta_AF7"],  ["Delta_TP10", "Delta_AF8"],  ["Delta_TP9", "Delta_AF7"]]
-var ratioColors = ["blue", "green", "red", "purple","blue", "green", "red", "purple"]
+var ratios = [["Gamma_TP10", "Gamma_TP9"], ["Gamma_AF8", "Gamma_AF7"], ["Gamma_TP10", "Gamma_AF8"], ["Gamma_TP9", "Gamma_AF7"],
+["Delta_TP10", "Delta_TP9"], ["Delta_AF8", "Delta_AF7"], ["Delta_TP10", "Delta_AF8"], ["Delta_TP9", "Delta_AF7"]]
+var ratioColors = ["blue", "green", "red", "purple", "blue", "green", "red", "purple"]
 var yR = d3.scaleLinear()
-        .domain([-5, 5])
-        .range([height - margin, margin])
+    .domain([-5, 5])
+    .range([height - (2 * margin), 0])
 
 
 
@@ -45,7 +48,9 @@ export function showLoadingValidate() {
     notice("Loading...")
 }
 export function validate(data) {
-    rawData = data.filter(e => e.avg60 == true) // Remove the first few rows
+    rawData = data
+    workingData = getEveryNth(data.filter(e => e.avg60 == true), 10) // Remove the first few rows
+
     buildValidationChart()
     buildRatioCharts()
     d3.select("#acceptBtn").style("display", "flex")
@@ -57,8 +62,8 @@ function buildValidationChart(data) {
     // Does not change original data - once user decides on a starting minute, the values from that minute will be stored as a starting vector
 
     d3.selectAll(".notice").remove() // Remove loading notice
-    var start = rawData[0].seconds
-    var end = rawData.slice(-1)[0].seconds
+    var start = workingData[0].seconds
+    var end = workingData.slice(-1)[0].seconds
 
     var div = d3.select("#relative")
 
@@ -75,23 +80,27 @@ function buildValidationChart(data) {
         .defined(((d, i) => !isNaN(d.ratio60)))
         .curve(d3.curveMonotoneX) // apply smoothing to the line
 
+    // Moment Variance SVG
+    buildMomentVarianceChart(div)
+
+
 
     // Graph SVG
     graphSVG = div.append("svg")
         .attr("id", "validate_svg")
         .attr("width", (width - (2 * margin)) + "px")
         .style("margin", margin + "px")
-        .attr("height", (height - sliderHeight - (4 * margin)) + "px")
+        .attr("height", (height - (2 * margin)) + "px")
 
     graphSVG.append("rect")
         .attr("width", (width - (2 * margin)) + "px")
-        .attr("height", (height - sliderHeight - (4 * margin)) + "px")
+        .attr("height", (height - (2 * margin)) + "px")
         .attr("fill", chartBackground);
 
-    
+
 
     // Limit svg.the data to this averaged-amount
-    var d = clone(rawData)
+    var d = clone(workingData)
     d = d.filter(e => e["avg10"] == true)
 
 
@@ -134,9 +143,7 @@ function buildValidationChart(data) {
     }
     y = d3.scaleLinear()
         .domain([minY, maxY])
-        .range([height - margin, margin])
-
-
+        .range([height - (2 * margin), 0])
 
     dataLines = clone(dataLinesOriginal)
     graphSVG.selectAll(".line")
@@ -161,15 +168,21 @@ function buildValidationChart(data) {
 
     // https://www.npmjs.com/package/d3-simple-slider
     svg.call(slider)
+    slider.on("end", prepareForNext())
     slider.on("onchange", function (d) {
 
         var newMax = minRatio
         var newMin = -1 * minRatio
         selectedStartSecond = d
+
+        d3.select("#varLine")
+            .attr("x1", x(selectedStartSecond))
+            .attr("x2", x(selectedStartSecond))
+
         dataLines = dataLinesOriginal.map(l => {
             var filtered = l.filter(e => e.seconds > d && e.y10 != null)
             var firstValue = filtered[0].y60
-            
+
             filtered.forEach(e => e.ratio1 = Math.log(e.y1 / firstValue))
             filtered.forEach(e => e.ratio10 = Math.log(e.y10 / firstValue))
             filtered.forEach(e => e.ratio60 = Math.log(e.y60 / firstValue))
@@ -190,7 +203,7 @@ function buildValidationChart(data) {
 
         y = d3.scaleLinear()
             .domain([newMin, newMax])
-            .range([height - margin, margin])
+            .range([height - (2 * margin), 0])
 
 
 
@@ -207,11 +220,55 @@ function buildValidationChart(data) {
             .attr("d", function (d, i) {
                 // Build the line - smooth it by taking every N rows
 
-                return line(getEveryNth(d, graphAverageN).filter(e => e.ratio60 != null))
+                return line(d)
             })
 
 
     }
+    prepareForNext() // Default to zero in case user just wants to move immediately to map
+
+
+}
+function buildMomentVarianceChart(div) {
+
+    yV = d3.scaleLog()
+        .domain([0.01, 100])
+        .range([height - margin, margin])
+
+    lineV = d3.line()
+        .x(function (d, i) { return x(d.seconds); })
+        .y(function (d, i) { return yV(d.momentVariance) })
+        .defined(((d, i) => !isNaN(d.momentVariance)))
+        .curve(d3.curveMonotoneX) // apply smoothing to the line
+
+    momentVarSVG = div.append("svg")
+        .attr("id", "momentvar_svg")
+        .attr("width", (width - (2 * margin)) + "px")
+        .style("margin", margin + "px")
+        .attr("height", (height - (2 * margin)) + "px")
+
+    momentVarSVG.append("rect")
+        .attr("width", (width - (2 * margin)) + "px")
+        .attr("height", (height - (2 * margin)) + "px")
+        .attr("fill", chartBackground);
+
+    momentVarSVG.selectAll(".line").data([workingData])
+        .enter()
+        .append("path")
+        .attr("class", "line")
+        .attr("fill", "none")
+        .attr("stroke", "black")
+        .attr("stroke-width", 3)
+        .attr("d", function (d) { return lineV(d) })
+    momentVarSVG.append("line")
+        .attr("id", "varLine")
+        .attr("x1", x(0))
+        .attr("x2", x(0))
+        .attr("y1", yV(0.01) - 10)
+        .attr("y2", yV(100))
+        .attr("stroke", "black")
+        .attr("stroke-width", 2)
+
 
 
 }
@@ -219,17 +276,16 @@ function buildRatioCharts() {
     // Graph SVG
     var div = d3.select("#ratios")
     div.selectAll("*").remove()
-    
     svgR = div.append("svg")
         .attr("id", "ratioSVG")
         .attr("width", (width - (2 * margin)) + "px")
         .style("margin", margin + "px")
-        .attr("height", (height - sliderHeight - (4 * margin)) + "px")
+        .attr("height", (height - (2 * margin)) + "px")
 
     svgR.append("rect")
         .attr("fill", chartBackground)
         .attr("width", (width - (2 * margin)) + "px")
-        .attr("height", (height - sliderHeight - (4 * margin)) + "px")
+        .attr("height", (height - (2 * margin)) + "px")
 
     lineR = d3.line()
         .x(function (d, i) { return x(d.seconds); })
@@ -245,11 +301,12 @@ function buildRatioCharts() {
 function updateRatioGraphs() {
     var svg = d3.select("#ratioSVG")
 
-    var firstEntry = rawData[selectedStartSecond]
-    
+    // Create a new dataset where each band value (like Gamma_TP10) has been converted into a % of the first value, then take ratios
+
+    var filteredRaw = workingData.filter(e => e.seconds >= selectedStartSecond)
+    var firstEntry = filteredRaw[0]
     var ratioData = ratios.map(ratio => {
-        return getEveryNth(rawData.map(entry => {
-            
+        return filteredRaw.map(entry => {
 
             var relativeVal1 = entry[ratio[0] + "_avg60"] / firstEntry[ratio[0] + "_avg60"]
             var relativeVal2 = entry[ratio[1] + "_avg60"] / firstEntry[ratio[1] + "_avg60"]
@@ -259,10 +316,9 @@ function updateRatioGraphs() {
                 ratio: ratioValue
 
             }
-        }), 30)
+        })
     })
-    console.log("ratiodata:")
-    console.log(ratioData[0])
+
     var d = svg.selectAll(".line")
         .data(ratioData)
 
@@ -272,13 +328,12 @@ function updateRatioGraphs() {
         .attr("fill", "none")
         .attr("stroke", function (d, i) { return ratioColors[i] })
         .attr("stroke-width", 3)
-        .attr("d", function(d){return lineR(d)})
+        .attr("d", function (d) { return lineR(d) })
     d
-    .attr("d", function(d)
-    {
-        console.log(d)
-        return lineR(d)
-    })
+        .attr("d", function (d) {
+
+            return lineR(d)
+        })
 }
 
 function buildPage() {
@@ -301,52 +356,44 @@ function buildPage() {
         .style("margin", margin + "px")
     buildBrowseFile(btndiv, "UPLOAD", 80, "grey", "black", "t1")
 
-
-    // ACCEPT button
-    btndiv.append("button")
-        .style("font-size", "18px")
-        .attr("id", "acceptBtn")
-        .style("display", "none")
-        .style("margin-left", "10px")
-        .text("ACCEPT")
-        .on("click", function () {
-            var filteredData = clone(rawData.filter(row => row.seconds >= selectedStartSecond))
-            var firstRow = filteredData[0]
-            console.log("First Row Selected:")
-            console.group(firstRow)
-            filteredData.forEach(row => {
-                channels.forEach(channel => {
-                    bands.forEach(band => {
-                        var avgs = [1, 10, 60]
-                        avgs.forEach(avg => {
-                            var key = band + "_" + channel + "_avg" + avg
-
-                            if (row[key] != null) {
-                                var newVal = row[key] / firstRow[key]
-                                row[key] = newVal
-                            }
-
-                        })
-
-                    })
-                })
-            })
-            cleanedData = filteredData
-        })
-
     // Charts
     d3.select("#relative")
         .style("margin", margin + "px")
         .style("width", width + "px")
-        .style("height", height + "px")
+        .style("height", (height * 2) + "px")
 
     d3.select("#ratios")
         .style("margin", margin + "px")
         .style("width", width + "px")
-        .style("height", height + "px")
+        .style("height", (height * 2) + "px")
 
 
 
+}
+function prepareForNext() {
+    // Create a new dataset from the raw dataset which starts at the selected time, and definitely has values for the avg60 values
+    var filteredData = clone(rawData.filter(row => row.seconds >= selectedStartSecond && row.avg60 == true))
+    var firstRow = filteredData[0]
+
+    // Convert all band powers to percentages of the first value
+    filteredData.forEach(row => {
+        channels.forEach(channel => {
+            bands.forEach(band => {
+                var avgs = [1, 10, 60]
+                avgs.forEach(avg => {
+                    var key = band + "_" + channel + "_avg" + avg
+
+                    if (row[key] != null) {
+                        var newVal = row[key] / firstRow[key]
+                        row[key] = newVal
+                    }
+
+                })
+
+            })
+        })
+    })
+    cleanedData = filteredData
 }
 
 export default function Validate() {
