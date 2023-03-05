@@ -1,5 +1,5 @@
 import { dot, getRelativeVector, pca, findSlope, runModel, measureDistance, cosineSimilarity, euclideanDistance, combinedDistance } from "../utils/analysis";
-import {waypoints, state, userDataLoaded} from "../index.js"
+import { waypoints, state, userDataLoaded } from "../index.js"
 import { updateChartWaypoints } from "./charts";
 import kmeans from '@jbeuckm/k-means-js'
 import { phamBestK } from '@jbeuckm/k-means-js'
@@ -27,10 +27,9 @@ export function buildModel(vectors) {
 
 }
 
-export function rebuildChart(autoClusters = true) {
-    
+export function rebuildChart(settings = { autoClusters: true, updateCharts: true }) {
 
-    state.zoom = 1    
+    state.zoom = 1
 
     // Remove waypoints from users de-selected by user
     waypoints.forEach(waypoint => {
@@ -69,11 +68,11 @@ export function rebuildChart(autoClusters = true) {
 
 
         var clusters = state.clusters
-        if (autoClusters == true) {
+        if (settings.autoClusters == true) {
             // Find best number of clusters
             var maxKToTest = 10;
             var result = phamBestK.findBestK(points, maxKToTest);
-            console.log("Best clusters: " + result.K)
+            console.log("Best cluster count: " + result.K)
             clusters = result.K
 
         }
@@ -90,19 +89,32 @@ export function rebuildChart(autoClusters = true) {
         // Cluster means
         state["cluster_means_avg" + avg] = kmeansResult.means
 
-        // Estimate the strongest meditation state in each cluster
-        for (let cluster in 0..clusters)
-        {
+        // Measure the cosine similarity to every point in the meditation for each mean
+        var meanSimilarities = kmeansResult.means.map(meanVector => {
+            var seconds = 0
+            var similarityTimeseries = points.map(point => {
+                var score = cosineSimilarity(point, meanVector)
+                seconds ++
+                return {
+                    seconds: seconds,
+                    cosine: score
+                }
+            }).filter(e => e.cosine != null)
+            return similarityTimeseries
+        })
+        state["cluster_means_similarities_avg" + avg] = meanSimilarities
+
+        // Estimate the strongest meditation state in each cluster (NOT USED YET)
+        for (let cluster in 0..clusters) {
             var clusterPoints = state.data.filter(point => point["cluster_avg" + avg] == cluster)
-            
-            clusterPoints.forEach(point =>
-                {
-                    state.data.map(testpoint =>
-                        {
-                            
-                        })
+
+            clusterPoints.forEach(point => {
+                state.data.map(testpoint => {
+
                 })
+            })
         }
+
 
     }
     findClusters(10)
@@ -218,6 +230,9 @@ export function rebuildChart(autoClusters = true) {
 
         })
     }
-    updateAllCharts()
+    if (settings.updateCharts == true) {
+        updateAllCharts()
+    }
+
 
 }

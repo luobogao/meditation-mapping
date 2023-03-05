@@ -300,7 +300,8 @@ export function buildClusterCounts(div) {
             d3.selectAll(".clusters-checkbox").property("checked", false)
             d3.select(this).property("checked", true)
             state.clusters = 1
-            rebuildChart(false)
+            var settings = {autoClusters: false, updateCharts: true}
+            rebuildChart(settings)
         })
     c2box
         .attr("class", "clusters-checkbox")
@@ -308,7 +309,9 @@ export function buildClusterCounts(div) {
             d3.selectAll(".clusters-checkbox").property("checked", false)
             d3.select(this).property("checked", true)
             state.clusters = 2
-            rebuildChart(false)
+            var settings = {autoClusters: false, updateCharts: true}
+            rebuildChart(settings)
+            
         })
     c3box
         .attr("class", "clusters-checkbox")
@@ -316,7 +319,9 @@ export function buildClusterCounts(div) {
             d3.selectAll(".clusters-checkbox").property("checked", false)
             d3.select(this).property("checked", true)
             state.clusters = 3
-            rebuildChart(false)
+            var settings = {autoClusters: false, updateCharts: true}
+            rebuildChart(settings)
+            
 
         })
     c4box
@@ -325,7 +330,9 @@ export function buildClusterCounts(div) {
             d3.selectAll(".clusters-checkbox").property("checked", false)
             d3.select(this).property("checked", true)
             state.clusters = 4
-            rebuildChart(false)
+            var settings = {autoClusters: false, updateCharts: true}
+            rebuildChart(settings)
+            
 
         })
 

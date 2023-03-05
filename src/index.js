@@ -24,6 +24,14 @@ export var waypoints
 export var users;
 export var userDataLoaded = false
 
+const originalLog = console.log;
+
+console.log = function (...args) {
+  if (!args.some((arg) => arg.includes(" => "))) {
+    originalLog.apply(console, args);
+  }
+};
+
 export var state =
 {
   "filename": "<filename>",

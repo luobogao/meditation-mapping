@@ -159,22 +159,6 @@ function setup() {
         .attr("height", chartHeight - (2 * chartMargin))
         .attr("transform", "translate(" + chartMargin + "," + chartMargin + ")")
 
-
-    // Browse button
-    var browse_btn = d3.select("#browse-div")
-    browse_btn
-        .style("margin-top", "20px")
-        .style("display", "flex")
-        .style("justify-content", "center")
-
-
-    buildBrowseFile(browse_btn, "UPLOAD", 80, "grey", "black", "t1")
-    browse_btn.append("button").text("LOAD")
-        .on("click", function () {
-
-            state.data = datastate.data
-            rebuildChart()
-        })
     buildRightSidebar()
     buildBottomBar()
     buildTopBar()
@@ -413,7 +397,7 @@ export default function Live() {
             <div id="nav">
                 <div id="navdiv">
                 <Link to="/validate">LOAD</Link>
-                <Link to="/validate">GRAPHS</Link>
+                <Link to="/graphs">GRAPHS</Link>
                     <button id="signin"></button>
                 </div>
 

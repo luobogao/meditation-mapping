@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { notice } from "../utils/ui";
-
 import { buildBrowseFile } from "../utils/load";
 import { sliderBottom } from 'd3-simple-slider';
+import {state} from "../index"
 import { datastate } from "../utils/load";
 import { clone, getEveryNth } from '../utils/functions';
 import { bands, channels } from "../utils/muse"
+import { rebuildChart } from "../utils/runmodel";
 const d3 = require("d3");
 
 // data
@@ -171,7 +172,7 @@ function buildValidationChart(data) {
 
     // https://www.npmjs.com/package/d3-simple-slider
     svg.call(slider)
-    slider.on("end", prepareForNext())
+    slider.on("end", function(d){ prepareForNext()})
     slider.on("onchange", function (d) {
 
         var newMax = minRatio
@@ -374,6 +375,7 @@ function buildPage() {
 
 }
 function prepareForNext() {
+    
     // Create a new dataset from the raw dataset which starts at the selected time, and definitely has values for the avg60 values
     var filteredData = clone(rawData.filter(row => row.seconds >= selectedStartSecond && row.avg60 == true))
     var firstRow = filteredData[0]
@@ -397,6 +399,9 @@ function prepareForNext() {
         })
     })
     cleanedData = filteredData
+    state.data = cleanedData
+    rebuildChart({autoClusters: true, updateCharts: false})
+    
 }
 
 export default function Validate() {
@@ -409,7 +414,8 @@ export default function Validate() {
     return (
         <div id="main-container">
             <div id="nav">
-                <Link to="/map">Map</Link>
+            <Link to="/map">Map</Link>
+            <Link to="/graphs">Graphs</Link>
             </div>
 
             <div id="header"></div>
