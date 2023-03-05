@@ -48,7 +48,7 @@ export function buildTimeslider() {
                             decay = 3.5;
                             break;
                     }
-                    decay = 3.5
+                    decay = 5
                     var diff = Math.abs(d.moment.percent - percent)
                     
                     var inverse = 100 - Math.pow(diff * 100, 2)
@@ -69,7 +69,7 @@ export function buildTimeslider() {
                             decay = 3.5;
                             break;
                     }
-                    decay = 3.5
+                    decay = 5
                     var diff = Math.abs(d.moment.percent - percent)
                     var inverse = 100 - Math.pow(diff * 100, 2)
                     if (inverse < 0) inverse = 0

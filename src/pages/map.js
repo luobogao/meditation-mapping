@@ -222,7 +222,23 @@ export function rebuildChart(autoClusters = true) {
             var clusterNumber = kmeansResult.assignments[i]
             state.data[i]["cluster_avg" + avg] = clusterNumber
         }
+
+        // Cluster means
         state["cluster_means_avg" + avg] = kmeansResult.means
+
+        // Estimate the strongest meditation state in each cluster
+        for (let cluster in 0..clusters)
+        {
+            var clusterPoints = state.data.filter(point => point["cluster_avg" + avg] == cluster)
+            
+            clusterPoints.forEach(point =>
+                {
+                    state.data.map(testpoint =>
+                        {
+                            
+                        })
+                })
+        }
 
     }
     findClusters(10)
@@ -730,7 +746,8 @@ export default function Live() {
 
             <div id="nav">
                 <div id="navdiv">
-                    <Link to="/validate">LOAD</Link>
+                <Link to="/validate">LOAD</Link>
+                <Link to="/validate">GRAPHS</Link>
                     <button id="signin"></button>
                 </div>
 
