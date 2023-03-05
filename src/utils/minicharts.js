@@ -1,4 +1,5 @@
-import { miniChartSize, waypoints, state } from "../pages/map"
+import { miniChartSize } from "../pages/map"
+import {state, waypoints} from "../index"
 import { parsePx } from "./functions";
 import { addMenu, menuRemove } from "./ui";
 import { zoom } from "./charts";

@@ -1,5 +1,5 @@
 import {ratio, clone} from "../utils/functions";
-import {state} from "../pages/map"
+import {state} from "../index"
 
 const d3 = require("d3");
 const math = require("mathjs");

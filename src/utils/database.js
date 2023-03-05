@@ -9,8 +9,7 @@ import { getAuth, onAuthStateChanged, updateProfile, signInAnonymously } from "f
 import * as firebaseui from "firebaseui"
 import "firebaseui/dist/firebaseui.css"
 import firebase from "firebase/compat/app"
-import {downloadWaypoints } from '../pages/map';
-
+import { downloadWaypoints } from '../index';
 
 const d3 = require("d3");
 export var user;

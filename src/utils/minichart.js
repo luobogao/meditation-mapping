@@ -1,4 +1,4 @@
-import { state } from "../pages/map";
+import { state } from "../index";
 import { unique, getEveryNth } from "./functions";
 import { popUp, popUpremove } from "./ui";
 var opacityUser = 1

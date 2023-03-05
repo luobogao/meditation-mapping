@@ -4,20 +4,20 @@ import { Link } from "react-router-dom";
 import { buildTimeslider } from "../utils/timeslider";
 import "firebaseui/dist/firebaseui.css"
 import { addCheckbox, buildChartSelectors, buildClusterCounts, buildResolutionSelectors, buildUserSelectors } from "../utils/ui";
-import { arraysEqual, unique } from "../utils/functions";
+import {state, waypoints, userDataLoaded} from "../index"
+import { rebuildChart } from "../utils/runmodel";
+import { firstLoad, downloadCSV } from "../utils/database";
+
 import { updateTimeseries, buildSimilarityChart, updateSimilarityChart } from "../utils/minicharts";
-import { anonymous, auth, login, updateUsername, listenEEG, getAllWaypoints, downloadCSV, buildAuthContainer, firstLoad } from "../utils/database"
-import { dot, getRelativeVector, pca, findSlope, runModel, measureDistance, cosineSimilarity, euclideanDistance, combinedDistance } from "../utils/analysis";
+
 import { zoom, updateChartWaypoints, updateChartUser } from "../utils/charts"
-import kmeans from '@jbeuckm/k-means-js'
-import { phamBestK } from '@jbeuckm/k-means-js'
+
 import { buildBrowseFile } from "../utils/load";
 import { datastate } from "../utils/load";
 import { cleanedData } from "./validate";
 import { bands, channels } from "../utils/muse"
 
 
-export var userDataLoaded = false
 
 const band_channels = []
 bands.forEach(band => {
@@ -28,7 +28,7 @@ bands.forEach(band => {
 
 // Critical variables
 const minimumMatch = 70 // minimum distance for waypoints to match
-const maxWaypoints = 5  // Take top N waypoints sorted by cosine distance to user's data
+
 
 
 const d3 = require("d3");
@@ -39,8 +39,7 @@ const navHeight = 35
 export const chartHeight = window.innerHeight - navHeight - 2
 export var mode3d = true
 const backgroundColor = "#d9d9d9"
-export var waypoints
-export var users;
+
 export var user;  // Firebase user
 
 
@@ -50,314 +49,10 @@ export const miniChartSize = 200
 const miniChartMargin = 10
 
 
-export var state =
-{
-    "filename": "<filename>",
-    "device": "Muse",
-    "selected_users": [],
-    "resolution": 10,
-    "clusters": 1,
-    "zoom": 1, // increasing this value will change the y-min of distance graphs
-    "showAllWaypoints": false, // Shows all waypoints (as red) even when not matching
-    "chartType": "pca", // PCA, Cosine, or Euclidean
-    "limitMatches": true,
-    "model":
-    {
-        "mapped": null, // Mapped x-y coordinates of each standard vector
 
-    },
-    "avg10": []
-
-}
 
 var email = null
 
-
-
-export function downloadWaypoints() {
-
-
-    var showWelcome = false
-    if (firstLoad == true && anonymous) {
-        showWelcome = true
-    }
-
-    // Reset waypoints
-    waypoints = []
-    users = []
-    getAllWaypoints().then((snapshot) => {
-
-        snapshot.forEach((doc) => {
-            var waypoint = doc.data()
-            waypoint.id = doc.id
-
-            if (waypoint.id != undefined && waypoint.vector != undefined && waypoint.label != undefined && waypoint.user != undefined) {
-
-                // Migration method - adds a "_avg60" to the end of each vector
-                var newVector = {}
-                bands.forEach(band => {
-                    channels.forEach(channel => {
-                        var key = band + "_" + channel
-                        newVector[key + "_avg60"] = waypoint.vector[key]
-                    })
-                })
-                waypoint.relative_vector_avg60 = getRelativeVector(newVector, 60)
-
-                waypoints.push(waypoint)
-                users.push(waypoint.user)
-            }
-
-
-        })
-        console.log(waypoints)
-
-        if (waypoints.length == 0 || users.length == 0) {
-            alert("Could not download data from server...")
-            return
-        }
-        users = unique(users).sort()
-        state.selected_users = users
-
-        // Build model of meditation states using the "vectors.js" file
-        // This first time, include ALL the waypoints
-
-        function buildModel_waypoint() {
-            let vectors = waypoints.filter(e => e.exclude != true)
-                .filter(e => state.selected_users.includes(e.user))
-                .map(e => e.relative_vector_avg60)
-            buildModel(vectors)
-        }
-
-        if (userDataLoaded) {
-
-            buildModel_waypoint()
-        }
-        else {
-            buildModel_waypoint()
-        }
-
-
-
-
-        waypoints.forEach(e => {
-            if (state.selected_users.includes(e.user)) {
-                e.match = true
-            }
-
-        })
-
-        //buildSimilarityChart()
-        updateChartWaypoints()
-        buildUserSelectors()
-
-        // Show the welcom screen only after data is loaded
-        if (showWelcome) {
-            buildWelcome()
-
-        }
-
-
-    })
-
-
-
-}
-
-export function rebuildChart(autoClusters = true) {
-    waypoints = waypoints.filter(waypoint => waypoint.remove != true)
-
-    state.zoom = 1
-
-    // Remove waypoints from users de-selected by user
-    waypoints.forEach(waypoint => {
-        waypoint.match = state.selected_users.includes(waypoint.user)
-    })
-    waypoints.forEach(waypoint => {
-        if (waypoint.hide == true) waypoint.match = false
-    })
-
-    var filtered_waypoints_user = waypoints.filter(e => e.match == true)
-
-    // Tests for data quality
-    if (userDataLoaded == false) {
-        // Only plot the waypoints - user hasn't loaded data yet
-
-        let vectors = waypoints.filter(w => w.match == true).map(e => e.relative_vector_avg60)
-        buildModel(vectors)
-        updateChartWaypoints()
-        return
-    }
-    if (filtered_waypoints_user.length == 0) {
-        alert("No Waypoints?")
-        return
-    }
-
-    // Find nearby waypoints to user's data - use every 60 seconds
-    state.data.forEach(entry => entry.relative_vector_avg1 = getRelativeVector(entry, 1))
-    state.data.forEach(entry => entry.relative_vector_avg10 = getRelativeVector(entry, 10))
-    state.data.forEach(entry => entry.relative_vector_avg60 = getRelativeVector(entry, 60))
-
-    // Find Clusters
-    function findClusters(avg) {
-        var kmeansResult
-        var points = state.data.map(e => e["relative_vector_avg" + avg]).filter(e => e != null)
-        if (points.length == 0) console.error("Only null vectors found in data!")
-
-
-        var clusters = state.clusters
-        if (autoClusters == true) {
-            // Find best number of clusters
-            var maxKToTest = 10;
-            var result = phamBestK.findBestK(points, maxKToTest);
-            console.log("Best clusters: " + result.K)
-            clusters = result.K
-
-        }
-
-        // Find Clusters
-        var kmeansResult = kmeans.cluster(points, clusters)
-
-        // Assign cluster numbers to every data point
-        for (let i in kmeansResult.assignments) {
-            var clusterNumber = kmeansResult.assignments[i]
-            state.data[i]["cluster_avg" + avg] = clusterNumber
-        }
-
-        // Cluster means
-        state["cluster_means_avg" + avg] = kmeansResult.means
-
-        // Estimate the strongest meditation state in each cluster
-        for (let cluster in 0..clusters)
-        {
-            var clusterPoints = state.data.filter(point => point["cluster_avg" + avg] == cluster)
-            
-            clusterPoints.forEach(point =>
-                {
-                    state.data.map(testpoint =>
-                        {
-                            
-                        })
-                })
-        }
-
-    }
-    findClusters(10)
-    findClusters(60)
-
-
-    var userVectors = state.data.map(e => e.relative_vector_avg10).filter(e => e != null)
-    var distanceIds = {}
-    userVectors.forEach(uservector => {
-
-        filtered_waypoints_user.forEach(waypoint => {
-
-            var id = waypoint.id
-            var distance = measureDistance(uservector, waypoint.relative_vector_avg60)
-
-
-            if (id in distanceIds) {
-                // This is the best match so far
-                if (distanceIds[id] < distance) {
-                    distanceIds[id] = distance
-                    waypoint.cosineSimilarity = distance
-                }
-
-            }
-            else {
-                distanceIds[id] = distance
-            }
-
-        })
-    })
-
-    // Sort the waypoint matches by distance
-    var distances = Object.entries(distanceIds)
-    distances.sort(function (a, b) {
-        return b[1] - a[1]
-    })
-
-    // Select waypoint IDs to use
-    var filtered_waypoint_ids
-    if (state.limitMatches) {
-
-        filtered_waypoint_ids =
-            distances
-                //.filter(e => e[1] > minimumMatch)
-                .slice(0, maxWaypoints)
-                .map(e => e[0])
-    }
-    else {
-        // Use ALL waypoints
-        filtered_waypoint_ids = filtered_waypoints_user.map(e => e.id)
-    }
-
-    if (filtered_waypoint_ids.length == 0) {
-        alert("zero waypoints selected!")
-        return
-    }
-    // Update ALL waypoints with match=true if their ids match
-    waypoints.forEach(waypoint => {
-
-        if (filtered_waypoint_ids.includes(waypoint.id)) {
-            waypoint.match = true
-
-        }
-        else waypoint.match = false
-    })
-    var filtered_waypoints = waypoints.filter(e => e.match == true)
-
-    // Re-build the PCA using only the top-N waypoints
-    //let vectors = waypoints.filter(w => w.match == true).map(e => getRelativeVector(e.vector))
-
-    // Rebuild PCA using the USER's data (seems to give much better results that top N vectors)
-
-    buildModel(userVectors)
-
-    // Find similarity to each waypoint for each row
-    function addWaypointDistances(rows) {
-        rows.forEach(row => {
-            var relativeVector = getRelativeVector(row.vector)
-            row.relative_vector = relativeVector
-            var distances = []
-            filtered_waypoints.forEach(waypoint => {
-
-                var distance = measureDistance(relativeVector, waypoint.relative_vector)
-
-
-                var label = waypoint.label + " (" + waypoint.user + ")"
-
-                distances.push({ label: label, distance: distance, waypoint: waypoint })
-
-            })
-            distances.sort(function (a, b) {
-                return b.distance - a.distance
-            })
-
-            row.distances = distances
-
-        })
-
-
-    }
-
-    // Make an array of similarities in each waypoint
-    function waypointMatches(rows, name) {
-        waypoints.forEach(waypoint => {
-            var matchesTimeseries = []
-            for (let x in rows.length) {
-                var dist = measureDistance(rows[x].relative_vector, waypoint.relative_vector)
-                matchesTimeseries.push({ x: x, y: dist })
-            }
-
-            waypoint[name] = matchesTimeseries
-
-
-        })
-    }
-
-    updateAllCharts()
-
-}
 export function updateAllCharts(reset = false) {
 
     if (reset == true) {
@@ -365,7 +60,7 @@ export function updateAllCharts(reset = false) {
     }
     //updateTimeseries("bottom-timeseries", state.highRes)
     buildTimeslider()
-    var data = state.data
+    var data;
     switch (state.resolution) {
         case 1:
             data = state.raw
@@ -401,27 +96,6 @@ export function updateAllCharts(reset = false) {
 function buildPage() {
 
     setup()
-
-
-}
-
-function buildModel(vectors) {
-    // Builds the AI model using a collection of input vectors
-    // These vectors are the raw (but averaged) values for each band/channel
-    // Okay to use a mix of the "standard" vectors plus a few user vectors
-    // Does not return x-y points - for that, need to call "run model" using the parameters set by this function
-
-    console.log("Building model with " + vectors.length + " vectors")
-    pca(vectors)
-
-    // Build x-y points for each waypoint and store them
-    let points = runModel(waypoints.map(e => e.relative_vector_avg60))
-
-    var i = 0
-    waypoints.map(waypoint => {
-        waypoint.coordinates = points[i]
-        i++
-    })
 
 
 }
@@ -499,7 +173,6 @@ function setup() {
         .on("click", function () {
 
             state.data = datastate.data
-            userDataLoaded = true
             rebuildChart()
         })
     buildRightSidebar()
@@ -623,7 +296,7 @@ function buildRightSidebar() {
     })
 
     // Checkbox: Limit to N waypoints
-    var limitWaypoints_box = addCheckbox(otherSelectors, "Limit to " + maxWaypoints + " Waypoints", state.limitMatches, "20px")
+    var limitWaypoints_box = addCheckbox(otherSelectors, "Limit to " + " N " + " Waypoints", state.limitMatches, "20px")
     limitWaypoints_box.on("click", function () {
         const active = this.checked
         if (active == true) {
@@ -634,11 +307,6 @@ function buildRightSidebar() {
         }
         rebuildChart()
     })
-
-
-
-
-
 }
 function buildBottomBar() {
     var bar = d3.select("#bottom-bar")
@@ -718,7 +386,6 @@ export default function Live() {
             var stringed = JSON.stringify(getEveryNth(cleanedData, 10))
             console.log("size: " + stringed.length)
             localStorage.setItem("lastData", stringed)
-            userDataLoaded = true
             rebuildChart()
         }
         else
@@ -729,7 +396,6 @@ export default function Live() {
             {
                 console.log("Found last data!")
                 state.data = JSON.parse(lastData)
-                userDataLoaded = true
                 rebuildChart()
             }
             }, 2000)

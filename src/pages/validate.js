@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { notice } from "../utils/ui";
 import { Link } from "react-router-dom";
+import { notice } from "../utils/ui";
+
 import { buildBrowseFile } from "../utils/load";
 import { sliderBottom } from 'd3-simple-slider';
 import { datastate } from "../utils/load";
@@ -25,7 +26,9 @@ var yV, lineV, momentVarSVG;
 var x, y, line, graphSVG, dataLines, dataLinesOriginal
 var graphAverageN = 30 // Rounding for the chart
 var minRatio = 1.5
-var relativeLines = ["Delta_TP10", "Delta_TP9", "Delta_AF7", "Delta_AF8", "Gamma_TP10", "Gamma_TP9", "Gamma_AF7", "Gamma_AF8",]
+var relativeLines = ["Delta_TP10",
+            
+"Delta_TP9", "Delta_AF7", "Delta_AF8", "Gamma_TP10", "Gamma_TP9", "Gamma_AF7", "Gamma_AF8",]
 var colors = ["blue", "blue", "blue", "blue", "red", "red", "red", "red"]
 
 // Ratio Charts

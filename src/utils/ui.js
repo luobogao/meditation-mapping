@@ -1,5 +1,6 @@
-import { state, updateAllCharts, rebuildChart, users } from "../pages/map";
-
+import { updateAllCharts} from "../pages/map";
+import { rebuildChart } from "./runmodel";
+import { state, users } from "../index";
 
 const d3 = require("d3");
 export function popUp(event, html) {

@@ -1,11 +1,12 @@
-import { userDataLoaded, chartWidth, chartHeight, mode3d, waypoints, updateAllCharts } from "../pages/map"
+import {chartWidth, rebuildCharts, chartHeight, mode3d, updateAllCharts } from "../pages/map"
 import { popUp, popUpremove, addMenu, menuRemove, moveMenu } from "./ui";
 import { getRelativeVector, runModel } from "../utils/analysis";
 import { addWaypoint, user, deleteWaypoint, updateWaypoint, anonymous } from "../utils/database"
 import { getEveryNth } from "./functions";
+import { rebuildChart } from "./runmodel";
 import { centroid, clone } from "./functions";
+import {state, userDataLoaded, waypoints} from "../index"
 import { x_mini } from "./minichart";
-import { state, rebuildChart } from "../pages/map";
 import { updateSimilarityChart } from "./minicharts";
 import { cluster } from "d3";
 const d3 = require("d3");
@@ -184,7 +185,6 @@ export function updateChartWaypoints() {
         d3.select("#chartsvg").call(zoom.transform, lastTransform)
 
     }
-
 
     // Get min/max only from the selected waypoints
     var standardCoordinates = waypoints.filter(e => e.exclude != true).filter(e => e.match == true).map(e => e.coordinates)
@@ -721,7 +721,6 @@ function adjustLabels() {
 
 }
 export function updateChartUser(data) {
-
 
     clearInterval(rotateOpening)
 
