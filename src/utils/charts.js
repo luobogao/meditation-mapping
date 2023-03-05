@@ -7,6 +7,7 @@ import { centroid, clone } from "./functions";
 import { x_mini } from "./minichart";
 import { state, rebuildChart } from "../pages/map";
 import { updateSimilarityChart } from "./minicharts";
+import { cluster } from "d3";
 const d3 = require("d3");
 
 
@@ -23,12 +24,15 @@ var accYaw = 0
 
 var loaded = false
 
+// Points
+var clusterWaypoints = []
+var userCircles = []
+var waypointCircles = []
+
 var rotateStart = false
 var rotateDuration = 0 // briefly set to 100 for opening rotation
 var rotateOpening = false // an 'interval' which rotates the chart when user starts
-var waypointCircles = []
 var waypointLinks = []
-var userCircles = []
 var svg;
 var zooming = false
 var label_array = []
@@ -253,7 +257,7 @@ export function updateChartWaypoints() {
         .domain([8, 15])
         .range([0.4, 1])
 
-    
+
     waypoints.forEach(entry => {
 
         var xi = entry.coordinates[0]
@@ -273,7 +277,7 @@ export function updateChartWaypoints() {
         //adjustLabels()
     }
 
-    buildLinks(svg, waypointCircles)
+    //buildLinks(svg, waypointCircles)
     addWaypoints(svg, waypointCircles)
 
 
@@ -387,11 +391,12 @@ function addWaypoints(svg, data) {
                     .style("margin-top", "20px")
                     .text("Hide")
                     .on("click", function () {
-                        waypoints.forEach(waypoint => { if (waypoint.id == d.fullentry.id)
-                            {
+                        waypoints.forEach(waypoint => {
+                            if (waypoint.id == d.fullentry.id) {
                                 console.log("hiding: " + d.fullentry.id)
                                 waypoint.hide = true
-                            } })
+                            }
+                        })
                         rebuildChart()
                     })
 
@@ -569,7 +574,7 @@ function addLabels(svg, data) {
 
 function buildLinks(svg, waypointData) {
 
-    
+
     waypointLinks = []
     function getWaypoint(id) {
         var matches = waypointData.filter(e => e.id == id)
@@ -593,7 +598,7 @@ function buildLinks(svg, waypointData) {
         })
     }
     else {
-        
+
     }
 
 
@@ -717,17 +722,17 @@ function adjustLabels() {
 }
 export function updateChartUser(data) {
 
-    
+
     clearInterval(rotateOpening)
 
-    var vectors = getEveryNth(data, 1).map(e => getRelativeVector(e, 10)).filter(e => e != null)
+    var vectors = data.map(e => getRelativeVector(e, state.resolution)).filter(e => e != null)
 
-    console.log("using: " + vectors.length)
+
 
     // FOR TESTING: use the waypoints as user point, they should match PERFECTLY with waypoinst
     //var vectors = waypoints.filter(e => e.match == true).map(e => getRelativeVector(e.vector))
 
-   
+
     if (data.length > 30 && userSize == 40) userSize = 20
 
 
@@ -749,15 +754,12 @@ export function updateChartUser(data) {
 
         index++
 
-        userCircles.push({ x: xi, y: yi, z: zi, moment: moment})
+        userCircles.push({ x: xi, y: yi, z: zi, moment: moment, cluster: moment.cluster_avg10 })
 
     })
     cameraProject(userCircles)
-    for (let i in userCircles)
-    {
-        userCircles[i].cluster = data[i].cluster_avg10
-    }
     
+
     // svg.append("path")
     //     .attr("fill", "none")
     //     .attr("stroke", "black")
@@ -775,10 +777,7 @@ export function updateChartUser(data) {
         .append("circle")
         .attr("class", "userpoints")
         .style("cursor", "pointer")
-        .attr("cx", function (d, i) {
-
-            return x(d.xp)
-        })
+        .attr("cx", function (d, i) {return x(d.xp)})
         .attr("cy", function (d) { return y(d.yp) })
         .attr("r", function (d) { return userSizeScale(d.z) })
         .attr("seconds", function (d) {
@@ -789,8 +788,8 @@ export function updateChartUser(data) {
 
         .attr("opacity", userOpacity)
         //.attr("fill", userPointColor)
-        .attr("fill", function(d){
-            
+        .attr("fill", function (d) {
+
             if (d.cluster == 0) return "blue"
             else if (d.cluster == 1) return "red"
             else if (d.cluster == 2) return "green"
@@ -845,7 +844,7 @@ export function updateChartUser(data) {
 
             console.log("vector at this point:")
             console.log(d.moment)
-                        
+
             var node = d3.select(this)
 
             // Toggle color for selected waypoint
@@ -867,8 +866,43 @@ export function updateChartUser(data) {
             d3.select("#mini-marker").style("display", "none")
         })
 
+    addClusterWaypoints(svg)
+    
     var center = centroid(userCircles) // get the center of a point cloud
     recenter(center)
+    
+
+}
+function addClusterWaypoints(svg) {
+    var vectors = state["cluster_means_avg10"]
+    
+    var mapped = runModel(vectors)
+    console.log("mapped:")
+    console.log(mapped)
+    clusterWaypoints = []
+
+    var cluster = 0
+    mapped.forEach(entry => {
+
+        var xi = entry[0]
+        var yi = entry[1]
+        var zi = entry[2]
+
+        clusterWaypoints.push({ x: xi, y: yi, z: zi, cluster: cluster })
+        cluster ++
+
+    })
+
+    cameraProject(clusterWaypoints)
+    svg.selectAll(".clusterpoints")
+        .data(clusterWaypoints)
+        .enter()
+        .append("circle")
+        .attr("class", "clusterpoints")
+        .attr("cx", function (d, i) {return x(d.xp)})
+        .attr("cy", function (d) { return y(d.yp) })
+        .attr("r", 10)
+        .attr("fill", "green")
 
 }
 function editWaypoint(waypoint, menu) {
@@ -880,10 +914,10 @@ function editWaypoint(waypoint, menu) {
     var user_select = menu.append("input").attr("type", "text").attr("value", waypoint.user).style("width", "220px")
         .on("change", function (d) {
             var selectedUser = d3.select(this).node().value
-            
+
         })
 
-    
+
     // Label
     menu.append("div").text("Label:").style("margin-top", "20px")
     var label = menu.append("input").attr("type", "text").attr("value", waypoint.label).style("width", "220px")
@@ -896,7 +930,7 @@ function editWaypoint(waypoint, menu) {
     menu.append("div").text("File:").style("margin-top", "20px")
     var file = menu.append("input").attr("type", "text").attr("value", waypoint.file).style("width", "220px")
         .on("change", function (d) {
-            
+
         })
 
 
@@ -945,7 +979,7 @@ function editWaypoint(waypoint, menu) {
 }
 function addUserWaypoint(user_point, menu) {
     menu.selectAll("*").remove()
-    
+
     menu.append("div").text("User:").style("margin-top", "20px")
     var owner = menu.append("input").attr("type", "text").style("width", "220px").attr("value", user.displayName)
 
@@ -970,9 +1004,9 @@ function addUserWaypoint(user_point, menu) {
             if (l.length > 1) {
                 // Note: an ID will be automatically generated by firebase
                 var newWaypoint = { userid: user.uid, user: o, label: l, vector: user_point.vector_avg60, notes: n, resolution: state.resolution }
-                                
+
                 addWaypoint(newWaypoint)
-                .then((doc) => {
+                    .then((doc) => {
                         console.log("Added waypoint: " + doc.id)
                         newWaypoint.id = doc.id
                         menuRemove()
@@ -1031,17 +1065,21 @@ function rotate(pitch, yaw, roll) {
     if (userCircles.length > 0) {
         rotatethis(userCircles)
     }
+    if (clusterWaypoints.length > 0)
+    {
+        rotatethis(clusterWaypoints)
+    }
 
     function rotatethis(matrix, type) {
-            var m = matrix.map(row => [row.x, row.y, row.z])
-            var m2 = math.multiply(m, transform)
-            for (let e = 0; e < m2.length; e++) {
+        var m = matrix.map(row => [row.x, row.y, row.z])
+        var m2 = math.multiply(m, transform)
+        for (let e = 0; e < m2.length; e++) {
 
 
-                matrix[e].x = m2[e][0]
-                matrix[e].y = m2[e][1]
-                matrix[e].z = m2[e][2]
-            }
+            matrix[e].x = m2[e][0]
+            matrix[e].y = m2[e][1]
+            matrix[e].z = m2[e][2]
+        }
 
     }
 
@@ -1075,7 +1113,7 @@ function recenter(node, duration) {
 
 
 
-    var updates = [userCircles, waypointCircles]
+    var updates = [userCircles, waypointCircles, clusterWaypoints]
     updates.forEach(arr => {
         arr.forEach(entry => {
             entry.x = entry.x - x
@@ -1089,12 +1127,17 @@ function recenter(node, duration) {
 
 }
 function readjustAllPoints(duration) {
-    cameraProject(waypointCircles)
 
-    //adjustLabels()
-
+    if (waypointCircles.length > 0)
+    {
+        cameraProject(waypointCircles)
+    }
     if (userCircles.length > 0) {
         cameraProject(userCircles)
+    }
+    if (clusterWaypoints.length > 0)
+    {
+        cameraProject(clusterWaypoints)
     }
 
     function updatePoints(classname) {
@@ -1213,6 +1256,7 @@ function readjustAllPoints(duration) {
 
     }
     updatePoints("userpoints")
+    updatePoints("clusterpoints")
     updatePoints("waypoints")
     updateLabels("label")
     updateNames("name")

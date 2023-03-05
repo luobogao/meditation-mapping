@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { getEveryNth } from "../utils/functions";
 import { Link } from "react-router-dom";
 import { buildTimeslider } from "../utils/timeslider";
 import "firebaseui/dist/firebaseui.css"
@@ -34,7 +35,8 @@ const d3 = require("d3");
 const sidebarWidth = 300
 const chartMargin = 10
 export const chartWidth = window.innerWidth - sidebarWidth
-export const chartHeight = window.innerHeight
+const navHeight = 35
+export const chartHeight = window.innerHeight - navHeight - 2
 export var mode3d = true
 const backgroundColor = "#d9d9d9"
 export var waypoints
@@ -415,6 +417,7 @@ function setup() {
 
     d3.select("#nav")
         .style("background", backgroundColor)
+        .style("height", navHeight + "px")
         .style("border-bottom", "1px solid grey")
 
     d3.select("#navdiv")
@@ -628,23 +631,22 @@ function buildBottomBar() {
         .attr("class", "user-selectors")
         .style("display", "none")
         .style("bottom", 0 + "px")
-        .style("left", (sidebarWidth + 100) + "px")
-        .style("right", (sidebarWidth + 100) + "px")
+        .style("left", "100px")
         .style("justify-content", "center")
         .style("flex-direction", "column")
     //.style("background", "grey")
 
-    var width = window.innerWidth - sidebarWidth - sidebarWidth - 300
+    var width = (window.innerWidth - sidebarWidth ) * 0.75
 
     // Bottom-bar Gamma
     bar.append("svg")
         .style("margin", "5px")
-        .attr("id", "bottom-timeseries").attr("width", width + "px").attr("height", "200px")
+        .attr("id", "bottom-timeseries").attr("width", width + "px").attr("height", "80px")
 
     // Slider
     bar.append("svg")
         .style("margin", "5px")
-        .attr("id", "timeslider").attr("width", width + "px").attr("height", "20px")
+        .attr("id", "timeslider").attr("width", width + "px").attr("height", "40px")
 }
 
 function buildTopBar() {
@@ -697,8 +699,25 @@ export default function Live() {
             console.log("LOADING FROM VALIDATE")
             console.log(cleanedData)
             state.data = cleanedData
+            var stringed = JSON.stringify(getEveryNth(cleanedData, 10))
+            console.log("size: " + stringed.length)
+            localStorage.setItem("lastData", stringed)
             userDataLoaded = true
             rebuildChart()
+        }
+        else
+        {
+            setTimeout(function(){
+                var lastData = localStorage.getItem("lastData")
+            if (lastData != null)
+            {
+                console.log("Found last data!")
+                state.data = JSON.parse(lastData)
+                userDataLoaded = true
+                rebuildChart()
+            }
+            }, 2000)
+            
         }
 
     })

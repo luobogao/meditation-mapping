@@ -29,7 +29,7 @@ var means = []
 var maxes = []
 var principals = []
 var modelType = "cosine" // How to measure variances
-var standardizeType = "ratio" // raw, ratio, or normal
+var standardizeType = "raw" // raw, ratio, or normal
 var distanceType = "combined"
 var eucAdjust = 0.8           // How much to adjust the Euclidean measurement compared with cos. 0.8 seems good to even out the cos data, anything more is far too dramatic
 
@@ -147,7 +147,7 @@ export function vectorRaw(row, avg) {
             // Divide each value by the theta value in this channel
             // this is my method to avoid magnitude differences
             var key = band + "_" + channel + "_avg" + avg
-            var value = row[key]            
+            var value = Math.log(row[key])
             vector.push(value) 
         })
     })

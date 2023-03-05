@@ -384,7 +384,7 @@ function prepareForNext() {
                     var key = band + "_" + channel + "_avg" + avg
 
                     if (row[key] != null) {
-                        var newVal = row[key] / firstRow[key]
+                        var newVal = Math.round(1000 * row[key] / firstRow[key]) / 1000
                         row[key] = newVal
                     }
 

@@ -273,7 +273,7 @@ export function getAllMarkers() {
     return promise
 }
 export function getAllWaypoints() {
-    var q = query(collection(db, "waypoints"), where("delete", "!=", true))
+    var q = query(collection(db, "waypoints"), where("version", "==", "1.0"))
     var promise = getDocs(q)
     return promise
 }
