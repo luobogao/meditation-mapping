@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { state } from "../index"
-import {user} from "../utils/database"
+import { user } from "../utils/database"
 import { cleanedData } from "./validate";
 import { getEveryNth } from "../utils/functions";
 import { Link } from "react-router-dom";
 import NavBarCustom from "../utils/navbar";
 import { buildClusterCounts } from "../utils/ui";
+import Sidebar from "../utils/sidebar";
 
 const d3 = require("d3");
 
@@ -115,21 +116,22 @@ export function updateGraphs() {
 
 
 function buildPage() {
+    d3.select("#main-container").style("display", "flex").style("flex-direction", "column")
+    d3.select("#maindiv").style("display", "flex").style("flex-direction", "row")
     d3.select("#cosine").append("svg").attr("id", "cosinesvg")
         .style("margin", "10px")
         .attr("width", width + "px")
         .attr("height", height + "px")
 
-        if (user != null)
-        {
-            d3.select("#loginElement").style("display", "flex")
-            d3.select("#loginName").text(user.displayName)
+    if (user != null) {
+        d3.select("#loginElement").style("display", "flex")
+        d3.select("#loginName").text(user.displayName)
 
-        }
-        
+    }
+
     var clusterDiv = d3.select("#options").append('div')
     buildClusterCounts(clusterDiv, "graphs")
-    
+
 }
 
 
@@ -149,14 +151,19 @@ export default function Graphs() {
     })
 
     return (
+
         <div id="main-container">
-            
-            <NavBarCustom/>
-            
-            <div id="bodydiv">
-                <div id="cosine"></div>
-                <div id="options"></div>
+            <NavBarCustom />
+            <div id="maindiv">
+                <Sidebar />
+                <div id="bodydiv">
+                    <div id="cosine"></div>
+                    <div id="options"></div>
+                </div>
+
             </div>
+
+
         </div>
 
     );
