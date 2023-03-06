@@ -12,7 +12,7 @@ const d3 = require("d3");
 var x, y, line, start, end, line
 const margin = 10
 const width = window.innerWidth * 0.8
-const height = window.innerHeight * 0.8
+const height = window.innerHeight * 0.5
 const backgroundColor = "#d9d9d9"
 const navHeight = 63
 
