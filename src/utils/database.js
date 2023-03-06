@@ -1,5 +1,5 @@
 import { getFirestore, collection, getDocs, setDoc, doc, deleteDoc, updateDoc, query, where, addDoc } from 'firebase/firestore/lite';
-import {processCSV} from "./load"
+import { processCSV } from "./load"
 import { getStorage, ref as storageRef, getBlob } from "firebase/storage"
 import { arraysEqual } from './functions';
 import { getDatabase, ref as dbref, onValue, off, get } from "firebase/database"
@@ -110,7 +110,7 @@ function getLiveUsersOnce() {
 export function listenLiveUsers() {
     // Listens to ALL realtimedb connections
     const eegref = dbref(database, "live-muse")
-    
+
     onValue(eegref, (snapshot) => {
 
         updateLiveUsers(snapshot)
@@ -198,7 +198,8 @@ export function updateUsername() {
 
         updateProfile(auth.currentUser, { displayName: newUsername }).then(() => {
             console.log("Profile updated!")
-            d3.select("#user").text("Logged in: " + newUsername)
+            d3.select("#loginName").text(newUsername)
+            d3.select("#loginElement").style("display", "flex")
             dialog.selectAll('*').remove()
             dialog.style("display", "none")
             registerUser()
@@ -239,7 +240,7 @@ export function addWaypoint(waypoint) {
             version: "1.0",
             user: waypoint.user, addedBy: userid, label: waypoint.label, vector: waypoint.vector,
             notes: waypoint.notes, delete: false, addedTime: millis, resolution: waypoint.resolution
-            
+
         }
 
         var promise = addDoc(collection(db, "waypoints"), entry)
@@ -282,12 +283,22 @@ export function updateWaypoint(waypoint) {
         var date = new Date()
         var millis = date.getTime()
         waypoint.updatedTime = millis
-        var promise = updateDoc(doc(db, "waypoints", waypoint.id), { notes: waypoint.notes, label: waypoint.label, updateTime: millis, updatedBy: auth.currentUser.uid, user: waypoint.user, file: waypoint.file})
+        var promise = updateDoc(doc(db, "waypoints", waypoint.id), { notes: waypoint.notes, label: waypoint.label, updateTime: millis, updatedBy: auth.currentUser.uid, user: waypoint.user, file: waypoint.file })
         return promise
     }
 
 }
 
+function signOut() {
+    console.log("Signing out...")
+    auth.signOut()
+    d3.select("#loginElement")
+    .on("click", function()
+    {
+        login()
+    })
+    
+}
 onAuthStateChanged(auth, (fbuser) => {
     // Called anything the authentication state changes: login, log out, anonymous login
     listenLiveUsers()
@@ -305,20 +316,6 @@ onAuthStateChanged(auth, (fbuser) => {
 
         // Automatically start listening for realtime db updates for this user (data from Muse probably)
 
-
-
-        d3.selectAll(".signin")
-            .text("Sign Out")
-            .on("click", function () {
-                console.log("Signing out...")
-                auth.signOut()
-                d3.select("#user").text("")
-                d3.selectAll(".signin").text("Sign In")
-                    .on("click", function () {
-
-                        login()
-                    })
-            })
 
         // No display name - prompt user to choose one
         if (user.displayName == null) {
@@ -339,7 +336,7 @@ onAuthStateChanged(auth, (fbuser) => {
             div.append("text").text("Should be just your first name, or any one-word username. This will be the name other users see if you submit a meditation 'waypoint'").style("color", "white").style("margin-top", "10px")
             div.append("button").style("position", "absolute").style("bottom", "10px").style("right", "10px").text("OK")
                 .on("click", function () {
-                    d3.select("#firebase-auth-container").remove()
+                    
                     updateUsername()
 
                 })
@@ -348,8 +345,13 @@ onAuthStateChanged(auth, (fbuser) => {
         // Found display name, good to go
         else {
 
-            d3.select("#user").text("Logged in: " + user.displayName)
             d3.select("#firebase-auth-container").remove()
+            d3.select("#loginName").text(user.displayName)
+            d3.select("#loginElement").style("display", "flex")
+                .on("click", function (d) {
+                    signOut()
+                })
+
 
             // Download all waypoints
             var text = d3.select("#welcome-auth")
@@ -370,14 +372,18 @@ onAuthStateChanged(auth, (fbuser) => {
         console.log("Not logged in")
         user = null
         email = null
-        d3.select("#signin").text("Sign In").on("click", function () {
-
-            login()
-        })
+    
 
         signInAnonymously(auth).then(() => {
             console.log("---> Logged in anonymously")
-            d3.selectAll(".signin").text("Sign In")
+
+            d3.select("#loginName").text("(Anonymous)")
+            .on("click", function()
+            {
+                login()
+            })
+            d3.select("#loginElement").style("display", "flex")
+
             d3.select("#firebase-auth-container").remove()
             var text = d3.select("#welcome-auth")
             if (text != null) {

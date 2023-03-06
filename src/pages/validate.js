@@ -8,7 +8,9 @@ import { datastate } from "../utils/load";
 import { clone, getEveryNth } from '../utils/functions';
 import { bands, channels } from "../utils/muse"
 import { rebuildChart } from "../utils/runmodel";
+import NavBarCustom from "../utils/navbar";
 const d3 = require("d3");
+
 
 // data
 var workingData, rawData;
@@ -413,11 +415,9 @@ export default function Validate() {
 
     return (
         <div id="main-container">
-            <div id="nav">
-            <Link to="/map">Map</Link>
-            <Link to="/graphs">Graphs</Link>
-            </div>
-
+            
+            <NavBarCustom/>
+            
             <div id="header"></div>
             <div id="bodydiv">
                 <div id="relative"></div>

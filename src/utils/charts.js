@@ -876,8 +876,7 @@ function addClusterWaypoints(svg) {
     var vectors = state["cluster_means_avg10"]
     
     var mapped = runModel(vectors)
-    console.log("mapped:")
-    console.log(mapped)
+    
     clusterWaypoints = []
 
     var cluster = 0

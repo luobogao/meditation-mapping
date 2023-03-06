@@ -1,6 +1,7 @@
 import { dot, getRelativeVector, pca, findSlope, runModel, measureDistance, cosineSimilarity, euclideanDistance, combinedDistance } from "../utils/analysis";
 import { waypoints, state, userDataLoaded } from "../index.js"
 import { updateChartWaypoints } from "./charts";
+import { updateGraphs } from "../pages/graphs";
 import kmeans from '@jbeuckm/k-means-js'
 import { phamBestK } from '@jbeuckm/k-means-js'
 import { updateAllCharts } from "../pages/map";
@@ -232,6 +233,10 @@ export function rebuildChart(settings = { autoClusters: true, updateCharts: true
     }
     if (settings.updateCharts == true) {
         updateAllCharts()
+    }
+    if (settings.updateGraphs == true)
+    {
+        updateGraphs()
     }
 
 

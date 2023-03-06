@@ -272,7 +272,10 @@ export function buildResolutionSelectors(div) {
 
 }
 
-export function buildClusterCounts(div) {
+export function buildClusterCounts(container, page) {
+    container.style("margin", "5px")
+    container.append("text").text("Clusters:")
+    var div = container.append("div").style("display", "flex").style("flex-direction", "row")
     var cluster1, cluster2, cluster3, cluster4 = false
     switch (state.clusters) {
         case 1:
@@ -294,13 +297,18 @@ export function buildClusterCounts(div) {
     var c3box = addCheckbox(div, "3", cluster3, "12px", "radio")
     var c4box = addCheckbox(div, "4", cluster4, "12px", "radio")
 
+    var settings = {autoClusters: false, updateCharts: true}
+    if (page == "graphs")
+    {
+        settings = {autoClusters: false, updateGraphs: true}
+    }
+
     c1box
         .attr("class", "clusters-checkbox")
         .on("click", function () {
             d3.selectAll(".clusters-checkbox").property("checked", false)
             d3.select(this).property("checked", true)
             state.clusters = 1
-            var settings = {autoClusters: false, updateCharts: true}
             rebuildChart(settings)
         })
     c2box
@@ -309,7 +317,6 @@ export function buildClusterCounts(div) {
             d3.selectAll(".clusters-checkbox").property("checked", false)
             d3.select(this).property("checked", true)
             state.clusters = 2
-            var settings = {autoClusters: false, updateCharts: true}
             rebuildChart(settings)
             
         })
@@ -319,7 +326,6 @@ export function buildClusterCounts(div) {
             d3.selectAll(".clusters-checkbox").property("checked", false)
             d3.select(this).property("checked", true)
             state.clusters = 3
-            var settings = {autoClusters: false, updateCharts: true}
             rebuildChart(settings)
             
 
@@ -330,7 +336,6 @@ export function buildClusterCounts(div) {
             d3.selectAll(".clusters-checkbox").property("checked", false)
             d3.select(this).property("checked", true)
             state.clusters = 4
-            var settings = {autoClusters: false, updateCharts: true}
             rebuildChart(settings)
             
 

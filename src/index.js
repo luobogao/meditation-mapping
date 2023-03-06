@@ -18,7 +18,7 @@ import Graphs from "./pages/graphs"
 import { arraysEqual, unique } from "./utils/functions";
 import { buildUserSelectors } from "./utils/ui";
 import { anonymous, auth, login, updateUsername, listenEEG, getAllWaypoints, downloadCSV, buildAuthContainer, firstLoad } from "./utils/database"
-
+import 'bootstrap/dist/css/bootstrap.min.css';
 
 export var waypoints
 export var users;

@@ -16,6 +16,7 @@ import { buildBrowseFile } from "../utils/load";
 import { datastate } from "../utils/load";
 import { cleanedData } from "./validate";
 import { bands, channels } from "../utils/muse"
+import NavBarCustom from "../utils/navbar";
 
 
 
@@ -35,7 +36,7 @@ const d3 = require("d3");
 const sidebarWidth = 300
 const chartMargin = 10
 export const chartWidth = window.innerWidth - sidebarWidth
-const navHeight = 35
+const navHeight = 63
 export const chartHeight = window.innerHeight - navHeight - 2
 export var mode3d = true
 const backgroundColor = "#d9d9d9"
@@ -105,16 +106,6 @@ function setup() {
         .style("flex-direction", "column")
         .style("font-family", "Cabin")
 
-    d3.select("#nav")
-        .style("background", backgroundColor)
-        .style("height", navHeight + "px")
-        .style("border-bottom", "1px solid grey")
-
-    d3.select("#navdiv")
-        .style("margin", "5px")
-        .style("background", backgroundColor)
-        .style("display", "flex")
-        .style("justify-content", "space-between")
 
     d3.select("#body").style("display", "flex")
         .style("flex-direction", "row")
@@ -161,29 +152,9 @@ function setup() {
 
     buildRightSidebar()
     buildBottomBar()
-    buildTopBar()
-
-    buildRealtime()
-
-
-
+    
 }
-function buildRealtime() {
 
-    var div = d3.select("#realtime-container")
-        .style("display", "none")
-        .style("position", "absolute")
-        .style("left", "20px")
-        .style("bottom", "20px")
-        .style("width", "300px")
-        .style("height", "100px")
-        .style("opacity", 0.9)
-    d3.select("#realtime-div")
-        .text("Waiting...")
-
-    d3.select("#realtime-record")
-        .style("width", "150px")
-}
 function buildWelcome() {
     firstLoad = false
     var welcome = d3.select("#welcome")
@@ -258,9 +229,9 @@ function buildRightSidebar() {
         .style("flex-direction", "column")
         .attr("class", "user-selectors")
 
-    otherSelectors.append("text").text("Clusters:")
-    var clustersContainer = otherSelectors.append("div").style("display", "flex").style("flex-direction", "row")
-    buildClusterCounts(clustersContainer)
+
+    var clustersContainer = otherSelectors.append("div")
+    buildClusterCounts(clustersContainer, "map")
 
     otherSelectors.append("text").text("Resolution:")
     var resolutionContainer = otherSelectors.append("div").style("display", "flex").style("flex-direction", "row")
@@ -317,23 +288,6 @@ function buildBottomBar() {
         .attr("id", "timeslider").attr("width", width + "px").attr("height", "40px")
 }
 
-function buildTopBar() {
-    var bar = d3.select("#top-bar")
-    bar.style("position", "absolute")
-        .attr("class", "user-selectors")
-        .style("display", "none")
-        .style("top", 50 + "px")
-        .style("left", sidebarWidth + "px")
-        .style("right", sidebarWidth + "px")
-        .style("justify-content", "center")
-    //.style("background", "rgba(0, 0, 0, 0.1)")
-
-
-
-    var charttypeContainer = bar.append("div").style("display", "flex").style("flex-direction", "row")
-    buildChartSelectors(charttypeContainer)
-
-}
 
 function buildMiniCharts(div) {
 
@@ -394,14 +348,8 @@ export default function Live() {
         <main id="main-container">
             <link href="https://fonts.googleapis.com/css?family=Cabin" rel="stylesheet"></link>
 
-            <div id="nav">
-                <div id="navdiv">
-                <Link to="/validate">LOAD</Link>
-                <Link to="/graphs">GRAPHS</Link>
-                    <button id="signin"></button>
-                </div>
-
-            </div>
+            <NavBarCustom/>
+            
             <div id="body">
                 <svg id="chartsvg"></svg>
                 <div id="popup"></div>

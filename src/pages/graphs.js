@@ -1,8 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { state } from "../index"
+import {user} from "../utils/database"
 import { cleanedData } from "./validate";
 import { getEveryNth } from "../utils/functions";
 import { Link } from "react-router-dom";
+import NavBarCustom from "../utils/navbar";
+import { buildClusterCounts } from "../utils/ui";
+
 const d3 = require("d3");
 
 var x, y, line, start, end, line
@@ -10,11 +14,11 @@ const margin = 10
 const width = window.innerWidth * 0.8
 const height = window.innerHeight * 0.8
 const backgroundColor = "#d9d9d9"
-const navHeight = 35
+const navHeight = 63
 
 const clusterColors = ["darkred", "blue", "orange", "lightgreen", "purple"]
 
-function updateCharts() {
+export function updateGraphs() {
 
     if (state != null && state["cluster_means_similarities_avg60"] != null) {
         var svg = d3.select("#cosinesvg")
@@ -39,7 +43,7 @@ function updateCharts() {
                     seconds: row.seconds,
                     y: row.cosine
                 }
-            }), 30)
+            }), 60)
 
         })
 
@@ -115,16 +119,17 @@ function buildPage() {
         .style("margin", "10px")
         .attr("width", width + "px")
         .attr("height", height + "px")
-    d3.select("#nav")
-        .style("background", backgroundColor)
-        .style("height", navHeight + "px")
-        .style("border-bottom", "1px solid grey")
 
-    d3.select("#navdiv")
-        .style("margin", "5px")
-        .style("background", backgroundColor)
-        .style("display", "flex")
-        .style("justify-content", "space-between")
+        if (user != null)
+        {
+            d3.select("#loginElement").style("display", "flex")
+            d3.select("#loginName").text(user.displayName)
+
+        }
+        
+    var clusterDiv = d3.select("#options").append('div')
+    buildClusterCounts(clusterDiv, "graphs")
+    
 }
 
 
@@ -132,31 +137,25 @@ export default function Graphs() {
     useEffect(() => {
         buildPage()
         if (cleanedData != null && state != null) {
-            updateCharts()
+            updateGraphs()
         }
 
 
     }, [])
     useEffect(() => {
         if (cleanedData != null) {
-            updateCharts()
+            updateGraphs()
         }
     })
 
     return (
         <div id="main-container">
-            <div id="nav">
-                <div id="navdiv">
-                    <Link to="/validate">LOAD</Link>
-                    <Link to="/map">MAP</Link>
-                    <Link to="/graphs">GRAPHS</Link>
-                    <button id="signin"></button>
-                </div>
-
-            </div>
+            
+            <NavBarCustom/>
+            
             <div id="bodydiv">
                 <div id="cosine"></div>
-                <div id="ratios"></div>
+                <div id="options"></div>
             </div>
         </div>
 
