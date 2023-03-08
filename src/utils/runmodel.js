@@ -88,10 +88,13 @@ export function rebuildChart(settings = { autoClusters: true, updateCharts: true
         }
 
         // Cluster means
-        state["cluster_means_avg" + avg] = kmeansResult.means
+        var means = kmeansResult.means
+        means = means.map(mean => {return mean.map(v => Math.round(v))} )
+        state["cluster_means_avg" + avg] = means
 
         // Measure the cosine similarity to every point in the meditation for each mean
-        var meanSimilarities = kmeansResult.means.map(meanVector => {
+        var cluster_i = 0
+        var meanSimilarities = means.map(meanVector => {
             var seconds = 0
             var similarityTimeseries = points.map(point => {
                 var score = cosineSimilarity(point, meanVector)
@@ -101,7 +104,12 @@ export function rebuildChart(settings = { autoClusters: true, updateCharts: true
                     cosine: score
                 }
             }).filter(e => e.cosine != null)
-            return similarityTimeseries
+            cluster_i ++
+            return {
+                similarityTimeseries: similarityTimeseries,
+                cluster: cluster_i,
+                vector: meanVector
+            }
         })
         state["cluster_means_similarities_avg" + avg] = meanSimilarities
 

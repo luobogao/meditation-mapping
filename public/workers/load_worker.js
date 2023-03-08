@@ -146,6 +146,7 @@ function processDataMuse(rows) {
 
 
         let timestamp = parseTime(row.TimeStamp)
+        row.timestamp = timestamp
 
         row.seconds = Math.round((timestamp - first_timestamp) / 1000) // seconds since beginning of meditation
         row.secondsFull = Math.round(timestamp / 1000) // Seconds since origin

@@ -3,17 +3,19 @@ import { Link } from "react-router-dom";
 import { notice } from "../utils/ui";
 import { buildBrowseFile } from "../utils/load";
 import { sliderBottom } from 'd3-simple-slider';
-import {state} from "../index"
+import { state } from "../index"
 import { datastate } from "../utils/load";
 import { clone, getEveryNth } from '../utils/functions';
 import { bands, channels } from "../utils/muse"
 import { rebuildChart } from "../utils/runmodel";
 import NavBarCustom from "../utils/navbar";
+import { getLastSession, addOrReplaceSession } from "../utils/indexdb";
 const d3 = require("d3");
 
 
 // data
-var workingData, rawData;
+var workingData = null
+var rawData = null
 
 // Style
 var chartBackground = "lightgrey"
@@ -30,8 +32,8 @@ var x, y, line, graphSVG, dataLines, dataLinesOriginal
 var graphAverageN = 30 // Rounding for the chart
 var minRatio = 1.5
 var relativeLines = ["Delta_TP10",
-            
-"Delta_TP9", "Delta_AF7", "Delta_AF8", "Gamma_TP10", "Gamma_TP9", "Gamma_AF7", "Gamma_AF8",]
+
+    "Delta_TP9", "Delta_AF7", "Delta_AF8", "Gamma_TP10", "Gamma_TP9", "Gamma_AF7", "Gamma_AF8",]
 var colors = ["blue", "blue", "blue", "blue", "red", "red", "red", "red"]
 
 // Ratio Charts
@@ -55,6 +57,7 @@ export function showLoadingValidate() {
 }
 export function validate(data) {
     rawData = data
+
     workingData = getEveryNth(data.filter(e => e.avg60 == true), 10) // Remove the first few rows
 
     buildValidationChart()
@@ -62,6 +65,11 @@ export function validate(data) {
     d3.select("#acceptBtn").style("display", "flex")
 
 }
+getLastSession(function (lastSession) {
+    state.data = lastSession.data
+    setTimeout(function () { validate(lastSession.data) }, 2000)
+
+})
 
 function buildValidationChart(data) {
     // Purpose: use the slider to select a different starting minute, all values are recalculated to be a % of the first value
@@ -174,7 +182,7 @@ function buildValidationChart(data) {
 
     // https://www.npmjs.com/package/d3-simple-slider
     svg.call(slider)
-    slider.on("end", function(d){ prepareForNext()})
+    slider.on("end", function (d) { prepareForNext() })
     slider.on("onchange", function (d) {
 
         var newMax = minRatio
@@ -377,7 +385,7 @@ function buildPage() {
 
 }
 function prepareForNext() {
-    
+
     // Create a new dataset from the raw dataset which starts at the selected time, and definitely has values for the avg60 values
     var filteredData = clone(rawData.filter(row => row.seconds >= selectedStartSecond && row.avg60 == true))
     var firstRow = filteredData[0]
@@ -400,10 +408,13 @@ function prepareForNext() {
             })
         })
     })
+    var session = { id: rawData[0].timestamp, data: filteredData }
+
+    addOrReplaceSession(session, function () { })
     cleanedData = filteredData
     state.data = cleanedData
-    rebuildChart({autoClusters: true, updateCharts: false})
-    
+    rebuildChart({ autoClusters: true, updateCharts: false })
+
 }
 
 export default function Validate() {
@@ -411,13 +422,23 @@ export default function Validate() {
         buildPage()
 
     }, [])
+    useEffect(() => {
+        setTimeout(function () {
+            if (workingData != null) {
+
+                buildValidationChart()
+                buildRatioCharts()
+            }
+        }, 500)
+
+    })
 
 
     return (
         <div id="main-container">
-            
-            <NavBarCustom/>
-            
+
+            <NavBarCustom />
+
             <div id="header"></div>
             <div id="bodydiv">
                 <div id="relative"></div>

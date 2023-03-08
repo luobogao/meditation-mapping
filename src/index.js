@@ -19,6 +19,7 @@ import { arraysEqual, unique } from "./utils/functions";
 import { buildUserSelectors } from "./utils/ui";
 import { anonymous, auth, login, updateUsername, listenEEG, getAllWaypoints, downloadCSV, buildAuthContainer, firstLoad } from "./utils/database"
 import 'bootstrap/dist/css/bootstrap.min.css';
+import { addSession, deleteAllSessions, getLastSession } from './utils/indexdb';
 
 
 export var waypoints
@@ -27,11 +28,11 @@ export var userDataLoaded = false
 
 const originalLog = console.log;
 
-console.log = function (...args) {
-  if (!args.some((arg) => arg.includes(" => "))) {
-    originalLog.apply(console, args);
-  }
-};
+// console.log = function (...args) {
+//   if (!args.some((arg) => arg.includes(" => "))) {
+//     originalLog.apply(console, args);
+//   }
+// };
 
 export var state =
 {

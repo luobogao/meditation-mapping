@@ -73,7 +73,6 @@ export function cosineSimilarity(a, b)
     //if (similarity < 0) similarity = 0
     return round(similarity)
 }
-
 export function euclideanDistance(a, b)
 {
     if (a.length != b.length) 
@@ -93,8 +92,6 @@ export function euclideanDistance(a, b)
     if (normalized < 10) normalized = 10
     return round(normalized)
 }
-
-
 const vector_columns_muse = [
     "Delta_TP9", "Theta_TP9", "Alpha_TP9", "Beta_TP9", "Gamma_TP9",
     "Delta_TP10", "Theta_TP10", "Alpha_TP10", "Beta_TP10", "Gamma_TP10",
@@ -147,7 +144,7 @@ export function vectorRaw(row, avg) {
             // Divide each value by the theta value in this channel
             // this is my method to avoid magnitude differences
             var key = band + "_" + channel + "_avg" + avg
-            var value = Math.log(row[key])
+            var value = Math.round(Math.log(row[key]) * 1000)
             vector.push(value) 
         })
     })

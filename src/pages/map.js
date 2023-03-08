@@ -317,29 +317,10 @@ export default function Live() {
 
     }, [])
     useEffect(() => {
-        if (cleanedData != null) {
-            console.log("LOADING FROM VALIDATE")
-            console.log(cleanedData)
-            state.data = cleanedData
-            var stringed = JSON.stringify(getEveryNth(cleanedData, 10))
-            console.log("size: " + stringed.length)
-            localStorage.setItem("lastData", stringed)
-            rebuildChart()
-        }
-        else
-        {
-            setTimeout(function(){
-                var lastData = localStorage.getItem("lastData")
-            if (lastData != null)
-            {
-                console.log("Found last data!")
-                state.data = JSON.parse(lastData)
-                rebuildChart()
-            }
-            }, 2000)
-            
-        }
-
+        
+    
+        setTimeout(function(){rebuildChart()}, 100)
+        
     })
 
     return (

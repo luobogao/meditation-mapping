@@ -237,13 +237,16 @@ export function addWaypoint(waypoint) {
 
         if (waypoint.notes == undefined) waypoint.notes = null
         var entry = {
-            version: "1.0",
+            version: waypoint.version,
             user: waypoint.user, addedBy: userid, label: waypoint.label, vector: waypoint.vector,
             notes: waypoint.notes, delete: false, addedTime: millis, resolution: waypoint.resolution
 
         }
+        var filteredObj = Object.keys(entry)
+            .filter(key => entry[key] !== undefined)
+            .reduce((acc, key) => ({ ...acc, [key]: entry[key] }), {});
 
-        var promise = addDoc(collection(db, "waypoints"), entry)
+        var promise = addDoc(collection(db, "waypoints"), filteredObj)
         return promise
     }
 
@@ -293,11 +296,10 @@ function signOut() {
     console.log("Signing out...")
     auth.signOut()
     d3.select("#loginElement")
-    .on("click", function()
-    {
-        login()
-    })
-    
+        .on("click", function () {
+            login()
+        })
+
 }
 onAuthStateChanged(auth, (fbuser) => {
     // Called anything the authentication state changes: login, log out, anonymous login
@@ -336,7 +338,7 @@ onAuthStateChanged(auth, (fbuser) => {
             div.append("text").text("Should be just your first name, or any one-word username. This will be the name other users see if you submit a meditation 'waypoint'").style("color", "white").style("margin-top", "10px")
             div.append("button").style("position", "absolute").style("bottom", "10px").style("right", "10px").text("OK")
                 .on("click", function () {
-                    
+
                     updateUsername()
 
                 })
@@ -347,10 +349,11 @@ onAuthStateChanged(auth, (fbuser) => {
 
             d3.select("#firebase-auth-container").remove()
             d3.select("#loginName").text(user.displayName)
+            .on("click", function (d) {
+                signOut()
+            })
             d3.select("#loginElement").style("display", "flex")
-                .on("click", function (d) {
-                    signOut()
-                })
+                
 
 
             // Download all waypoints
@@ -372,16 +375,15 @@ onAuthStateChanged(auth, (fbuser) => {
         console.log("Not logged in")
         user = null
         email = null
-    
+
 
         signInAnonymously(auth).then(() => {
             console.log("---> Logged in anonymously")
 
             d3.select("#loginName").text("(Anonymous)")
-            .on("click", function()
-            {
-                login()
-            })
+                .on("click", function () {
+                    login()
+                })
             d3.select("#loginElement").style("display", "flex")
 
             d3.select("#firebase-auth-container").remove()
