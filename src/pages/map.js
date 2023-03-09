@@ -17,6 +17,7 @@ import { datastate } from "../utils/load";
 import { cleanedData } from "./validate";
 import { bands, channels } from "../utils/muse"
 import NavBarCustom from "../utils/navbar";
+import {navHeight} from "../utils/ui"
 
 
 
@@ -29,14 +30,11 @@ bands.forEach(band => {
 
 // Critical variables
 const minimumMatch = 70 // minimum distance for waypoints to match
-
-
-
+const chartMargin = 10
 const d3 = require("d3");
 const sidebarWidth = 300
-const chartMargin = 10
+
 export const chartWidth = window.innerWidth - sidebarWidth
-const navHeight = 63
 export const chartHeight = window.innerHeight - navHeight - 2
 export var mode3d = true
 const backgroundColor = "#d9d9d9"

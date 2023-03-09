@@ -1,99 +1,138 @@
 // Open the IndexedDB database with name "myDatabase" and version 1
 const dbName = "meditation-database";
-const dbVersion = 1;
+const dbVersion = 2;
 const request = window.indexedDB.open(dbName, dbVersion);
 
-// If the database doesn't exist, create it and add a table called 'sessions'
+// If the database doesn't exist, create it and add a table called 'recordings'
 request.onupgradeneeded = function (event) {
-    const db = event.target.result;
-    if (!db.objectStoreNames.contains('sessions')) {
-        db.createObjectStore('sessions', { keyPath: 'id', autoIncrement: true });
-        console.log("CREATING NEW DATABASE")
-    }
+  const db = event.target.result;
+  if (!db.objectStoreNames.contains('recordings')) {
+    db.createObjectStore('recordings', { keyPath: 'id', autoIncrement: true });
+    console.log("CREATING NEW DATABASE")
+  }
 };
 
 
-// Function to add an item to the 'sessions' table
+// Function to add an item to the 'recordings' table
 export function addSession(session) {
-    const request = window.indexedDB.open(dbName, dbVersion);
-    request.onsuccess = function (event) {
-        const db = event.target.result;
-        const tx = db.transaction('sessions', 'readwrite');
-        const store = tx.objectStore('sessions');
-        store.add(session);
-        console.log("------> ADDED SESSION TO DB")
-    }
+  const request = window.indexedDB.open(dbName, dbVersion);
+  request.onsuccess = function (event) {
+    const db = event.target.result;
+    const tx = db.transaction('recordings', 'readwrite');
+    const store = tx.objectStore('recordings');
+    store.add(session);
+    console.log("------> ADDED SESSION TO DB")
+  }
 }
 function getSessionById(id, callback) {
-    const request = window.indexedDB.open(dbName, dbVersion);
-    request.onsuccess = function(event) {
-      const db = event.target.result;
-      const tx = db.transaction('sessions', 'readonly');
-      const store = tx.objectStore('sessions');
-      const getRequest = store.get(id);
-      getRequest.onsuccess = function(event) {
-        const session = event.target.result;
-        callback(session);
-      }
+  const request = window.indexedDB.open(dbName, dbVersion);
+  request.onsuccess = function (event) {
+    const db = event.target.result;
+    const tx = db.transaction('recordings', 'readonly');
+    const store = tx.objectStore('recordings');
+    const getRequest = store.get(id);
+    getRequest.onsuccess = function (event) {
+      const session = event.target.result;
+      callback(session);
     }
   }
-  // Function to retrieve the last session object added to the 'sessions' table
+}
+// Function to retrieve the last session object added to the 'recordings' table
 export function getLastSession(callback) {
-    const request = window.indexedDB.open(dbName, dbVersion);
-    request.onsuccess = function(event) {
-      const db = event.target.result;
-      const tx = db.transaction('sessions', 'readonly');
-      const store = tx.objectStore('sessions');
-      const countRequest = store.count();
-      countRequest.onsuccess = function(event) {
-        const count = event.target.result;
-        const getRequest = store.openCursor(null, 'prev');
-        let i = 0;
-        getRequest.onsuccess = function(event) {
-          const cursor = event.target.result;
-          if (cursor) {
-            if (i == count - 1) {
-              const session = cursor.value;
-              callback(session);
-            } else {
-              i++;
-              cursor.continue();
-            }
+  const request = window.indexedDB.open(dbName, dbVersion);
+  request.onsuccess = function (event) {
+    const db = event.target.result;
+    const tx = db.transaction('recordings', 'readonly');
+    const store = tx.objectStore('recordings');
+    const countRequest = store.count();
+    countRequest.onsuccess = function (event) {
+      const count = event.target.result;
+      const getRequest = store.openCursor(null, 'prev');
+      let i = 0;
+      getRequest.onsuccess = function (event) {
+        const cursor = event.target.result;
+        if (cursor) {
+          if (i == 0) {
+            const session = cursor.value;
+            callback(session);
+          } else {
+            i++;
+            cursor.continue();
           }
         }
       }
     }
   }
-  export function deleteAllSessions(callback) {
-    const request = window.indexedDB.open(dbName, dbVersion);
-    request.onsuccess = function(event) {
+}
+export function getAllRecordings() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(dbName);
+    let entries = [];
+
+    request.onerror = () => {
+      reject(request.error);
+    };
+
+    request.onsuccess = (event) => {
       const db = event.target.result;
-      const tx = db.transaction('sessions', 'readwrite');
-      const store = tx.objectStore('sessions');
-      const clearRequest = store.clear();
-      clearRequest.onsuccess = function(event) {
-        callback();
-      }
-    }
-  }
-  // Function to add a session object to the 'sessions' table, overwriting any existing record with the same key
-export function addOrReplaceSession(session, callback) {
-    const request = window.indexedDB.open(dbName, dbVersion);
-    request.onsuccess = function(event) {
-      const db = event.target.result;
-      const tx = db.transaction('sessions', 'readwrite');
-      const store = tx.objectStore('sessions');
-      console.log("DB: Adding new session")
-      const getRequest = store.get(session.id);
-      getRequest.onsuccess = function(event) {
-        if (event.target.result) {
-            console.log("----> UPDATED existing session")
-          store.put(session);
+      const transaction = db.transaction("recordings", 'readonly');
+      const objectStore = transaction.objectStore("recordings");
+
+      objectStore.openCursor().onsuccess = (event) => {
+        const cursor = event.target.result;
+
+        if (cursor) {
+          entries.push(cursor.value);
+          cursor.continue();
         } else {
-            console.log("----> ADDED NEW session")
-          store.add(session);
+          resolve(entries);
         }
-        callback();
+      };
+    };
+  });
+}
+export function deleteAllrecordings() {
+  return new Promise((resolve, reject) => {
+    const request = window.indexedDB.open(dbName, dbVersion);
+
+    request.onerror = () => {
+      reject(request.error);
+    };
+
+    request.onsuccess = (event) => {
+      const db = event.target.result;
+      const tx = db.transaction('recordings', 'readwrite');
+      const store = tx.objectStore('recordings');
+      const clearRequest = store.clear();
+
+      clearRequest.onerror = () => {
+        reject(clearRequest.error);
+      };
+
+      clearRequest.onsuccess = () => {
+        resolve();
+      };
+    };
+  });
+}
+// Function to add a session object to the 'recordings' table, overwriting any existing record with the same key
+export function addOrReplaceSession(session, callback) {
+  const request = window.indexedDB.open(dbName, dbVersion);
+  request.onsuccess = function (event) {
+    const db = event.target.result;
+    const tx = db.transaction('recordings', 'readwrite');
+    const store = tx.objectStore('recordings');
+    console.log("DB: Adding new session")
+    const getRequest = store.get(session.id);
+    getRequest.onsuccess = function (event) {
+      if (event.target.result) {
+        console.log("----> UPDATED existing session")
+        store.put(session);
+      } else {
+        console.log("----> ADDED NEW session")
+        store.add(session);
       }
+      callback();
     }
   }
+}

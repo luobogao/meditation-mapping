@@ -4,6 +4,7 @@ import { state } from "../index";
 import { users } from "./database";
 
 const d3 = require("d3");
+export const navHeight = 63
 export function popUp(event, html) {
     var x = event.pageX
     var y = event.pageY

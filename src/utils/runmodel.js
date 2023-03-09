@@ -14,7 +14,7 @@ export function buildModel(vectors) {
     // Okay to use a mix of the "standard" vectors plus a few user vectors
     // Does not return x-y points - for that, need to call "run model" using the parameters set by this function
 
-    console.log("Building model with " + vectors.length + " vectors")
+    
     pca(vectors)
 
     // Build x-y points for each waypoint and store them
@@ -74,7 +74,7 @@ export function rebuildChart(settings = { autoClusters: true, updateCharts: true
             // Find best number of clusters
             var maxKToTest = 10;
             var result = phamBestK.findBestK(points, maxKToTest);
-            console.log("Best cluster count: " + result.K)
+            //console.log("Best cluster count: " + result.K)
             clusters = result.K
 
         }

@@ -26,6 +26,8 @@ export var users;
 export var userDataLoaded = false
 export var recordings
 
+export var currentRecording = null // Holds the firebase JSON entry of the active recording
+
 export var user;
 var email;
 export var anonymous;
@@ -264,6 +266,8 @@ export function addWaypoint(waypoint) {
     }
 
 }
+
+// Recordings
 export function addRecording(recording) {
     // Uploads a doc containing info about a recording, including the filename that has already been uploaded to Storage
     if (!anonymous) {
@@ -280,6 +284,28 @@ export function addRecording(recording) {
 
 
 }
+export function setCurrentRecording(recording)
+{
+    currentRecording = recording
+}
+export function updateRecording(recording)
+{
+    
+    if (recording.id != null)
+    {
+        var date = new Date()
+        var millis = date.getTime()
+        recording.updatedTime = millis
+        var promise = updateDoc(doc(db, "recordings", recording.id), recording)
+        return promise
+    }
+    else
+    {
+        console.error("recording does not have ID yet")
+    }
+}
+
+
 export function addMarker(eegdata, markerName) {
     var date = new Date()
     var millis = date.getTime()
@@ -547,7 +573,9 @@ export function downloadWaypoints() {
     getAllRecordings().then((snapshot) => {
         recordings = []
         snapshot.forEach((doc) => {
-            recordings.puh(doc.data())
+            var recording = doc.data()
+            recording.id = doc.id
+            recordings.push(recording)
         })
     })
 

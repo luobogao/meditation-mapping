@@ -4,17 +4,20 @@ import { notice } from "../utils/ui";
 import { buildBrowseFile } from "../utils/load";
 import { sliderBottom } from 'd3-simple-slider';
 import { state } from "../index"
-import {user, addRecording} from "../utils/database"
+import { currentRecording, setCurrentRecording, updateRecording } from "../utils/database";
 import { datastate } from "../utils/load";
-import { clone, getEveryNth } from '../utils/functions';
+import { clone, formatDate, getEveryNth } from '../utils/functions';
 import { bands, channels } from "../utils/muse"
 import { rebuildChart } from "../utils/runmodel";
 import NavBarCustom from "../utils/navbar";
-import { getLastSession, addOrReplaceSession } from "../utils/indexdb";
+import { getLastSession, addOrReplaceSession, deleteAllrecordings, getAllRecordings } from "../utils/indexdb";
+import { navHeight } from "../utils/ui"
 const d3 = require("d3");
 
+//deleteAllSessions(function(){})
 
 // data
+var record = null
 var workingData = null
 var rawData = null
 
@@ -22,7 +25,8 @@ var rawData = null
 var chartBackground = "lightgrey"
 var selectedStartSecond = 0
 const margin = 10
-var width = (window.innerWidth / 2) - (margin * 4)
+var sidebarWidth = 300
+var width = ((window.innerWidth - sidebarWidth) / 2) - (margin * 4)
 var height = (width / 2)
 
 // Moment Variance chart
@@ -56,20 +60,30 @@ export var cleanedData = null
 export function showLoadingValidate() {
     notice("Loading...", "loading")
 }
-export function validate(data) {
-    rawData = data
+export function validate(recording) {
+    console.log("Validating:")
+    console.log(recording)
+    record = recording
 
-    workingData = getEveryNth(data.filter(e => e.avg60 == true), 10) // Remove the first few rows
+    selectedStartSecond = recording.metadata.startSecond
+    rawData = record.data
+    workingData = getEveryNth(rawData.filter(e => e.avg60 == true), 10) // Remove the first few rows
 
     d3.selectAll(".loading").remove()
     buildValidationChart()
     buildRatioCharts()
+    updateRecordingTable()
+    updateRelative(selectedStartSecond)
     d3.select("#acceptBtn").style("display", "flex")
 
 }
 getLastSession(function (lastSession) {
     state.data = lastSession.data
-    setTimeout(function () { validate(lastSession.data) }, 2000)
+    console.error("found recording:")
+
+    setCurrentRecording(lastSession.metadata)
+    //selectedStartSecond = lastSession.recording.startSecond
+    setTimeout(function () { validate(lastSession) }, 2000)
 
 })
 
@@ -174,7 +188,7 @@ function buildValidationChart(data) {
 
     updateValidChart(dataLines)
 
-    const slider = sliderBottom().min(20).default(20).max(300).ticks(10).step(1).width(width - (4 * margin));
+    const slider = sliderBottom().min(20).default(selectedStartSecond).max(300).ticks(10).step(1).width(width - (4 * margin));
     // Slider SVG
     var svg = div.append("svg")
         .attr("width", width + "px")
@@ -186,65 +200,69 @@ function buildValidationChart(data) {
     // https://www.npmjs.com/package/d3-simple-slider
     svg.call(slider)
     slider.on("end", function (d) { prepareForNext() })
-    slider.on("onchange", function (d) {
+    slider.on("onchange", function (second) {
 
-        var newMax = minRatio
-        var newMin = -1 * minRatio
-        selectedStartSecond = d
-
-        d3.select("#varLine")
-            .attr("x1", x(selectedStartSecond))
-            .attr("x2", x(selectedStartSecond))
-
-        dataLines = dataLinesOriginal.map(l => {
-            var filtered = l.filter(e => e.seconds > d && e.y10 != null)
-            var firstValue = filtered[0].y60
-
-            filtered.forEach(e => e.ratio1 = Math.log(e.y1 / firstValue))
-            filtered.forEach(e => e.ratio10 = Math.log(e.y10 / firstValue))
-            filtered.forEach(e => e.ratio60 = Math.log(e.y60 / firstValue))
-
-            var max = d3.max(filtered.map(e => e.ratio10))
-            var min = d3.min(filtered.map(e => e.ratio10))
-            if (max > newMax) newMax = max
-            if (min < newMin) newMin = min
-
-            return filtered
-        }
-        )
-        if (newMax > 0 && newMin < 0) {
-            if (Math.abs(newMin) > newMax) newMax = Math.abs(newMin)
-            else newMin = -1 * newMax
-        }
-
-
-        y = d3.scaleLinear()
-            .domain([newMin, newMax])
-            .range([height - (2 * margin), 0])
-
-
-
-        updateValidChart(dataLines)
-        updateRatioGraphs()
+        updateRelative(second)
     })
 
 
-
-    // Update chart - called each time graph needs to be changed
-    function updateValidChart(data) {
-        graphSVG.selectAll(".line")
-            .data(data)
-            .attr("d", function (d, i) {
-                // Build the line - smooth it by taking every N rows
-
-                return line(d)
-            })
+    prepareForNext(false) // Default to zero in case user just wants to move immediately to map
 
 
+}
+
+
+// Update chart - called each time graph needs to be changed
+function updateValidChart(data) {
+    graphSVG.selectAll(".line")
+        .data(data)
+        .attr("d", function (d, i) {
+            // Build the line - smooth it by taking every N rows
+
+            return line(d)
+        })
+
+
+}
+function updateRelative(selectedStartSecond) {
+    // Takes the second that user has selected for the chart to "start" from
+    var newMax = minRatio
+    var newMin = -1 * minRatio
+
+    d3.select("#varLine")
+        .attr("x1", x(selectedStartSecond))
+        .attr("x2", x(selectedStartSecond))
+
+    dataLines = dataLinesOriginal.map(l => {
+        var filtered = l.filter(e => e.seconds > selectedStartSecond && e.y10 != null)
+        var firstValue = filtered[0].y60
+
+        filtered.forEach(e => e.ratio1 = Math.log(e.y1 / firstValue))
+        filtered.forEach(e => e.ratio10 = Math.log(e.y10 / firstValue))
+        filtered.forEach(e => e.ratio60 = Math.log(e.y60 / firstValue))
+
+        var max = d3.max(filtered.map(e => e.ratio10))
+        var min = d3.min(filtered.map(e => e.ratio10))
+        if (max > newMax) newMax = max
+        if (min < newMin) newMin = min
+
+        return filtered
     }
-    prepareForNext() // Default to zero in case user just wants to move immediately to map
+    )
+    if (newMax > 0 && newMin < 0) {
+        if (Math.abs(newMin) > newMax) newMax = Math.abs(newMin)
+        else newMin = -1 * newMax
+    }
 
 
+    y = d3.scaleLinear()
+        .domain([newMin, newMax])
+        .range([height - (2 * margin), 0])
+
+
+
+    updateValidChart(dataLines)
+    updateRatioGraphs()
 }
 function buildMomentVarianceChart(div) {
 
@@ -315,6 +333,52 @@ function buildRatioCharts() {
 
 
 }
+
+function buildSidebar() {
+    var div = d3.select("#rightsidebar")
+        .style("width", sidebarWidth + "px")
+        .style("height", (window.innerHeight - navHeight) + "px")
+        .style("background", "#666666")
+
+    // Browse
+    var btndiv = div.append("div")
+        .style("display", "flex")
+        .style("margin", margin + "px")
+    buildBrowseFile(btndiv, "UPLOAD", 80, "grey", "black", "t1")
+
+    // Saved Recordings
+    var table = div.append("div").append("table").attr("id", "recordingTable")
+
+    updateRecordingTable()
+
+    div.append("button").text("Delete All")
+        .on("click", function () {
+            deleteAllrecordings().then(() => {
+                console.log("DELETED ALL RECORDS")
+                updateRecordingTable()
+            })
+        })
+
+
+}
+function updateRecordingTable() {
+    var table = d3.select("#recordingTable")
+    getAllRecordings().then(entries => {
+
+        var d = table.selectAll('tr').data(entries)
+        d.exit().remove()
+        d.enter()
+            .append("tr")
+            .append("td")
+            .append("div")
+            .text(function (recording) {
+                return formatDate(recording.timestamp)
+            })
+    }).catch(error => {
+
+    })
+
+}
 function updateRatioGraphs() {
     var svg = d3.select("#ratioSVG")
 
@@ -360,6 +424,13 @@ function buildPage() {
     d3.select("#main-container").style("display", "flex")
         .style("flex-direction", "column")
 
+    d3.select("#subcontainer").style("display", "flex")
+        .style("flex-direction", "row")
+
+
+
+    buildSidebar()
+
     d3.select("#bodydiv")
         .style("display", "flex")
         .style("flex-direction", "row")
@@ -367,11 +438,6 @@ function buildPage() {
     d3.select("#relative").style("border", "1px solid black")
     d3.select("#ratios").style("border", "1px solid black")
 
-    // Headers
-    var btndiv = d3.select("#header").append("div")
-        .style("display", "flex")
-        .style("margin", margin + "px")
-    buildBrowseFile(btndiv, "UPLOAD", 80, "grey", "black", "t1")
 
     // Charts
     d3.select("#relative")
@@ -391,11 +457,23 @@ function buildPage() {
 
 }
 
-function prepareForNext() {
+function prepareForNext(update = true) {
+
+    console.log("Compiling...")
 
     // Create a new dataset from the raw dataset which starts at the selected time, and definitely has values for the avg60 values
     var filteredData = clone(rawData.filter(row => row.seconds >= selectedStartSecond && row.avg60 == true))
     var firstRow = filteredData[0]
+
+    record.metadata.startSecond = selectedStartSecond
+    updateRecording(record.metadata).then(() => {
+        //console.log("UPDATED FIREBASE")
+
+    })
+    addOrReplaceSession(record, function () {
+        updateRecordingTable()
+    })
+
 
     // Convert all band powers to percentages of the first value
     filteredData.forEach(row => {
@@ -415,11 +493,13 @@ function prepareForNext() {
             })
         })
     })
-    var session = { id: rawData[0].timestamp, data: filteredData }
 
-    addOrReplaceSession(session, function () { })
+
+
     cleanedData = filteredData
     state.data = cleanedData
+
+
     rebuildChart({ autoClusters: true, updateCharts: false })
 
 }
@@ -443,7 +523,7 @@ export default function Validate() {
 
                 buildValidationChart()
                 buildRatioCharts()
-                
+
             }
         }, 500)
 
@@ -454,11 +534,13 @@ export default function Validate() {
         <div id="main-container">
 
             <NavBarCustom />
+            <div id="subcontainer">
+                <div id="rightsidebar"> </div>
+                <div id="bodydiv">
+                    <div id="relative"></div>
+                    <div id="ratios"></div>
+                </div>
 
-            <div id="header"></div>
-            <div id="bodydiv">
-                <div id="relative"></div>
-                <div id="ratios"></div>
             </div>
         </div>
 

@@ -14,27 +14,27 @@ import Graphs from "./pages/graphs"
 import 'bootstrap/dist/css/bootstrap.min.css';
 
 
-const originalLog = console.log;
+// const originalLog = console.log;
 
-// Override the console.log() function
-console.log = function(...args) {
-  // Check each argument separately
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
+// // Override the console.log() function
+// console.log = function(...args) {
+//   // Check each argument separately
+//   for (let i = 0; i < args.length; i++) {
+//     const arg = args[i];
 
-    // If the argument is an object or array, convert it to a string
-    const argString = typeof arg === 'object' ? JSON.stringify(arg) : arg;
+//     // If the argument is an object or array, convert it to a string
+//     const argString = typeof arg === 'object' ? JSON.stringify(arg) : arg;
 
-    // Check if the string representation of the argument contains the string to avoid
-    if (argString.includes(' => ')) {
-      // Don't log this message
-      return;
-    }
-  }
+//     // Check if the string representation of the argument contains the string to avoid
+//     if (argString.includes(' => ')) {
+//       // Don't log this message
+//       return;
+//     }
+//   }
 
-  // If we made it here, none of the arguments contained the string to avoid, so log the message
-  originalLog.apply(console, args);
-};
+//   // If we made it here, none of the arguments contained the string to avoid, so log the message
+//   originalLog.apply(console, args);
+// };
 
 export var state =
 {
