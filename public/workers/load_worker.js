@@ -111,6 +111,9 @@ function processDataMuse(rows) {
     // First timestamp - used to define the start time of this meditation
     let first_timestamp = parseTime(rows[0].TimeStamp)
 
+    // Trim the first few seconds and last few seconds - those definitely have movement
+    rows = rows.slice(10, rows.length - 10)
+
     // First timestamp can't be parsed - use current time as starting point and increment by 1 sec per row
     if (typeof first_timestamp != "number" || isNaN(first_timestamp) || first_timestamp < 1000000) {
         console.log("Bad timestamps")
@@ -210,6 +213,7 @@ function processDataMuse(rows) {
     averageRows(standardRows, 60)
 
     returnObj.data = standardRows
+    returnObj.startTime = first_timestamp
     
     postMessage(JSON.stringify(returnObj))
 

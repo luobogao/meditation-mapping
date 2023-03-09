@@ -1,10 +1,11 @@
 import { dot, getRelativeVector, pca, findSlope, runModel, measureDistance, cosineSimilarity, euclideanDistance, combinedDistance } from "../utils/analysis";
-import { waypoints, state, userDataLoaded } from "../index.js"
+import { state } from "../index.js"
 import { updateChartWaypoints } from "./charts";
 import { updateGraphs } from "../pages/graphs";
 import kmeans from '@jbeuckm/k-means-js'
 import { phamBestK } from '@jbeuckm/k-means-js'
 import { updateAllCharts } from "../pages/map";
+import { waypoints } from "./database";
 
 const maxWaypoints = 5  // Take top N waypoints sorted by cosine distance to user's data
 export function buildModel(vectors) {

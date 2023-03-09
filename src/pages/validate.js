@@ -4,6 +4,7 @@ import { notice } from "../utils/ui";
 import { buildBrowseFile } from "../utils/load";
 import { sliderBottom } from 'd3-simple-slider';
 import { state } from "../index"
+import {user, addRecording} from "../utils/database"
 import { datastate } from "../utils/load";
 import { clone, getEveryNth } from '../utils/functions';
 import { bands, channels } from "../utils/muse"
@@ -53,13 +54,14 @@ const sliderHeight = 50
 export var cleanedData = null
 
 export function showLoadingValidate() {
-    notice("Loading...")
+    notice("Loading...", "loading")
 }
 export function validate(data) {
     rawData = data
 
     workingData = getEveryNth(data.filter(e => e.avg60 == true), 10) // Remove the first few rows
 
+    d3.selectAll(".loading").remove()
     buildValidationChart()
     buildRatioCharts()
     d3.select("#acceptBtn").style("display", "flex")
@@ -75,7 +77,7 @@ function buildValidationChart(data) {
     // Purpose: use the slider to select a different starting minute, all values are recalculated to be a % of the first value
     // Does not change original data - once user decides on a starting minute, the values from that minute will be stored as a starting vector
 
-    d3.selectAll(".notice").remove() // Remove loading notice
+
     var start = workingData[0].seconds
     var end = workingData.slice(-1)[0].seconds
 
@@ -165,6 +167,7 @@ function buildValidationChart(data) {
         .enter()
         .append("path")
         .attr("class", "line")
+        .on("click", function (d) { console.log(d) })
         .attr("fill", "none")
         .attr("stroke", function (d, i) { return colors[i] })
         .attr("stroke-width", 3)
@@ -383,7 +386,11 @@ function buildPage() {
 
 
 
+
+
+
 }
+
 function prepareForNext() {
 
     // Create a new dataset from the raw dataset which starts at the selected time, and definitely has values for the avg60 values
@@ -417,9 +424,17 @@ function prepareForNext() {
 
 }
 
+function handleStorage(event) {
+    console.log("----> STORAGE EVENT")
+    if (event.key == "waypoints-updated") {
+        console.error("WAYPOINTS UPDATED")
+    }
+}
+window.addEventListener("storage", handleStorage)
 export default function Validate() {
     useEffect(() => {
         buildPage()
+
 
     }, [])
     useEffect(() => {
@@ -428,6 +443,7 @@ export default function Validate() {
 
                 buildValidationChart()
                 buildRatioCharts()
+                
             }
         }, 500)
 

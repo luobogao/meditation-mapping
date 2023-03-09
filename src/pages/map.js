@@ -318,8 +318,8 @@ export default function Live() {
     }, [])
     useEffect(() => {
         
-    
         setTimeout(function(){rebuildChart()}, 100)
+        
         
     })
 

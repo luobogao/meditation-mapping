@@ -1,6 +1,7 @@
 import { updateAllCharts} from "../pages/map";
 import { rebuildChart } from "./runmodel";
-import { state, users } from "../index";
+import { state } from "../index";
+import { users } from "./database";
 
 const d3 = require("d3");
 export function popUp(event, html) {
@@ -28,21 +29,23 @@ export function popUp(event, html) {
 
 }
 
-export function notice(message) {
+export function notice(message, id) {
     // Blanks out background then adds a foreground div
     
+    d3.selectAll(".notice").remove()
+
     d3.select("body").append("div")
-        .attr("class", "notice")
+        .attr("class", "notice " + id)
         .style("width", window.innerWidth + "px")
         .style("height", window.innerHeight + "px")
-        .style("background", "white")
+        .style("background", "black")
         .style("position", "absolute")
         .style("left", 0)
         .style("top", 0)
-        .style("opacity", 0.4)
+        .style("opacity", 0.5)
 
     var div = d3.select("body").append("div")
-        .attr("class", "notice")
+        .attr("class", "notice " + id)
         .style("width", "fit-content")
         .style("height", "fit-content")
         .style("background", "grey")

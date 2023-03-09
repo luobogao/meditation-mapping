@@ -12,6 +12,7 @@ request.onupgradeneeded = function (event) {
     }
 };
 
+
 // Function to add an item to the 'sessions' table
 export function addSession(session) {
     const request = window.indexedDB.open(dbName, dbVersion);

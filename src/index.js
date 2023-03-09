@@ -3,11 +3,7 @@ import React from 'react';
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import './index.css';
-import { bands, channels } from "./utils/muse"
-import { getRelativeVector } from './utils/analysis';
-import {buildModel} from "./utils/runmodel"
-import { zoom, updateChartWaypoints, updateChartUser } from "./utils/charts"
-import { getAnalytics } from "firebase/analytics";
+
 import About from "./pages/about"
 import Home from "./pages/home"
 import Layout from "./pages/layout"
@@ -15,24 +11,30 @@ import Map from "./pages/map"
 import Record from "./pages/record"
 import Validate from "./pages/validate"
 import Graphs from "./pages/graphs"
-import { arraysEqual, unique } from "./utils/functions";
-import { buildUserSelectors } from "./utils/ui";
-import { anonymous, auth, login, updateUsername, listenEEG, getAllWaypoints, downloadCSV, buildAuthContainer, firstLoad } from "./utils/database"
 import 'bootstrap/dist/css/bootstrap.min.css';
-import { addSession, deleteAllSessions, getLastSession } from './utils/indexdb';
 
-
-export var waypoints
-export var users;
-export var userDataLoaded = false
 
 const originalLog = console.log;
 
-// console.log = function (...args) {
-//   if (!args.some((arg) => arg.includes(" => "))) {
-//     originalLog.apply(console, args);
-//   }
-// };
+// Override the console.log() function
+console.log = function(...args) {
+  // Check each argument separately
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+
+    // If the argument is an object or array, convert it to a string
+    const argString = typeof arg === 'object' ? JSON.stringify(arg) : arg;
+
+    // Check if the string representation of the argument contains the string to avoid
+    if (argString.includes(' => ')) {
+      // Don't log this message
+      return;
+    }
+  }
+
+  // If we made it here, none of the arguments contained the string to avoid, so log the message
+  originalLog.apply(console, args);
+};
 
 export var state =
 {
@@ -54,92 +56,8 @@ export var state =
 
 }
 
-export function downloadWaypoints() {
 
 
-  var showWelcome = false
-  if (firstLoad == true && anonymous) {
-    showWelcome = true
-  }
-
-  // Reset waypoints
-  waypoints = []
-  users = []
-  getAllWaypoints().then((snapshot) => {
-
-    snapshot.forEach((doc) => {
-      var waypoint = doc.data()
-      waypoint.id = doc.id
-
-      if (waypoint.id != undefined && waypoint.vector != undefined && waypoint.label != undefined && waypoint.user != undefined) {
-
-        // Migration method - adds a "_avg60" to the end of each vector
-        var newVector = {}
-        bands.forEach(band => {
-          channels.forEach(channel => {
-            var key = band + "_" + channel
-            newVector[key + "_avg60"] = waypoint.vector[key]
-          })
-        })
-        waypoint.relative_vector_avg60 = getRelativeVector(newVector, 60)
-
-        waypoints.push(waypoint)
-        users.push(waypoint.user)
-      }
-
-
-    })
-    console.log(waypoints)
-
-    if (waypoints.length == 0 || users.length == 0) {
-      alert("Could not download data from server...")
-      return
-    }
-    users = unique(users).sort()
-    state.selected_users = users
-
-    // Build model of meditation states using the "vectors.js" file
-    // This first time, include ALL the waypoints
-
-    function buildModel_waypoint() {
-      let vectors = waypoints.filter(e => e.exclude != true)
-        .filter(e => state.selected_users.includes(e.user))
-        .map(e => e.relative_vector_avg60)
-      buildModel(vectors)
-    }
-
-    if (userDataLoaded) {
-
-      buildModel_waypoint()
-    }
-    else {
-      buildModel_waypoint()
-    }
-
-
-
-
-    waypoints.forEach(e => {
-      if (state.selected_users.includes(e.user)) {
-        e.match = true
-      }
-
-    })
-
-    //buildSimilarityChart()
-    updateChartWaypoints()
-    buildUserSelectors()
-
-    // Show the welcom screen only after data is loaded
-    if (showWelcome) {
-      //buildWelcome()
-
-    }
-
-
-  })
-
-}
 
 
 

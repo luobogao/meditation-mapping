@@ -39,19 +39,19 @@ export function buildTimeslider() {
                     var decay = 2
                     switch (state.resolution) {
                         case 1:
-                            decay = 1.5;
+                            decay = 3;
                             break;
                         case 10:
-                            decay = 2.5;
+                            decay = 6;
                             break;
                         case 60:
-                            decay = 3.5;
+                            decay = 1;
                             break;
                     }
-                    decay = 5
+                    
                     var diff = Math.abs(d.moment.percent - percent)
                     
-                    var inverse = 100 - Math.pow(diff * 100, 2)
+                    var inverse = 100 - Math.pow(diff * 100, decay)
                     if (inverse < 0) inverse = 0
                     return inverse / 100
                 })
@@ -60,18 +60,18 @@ export function buildTimeslider() {
                     var decay = 2
                     switch (state.resolution) {
                         case 1:
-                            decay = 1.5;
+                            decay = 3;
                             break;
                         case 10:
-                            decay = 2.5;
+                            decay = 6;
                             break;
                         case 60:
-                            decay = 3.5;
+                            decay = 1;
                             break;
                     }
                     decay = 5
                     var diff = Math.abs(d.moment.percent - percent)
-                    var inverse = 100 - Math.pow(diff * 100, 2)
+                    var inverse = 100 - Math.pow(diff * 100, decay)
                     if (inverse < 0) inverse = 0
                     return (inverse / 20) + "px"
                 })

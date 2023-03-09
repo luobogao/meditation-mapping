@@ -1,7 +1,7 @@
 import { getFirestore, collection, getDocs, setDoc, doc, deleteDoc, updateDoc, query, where, addDoc } from 'firebase/firestore/lite';
 import { processCSV } from "./load"
-import { getStorage, ref as storageRef, getBlob } from "firebase/storage"
-import { arraysEqual } from './functions';
+import { getStorage, ref as storageRef, getBlob, uploadString, getDownloadURL, updateMetadata } from "firebase/storage"
+import { arraysEqual, unique } from './functions';
 import { getDatabase, ref as dbref, onValue, off, get } from "firebase/database"
 import { resetRecord, startRecording } from '../pages/record';
 import { initializeApp } from "firebase/app";
@@ -9,9 +9,23 @@ import { getAuth, onAuthStateChanged, updateProfile, signInAnonymously } from "f
 import * as firebaseui from "firebaseui"
 import "firebaseui/dist/firebaseui.css"
 import firebase from "firebase/compat/app"
-import { downloadWaypoints } from '../index';
+import { bands, channels } from "../utils/muse"
+import { getRelativeVector } from '../utils/analysis';
+import {buildModel, rebuildChart} from "../utils/runmodel"
+import { zoom, updateChartWaypoints, updateChartUser } from "../utils/charts"
+import { getAnalytics } from "firebase/analytics";
+import {state} from "../index"
+import { buildUserSelectors } from "../utils/ui";
+
+
 
 const d3 = require("d3");
+
+export var waypoints
+export var users;
+export var userDataLoaded = false
+export var recordings
+
 export var user;
 var email;
 export var anonymous;
@@ -166,7 +180,6 @@ export function buildAuthContainer(div) {
 
 }
 
-
 export function login() {
 
     buildAuthContainer(d3.select("#main-container"))
@@ -251,6 +264,22 @@ export function addWaypoint(waypoint) {
     }
 
 }
+export function addRecording(recording) {
+    // Uploads a doc containing info about a recording, including the filename that has already been uploaded to Storage
+    if (!anonymous) {
+        var date = new Date()
+        var millis = date.getTime()
+        var userid = auth.currentUser.uid
+
+        recording.addedTime = millis
+        recording.addedBy = userid
+
+        var promise = addDoc(collection(db, "recordings"), recording)
+        return promise
+    }
+
+
+}
 export function addMarker(eegdata, markerName) {
     var date = new Date()
     var millis = date.getTime()
@@ -280,6 +309,11 @@ export function getAllWaypoints() {
     var promise = getDocs(q)
     return promise
 }
+export function getAllRecordings() {
+    var q = query(collection(db, "recordings"))
+    var promise = getDocs(q)
+    return promise
+}
 
 export function updateWaypoint(waypoint) {
     if (!anonymous) {
@@ -289,6 +323,49 @@ export function updateWaypoint(waypoint) {
         var promise = updateDoc(doc(db, "waypoints", waypoint.id), { notes: waypoint.notes, label: waypoint.label, updateTime: millis, updatedBy: auth.currentUser.uid, user: waypoint.user, file: waypoint.file })
         return promise
     }
+
+}
+export function uploadCSV(csvString, folder, filename, metadata) {
+    const fullpath = folder + "/" + filename + ".csv"
+    const fileRef = storageRef(storage, fullpath)
+
+    var standardMetadata = {}
+    standardMetadata.contentType = 'text/csv'
+    standardMetadata.customMetadata = metadata
+
+    // Check if the file exists
+    getDownloadURL(fileRef)
+        .then(() => {
+            // File exists
+            console.log('File already exists');
+        })
+        .catch((error) => {
+            // File doesn't exist
+            console.log('File does not exist');
+            console.log("Uploading file: " + fullpath)
+            var uploadTask = uploadString(fileRef, csvString)
+
+
+            uploadTask.then((doc) => {
+                console.log("---> Done!")
+                updateMetadata(fileRef, metadata)
+                    .then(() => {
+                        console.log("--------> Updated metadata")
+                    })
+                    .catch((error) => {
+
+                    })
+
+
+            })
+                .catch((error) => {
+                    console.error("Failed to upload:")
+                    console.log(error)
+
+                })
+        });
+
+
 
 }
 
@@ -304,8 +381,11 @@ function signOut() {
 onAuthStateChanged(auth, (fbuser) => {
     // Called anything the authentication state changes: login, log out, anonymous login
     listenLiveUsers()
+    downloadWaypoints()
+
     if (fbuser && fbuser.email == null) {
         anonymous = true
+
     }
     if (fbuser && fbuser.email != null) {
 
@@ -349,11 +429,11 @@ onAuthStateChanged(auth, (fbuser) => {
 
             d3.select("#firebase-auth-container").remove()
             d3.select("#loginName").text(user.displayName)
-            .on("click", function (d) {
-                signOut()
-            })
+                .on("click", function (d) {
+                    signOut()
+                })
             d3.select("#loginElement").style("display", "flex")
-                
+
 
 
             // Download all waypoints
@@ -363,7 +443,7 @@ onAuthStateChanged(auth, (fbuser) => {
             }
             if (firstLoad) {
                 firstLoad = false
-                downloadWaypoints()
+
             }
         }
 
@@ -397,4 +477,79 @@ onAuthStateChanged(auth, (fbuser) => {
 
     }
 })
+export function downloadWaypoints() {
+
+    // Reset waypoints
+    waypoints = []
+    users = []
+    getAllWaypoints().then((snapshot) => {
+
+        snapshot.forEach((doc) => {
+            var waypoint = doc.data()
+            waypoint.id = doc.id
+
+            if (waypoint.id != undefined && waypoint.vector != undefined && waypoint.label != undefined && waypoint.user != undefined) {
+
+                // Migration method - adds a "_avg60" to the end of each vector
+                var newVector = {}
+                bands.forEach(band => {
+                    channels.forEach(channel => {
+                        var key = band + "_" + channel
+                        newVector[key + "_avg60"] = waypoint.vector[key]
+                    })
+                })
+                waypoint.relative_vector_avg60 = getRelativeVector(newVector, 60)
+
+                waypoints.push(waypoint)
+                users.push(waypoint.user)
+            }
+
+
+        })
+        var d = new Date()
+        var millis = d.getTime()
+        localStorage.setItem("waypoints-updated", millis) // Set this so that other pages can know the waypoints are updated
+        if (waypoints.length == 0 || users.length == 0) {
+            alert("Could not download data from server...")
+            return
+        }
+        users = unique(users).sort()
+        state.selected_users = users
+
+        // Build model of meditation states using the "vectors.js" file
+        // This first time, include ALL the waypoints
+
+        function buildModel_waypoint() {
+            let vectors = waypoints.filter(e => e.exclude != true)
+                .filter(e => state.selected_users.includes(e.user))
+                .map(e => e.relative_vector_avg60)
+            buildModel(vectors)
+        }
+
+        if (userDataLoaded) {
+
+            buildModel_waypoint()
+
+        }
+        else {
+            buildModel_waypoint()
+        }
+        
+
+        //buildSimilarityChart()
+        updateChartWaypoints()
+        buildUserSelectors()
+        rebuildChart()
+
+
+
+    })
+    getAllRecordings().then((snapshot) => {
+        recordings = []
+        snapshot.forEach((doc) => {
+            recordings.puh(doc.data())
+        })
+    })
+
+}
 

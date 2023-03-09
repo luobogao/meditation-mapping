@@ -5,7 +5,8 @@ import { addWaypoint, user, deleteWaypoint, updateWaypoint, anonymous } from "..
 import { getEveryNth } from "./functions";
 import { rebuildChart } from "./runmodel";
 import { centroid, clone } from "./functions";
-import {state, userDataLoaded, waypoints} from "../index"
+import {state} from "../index"
+import { waypoints, userDataLoaded } from "./database";
 import { x_mini } from "./minichart";
 import { updateSimilarityChart } from "./minicharts";
 import { cluster } from "d3";
