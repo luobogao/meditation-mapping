@@ -293,6 +293,8 @@ export function updateRecording(recording)
     
     if (recording.id != null)
     {
+        console.log("FB: adding record")
+        console.log(recording)
         var date = new Date()
         var millis = date.getTime()
         recording.updatedTime = millis
@@ -303,6 +305,11 @@ export function updateRecording(recording)
     {
         console.error("recording does not have ID yet")
     }
+}
+export function deleteRecordingFirebase(recording)
+{
+    var promise = deleteDoc(doc(db, "recordings", recording.id))
+    return promise
 }
 
 

@@ -13,24 +13,96 @@ import { addWaypoint } from "../utils/database";
 const d3 = require("d3");
 
 var x, y, line, start, end, line
+var cluster = { id: -1 } // currently selected cluster
 const margin = 10
 const width = window.innerWidth * 0.8
 const height = window.innerHeight * 0.5
+var textColor = "white"
+var sidebarWidth = 300
 const backgroundColor = "#d9d9d9"
 const navHeight = 63
 
 const clusterColors = ["darkred", "blue", "orange", "lightgreen", "purple"]
+
+function buildClusterTable() {
+    var table = d3.select("#clustertable")
+
+
+    table
+        .style("margin", "10px")
+        .style("border-collapse", "separate")
+        .style("border-spacing", "0 5px")
+
+    
+}
+function updateClusterTable() {
+    var table = d3.select("#clustertable")
+    var clusters = state["cluster_means_similarities_avg60"]
+    var d = table.selectAll("tr")
+        .data(clusters)
+
+    d.exit().remove()
+    var rows = d
+        .enter()
+        .append("tr")
+        .attr("class", "clusterrow")
+        .style("cursor", "pointer")
+        .on("click", function (event, d) {
+            cluster = d
+            d3.selectAll(".clusterrow").style("background", "none")
+            d3.select(this).style("background", "green")
+            setTimeout(function () { }, 80)
+
+
+        })
+        .on("mouseover", function (event, d) {
+            var newcolor = "black"
+            if (d.id == cluster.id) {
+                newcolor = "darkgreen"
+            }
+            d3.selectAll(".clusterline").style("opacity", 0.2)
+            d3.select("#clusterLine" + d.id).style("opacity", 1)
+            d3.select(this).style("background", newcolor).style("color", "white")
+        })
+        .on("mouseout", function (i, d) {
+            var newcolor = "none"
+            if (d.id == cluster.id) newcolor = "green"
+            d3.selectAll(".clusterline").style("opacity", 1)
+            d3.select(this).style("background", newcolor).style("color", "black")
+        })
+
+    rows
+        .append("td")
+        .style("border-top-left-radius", "5px")
+        .style("border-bottom-left-radius", "5px")
+        .style("border", "1px solid " + textColor)
+        .append("div")
+        .style("color", textColor)
+        .style("margin-left", "10px")
+        .style("margin-right", "10px")
+        .text(function (d, i) { return "Cluster " + i })
+
+    rows.append("td")
+        .style("border-top-right-radius", "5px")
+        .style("border-bottom-right-radius", "5px")
+        .style("border", "1px solid " + textColor)
+        .append("div")
+        .style("margin-left", "10px")
+        .style("margin-right", "10px")
+        .text("⬤")
+        .style("color", function (d, i) { return clusterColors[i] })
+}
 
 export function updateGraphs() {
 
     if (state != null && state["cluster_means_similarities_avg60"] != null) {
         var svg = d3.select("#cosinesvg")
         svg.selectAll("*").remove()
-
+        var clusters = state["cluster_means_similarities_avg60"]
         start = cleanedData[0].seconds
         end = cleanedData.slice(-1)[0].seconds
 
-
+        updateClusterTable()
 
         // var data = getEveryNth(cleanedData.map(row => {
         //     return {
@@ -39,35 +111,7 @@ export function updateGraphs() {
         //     }
         // }), 10)
         var minY = 90
-        var clusters = state["cluster_means_similarities_avg60"]
 
-
-        // Sidebar
-        d3.select("#sidebar").selectAll("*").remove()
-        var sidebar = d3.select("#sidebar").append("div").style("margin-top", "10px").style("margin-bottom", "10px")
-        console.log("clusters:")
-        console.log(clusters)
-        sidebar.selectAll("div")
-            .data(clusters)
-            .enter()
-            .append("div")
-            .style("margin", "5px")
-            .style("border", "1px solid black")
-            .style("border-radius", "5px")
-            .style("text-align", "center")
-            .style("cursor", "pointer")
-            .on("click", function (event, d) {
-                newWaypoint(d)
-            })
-            .on("mouseover", function (d) {
-                d3.select(this).style("background", "black").style("color", "white")
-            })
-            .on("mouseout", function (d) {
-                d3.select(this).style("background", "none").style("color", "black")
-            })
-            .text(function (d, i) {
-                return "Cluster " + i
-            })
 
 
         // Graph
@@ -98,11 +142,12 @@ export function updateGraphs() {
             .curve(d3.curveMonotoneX) // apply smoothing to the line
 
 
-        svg.selectAll(".line")
+        svg.selectAll(".clusterline")
             .data(data)
             .enter()
             .append("path")
-            .attr("class", "line")
+            .attr("id", function (d, i) { return "clusterLine" + i })
+            .attr("class", "clusterline")
             .attr("fill", "none")
             .attr("stroke", function (d, i) { return clusterColors[i] })
             .attr("stroke-width", 3)
@@ -158,10 +203,10 @@ function newWaypoint(cluster) {
 
     menu.append("div").text("Label:").style("margin-top", "20px")
     var label = menu.append("input").attr("type", "text").style("width", "220px")
-       
+
     menu.append("div").text("Notes:").style("margin-top", "20px")
     var notes = menu.append("textarea").attr("rows", 10).attr("cols", 30)
-     
+
     menu.append("div").style("margin-top", "30px")
         .append("button").text("Submit")
         .on("click", function () {
@@ -177,7 +222,7 @@ function newWaypoint(cluster) {
                     .then((doc) => {
                         console.log("Added waypoint: " + doc.id)
                         d3.selectAll(".notice").remove()
-                        
+
                     })
                     .catch((error) => {
                         console.error("Failed to add waypoint:")
@@ -195,17 +240,10 @@ function newWaypoint(cluster) {
 
 
 function buildPage() {
-    d3.select("#main-container").style("display", "flex").style("flex-direction", "column")
+    d3.select("#main-container").style("display", "flex").style("flex-direction", "column").style("background", "grey")
+
     d3.select("#maindiv").style("display", "flex").style("flex-direction", "row")
         .style("height", (window.innerHeight - navHeight) + "px")
-
-    // Sidebar
-    d3.select("#sidebar").style("width", "300px")
-        .style("background", "grey")
-        .style("margin", "10px")
-        .style("border", "2px solid black")
-        .style("border-radius", "10px")
-        .style("height", "fit-content")
 
 
 
@@ -214,14 +252,35 @@ function buildPage() {
         .attr("width", width + "px")
         .attr("height", height + "px")
 
+
+
+    // Sidebar
+    var sidebar = d3.select("#sidebar")
+        .style("width", sidebarWidth + "px")
+        .style("height", (window.innerHeight - navHeight) + "px")
+        .style("background", "#666666")
+        .style("display", "flex")
+        .style("flex-direction", "column")
+        .style("justify-content", "space-between")
+
+    var sidebarTopDiv = sidebar.append("div")
+
+    var clusterDiv = sidebarTopDiv.append("div")
+    buildClusterCounts(clusterDiv, "graphs")
+
+
+    sidebarTopDiv.append("div").style("margin", "10px").append("table").attr("id", "clustertable")
+    buildClusterTable()
+
+
+
+
     if (user != null) {
         d3.select("#loginElement").style("display", "flex")
         d3.select("#loginName").text(user.displayName)
 
     }
 
-    var clusterDiv = d3.select("#options").append('div')
-    buildClusterCounts(clusterDiv, "graphs")
 
 }
 

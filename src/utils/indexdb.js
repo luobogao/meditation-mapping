@@ -24,13 +24,26 @@ export function addSession(session) {
     console.log("------> ADDED SESSION TO DB")
   }
 }
-function getSessionById(id, callback) {
+export function getRecordingById(id, callback) {
   const request = window.indexedDB.open(dbName, dbVersion);
   request.onsuccess = function (event) {
     const db = event.target.result;
     const tx = db.transaction('recordings', 'readonly');
     const store = tx.objectStore('recordings');
     const getRequest = store.get(id);
+    getRequest.onsuccess = function (event) {
+      const session = event.target.result;
+      callback(session);
+    }
+  }
+}
+export function deleteRecording(id, callback) {
+  const request = window.indexedDB.open(dbName, dbVersion);
+  request.onsuccess = function (event) {
+    const db = event.target.result;
+    const tx = db.transaction('recordings', 'readwrite');
+    const store = tx.objectStore('recordings');
+    const getRequest = store.delete(id);
     getRequest.onsuccess = function (event) {
       const session = event.target.result;
       callback(session);

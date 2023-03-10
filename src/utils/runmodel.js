@@ -94,7 +94,7 @@ export function rebuildChart(settings = { autoClusters: true, updateCharts: true
         state["cluster_means_avg" + avg] = means
 
         // Measure the cosine similarity to every point in the meditation for each mean
-        var cluster_i = 0
+        var cluster_i = -1
         var meanSimilarities = means.map(meanVector => {
             var seconds = 0
             var similarityTimeseries = points.map(point => {
@@ -108,7 +108,7 @@ export function rebuildChart(settings = { autoClusters: true, updateCharts: true
             cluster_i ++
             return {
                 similarityTimeseries: similarityTimeseries,
-                cluster: cluster_i,
+                id: cluster_i,
                 vector: meanVector
             }
         })
