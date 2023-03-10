@@ -135,14 +135,14 @@ export function addOrReplaceSession(session, callback) {
     const db = event.target.result;
     const tx = db.transaction('recordings', 'readwrite');
     const store = tx.objectStore('recordings');
-    console.log("DB: Adding new session")
+    
     const getRequest = store.get(session.id);
     getRequest.onsuccess = function (event) {
       if (event.target.result) {
-        console.log("----> UPDATED existing session")
+        //console.log("----> UPDATED existing session")
         store.put(session);
       } else {
-        console.log("----> ADDED NEW session")
+        console.log("----> ADDED NEW recording to IndexDB")
         store.add(session);
       }
       callback();

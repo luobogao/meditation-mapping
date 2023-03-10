@@ -63,8 +63,7 @@ export function showLoadingValidate() {
     notice("Loading...", "loading")
 }
 export function validate(recording) {
-    console.log("Validating:")
-    console.log(recording)
+    
     record = recording
 
     selectedStartSecond = recording.metadata.startSecond
@@ -567,8 +566,6 @@ function buildPage() {
 
 function prepareForNext(update = true) {
 
-    console.log("Compiling...")
-
     // Create a new dataset from the raw dataset which starts at the selected time, and definitely has values for the avg60 values
     var filteredData = clone(rawData.filter(row => row.seconds >= selectedStartSecond && row.avg60 == true))
     var firstRow = filteredData[0]
@@ -580,7 +577,7 @@ function prepareForNext(update = true) {
 
     })
     addOrReplaceSession(record, function () {
-        console.log("---> Updated IndexDB: " + selectedStartSecond)
+        
         updateRecordingTable()
     })
 

@@ -3,7 +3,7 @@ import {state} from "../index"
 import { parsePx } from "./functions";
 import { waypoints } from "./database";
 import { addMenu, menuRemove } from "./ui";
-import { zoom } from "./charts";
+import { zoom } from "./3d_charts";
 import { ratio, interpolate } from "./functions";
 const d3 = require("d3");
 var similarityLine, miniX, miniY, similaritySVG

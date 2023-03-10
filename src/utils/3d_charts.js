@@ -1,7 +1,7 @@
 import {chartWidth, rebuildCharts, chartHeight, mode3d, updateAllCharts } from "../pages/map"
 import { popUp, popUpremove, addMenu, menuRemove, moveMenu } from "./ui";
-import { getRelativeVector, runModel } from "../utils/analysis";
-import { addWaypoint, user, deleteWaypoint, updateWaypoint, anonymous } from "../utils/database"
+import { getRelativeVector, runModel } from "./analysis";
+import { addWaypoint, user, deleteWaypoint, updateWaypoint, anonymous } from "./database"
 import { getEveryNth } from "./functions";
 import { rebuildChart } from "./runmodel";
 import { centroid, clone } from "./functions";

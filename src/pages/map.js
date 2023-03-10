@@ -10,7 +10,7 @@ import { firstLoad, downloadCSV } from "../utils/database";
 
 import { updateTimeseries, buildSimilarityChart, updateSimilarityChart } from "../utils/minicharts";
 
-import { zoom, updateChartWaypoints, updateChartUser } from "../utils/charts"
+import { zoom, updateChartWaypoints, updateChartUser } from "../utils/3d_charts"
 
 import { buildBrowseFile } from "../utils/load";
 import { datastate } from "../utils/load";
@@ -245,7 +245,7 @@ function buildRightSidebar() {
         else {
             state.showAllWaypoints = false
         }
-        rebuildChart()
+        updateAllCharts()
     })
 
     // Checkbox: Limit to N waypoints
@@ -258,7 +258,7 @@ function buildRightSidebar() {
         else {
             state.limitMatches = false
         }
-        rebuildChart()
+        updateAllCharts()
     })
 }
 function buildBottomBar() {
@@ -316,7 +316,11 @@ export default function Live() {
     }, [])
     useEffect(() => {
         
-        setTimeout(function(){rebuildChart()}, 100)
+        setTimeout(function()
+        {
+            console.log("MAP is re-rending, rebuilding chart")
+            updateAllCharts()
+        }, 100)
         
         
     })

@@ -2,6 +2,7 @@
 const d3 = require("d3");
 
 const moment = require("moment")
+const originalConsoleLog = console.log; 
 
 debug = false
 export function interpolate(data, key, n) {
@@ -148,4 +149,15 @@ export function formatDate(epoch) {
     const minutes = ('0' + date.getMinutes()).slice(-2);
     const seconds = ('0' + date.getSeconds()).slice(-2);
     return `${year}-${month}-${day} ${hours}:${minutes}`;
+}
+export function disableLogging()
+{
+    
+    console.log = function() {
+        // temporarily disable console logging, because this libary uses it too much
+      };
+}
+export function enableLogging()
+{
+    console.log = originalConsoleLog
 }

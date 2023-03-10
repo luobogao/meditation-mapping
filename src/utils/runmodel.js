@@ -1,11 +1,12 @@
 import { dot, getRelativeVector, pca, findSlope, runModel, measureDistance, cosineSimilarity, euclideanDistance, combinedDistance } from "../utils/analysis";
 import { state } from "../index.js"
-import { updateChartWaypoints } from "./charts";
+import { updateChartWaypoints } from "./3d_charts";
 import { updateGraphs } from "../pages/graphs";
 import kmeans from '@jbeuckm/k-means-js'
 import { phamBestK } from '@jbeuckm/k-means-js'
 import { updateAllCharts } from "../pages/map";
 import { waypoints } from "./database";
+import { disableLogging, enableLogging } from "./functions";
 
 const maxWaypoints = 5  // Take top N waypoints sorted by cosine distance to user's data
 export function buildModel(vectors) {
@@ -30,7 +31,7 @@ export function buildModel(vectors) {
 }
 
 export function rebuildChart(settings = { autoClusters: true, updateCharts: true }) {
-
+    console.log("--- Rebuilding Models ---")
     state.zoom = 1
 
     // Remove waypoints from users de-selected by user
@@ -63,6 +64,7 @@ export function rebuildChart(settings = { autoClusters: true, updateCharts: true
     state.data.forEach(entry => entry.relative_vector_avg60 = getRelativeVector(entry, 60))
 
     // Find Clusters
+    disableLogging()
     function findClusters(avg) {
         var kmeansResult
         var points = state.data.map(e => e["relative_vector_avg" + avg]).filter(e => e != null)
@@ -129,6 +131,7 @@ export function rebuildChart(settings = { autoClusters: true, updateCharts: true
     }
     findClusters(10)
     findClusters(60)
+    enableLogging()
 
 
     var userVectors = state.data.map(e => e.relative_vector_avg10).filter(e => e != null)
