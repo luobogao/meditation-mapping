@@ -254,7 +254,7 @@ export function addWaypoint(waypoint) {
         var entry = {
             version: waypoint.version,
             user: waypoint.user, addedBy: userid, label: waypoint.label, vector: waypoint.vector,
-            notes: waypoint.notes, delete: false, addedTime: millis, resolution: waypoint.resolution,
+            notes: waypoint.notes, averaging: waypoint.averaging, delete: false, addedTime: millis, resolution: waypoint.resolution,
             sourceFilename: waypoint.sourceFilename, recordID: waypoint.recordID
 
         }
@@ -532,6 +532,8 @@ export function downloadWaypoints() {
                         newVector[key + "_avg60"] = waypoint.vector[key]
                     })
                 })
+                waypoint.relative_vector_avg1 = getRelativeVector(newVector, 1)
+                waypoint.relative_vector_avg10 = getRelativeVector(newVector, 10)
                 waypoint.relative_vector_avg60 = getRelativeVector(newVector, 60)
 
                 waypoints.push(waypoint)
@@ -544,7 +546,7 @@ export function downloadWaypoints() {
         var millis = d.getTime()
         localStorage.setItem("waypoints-updated", millis) // Set this so that other pages can know the waypoints are updated
         if (waypoints.length == 0 || users.length == 0) {
-            alert("Could not download data from server...")
+            alert("No waypoints found on server!")
             return
         }
         users = unique(users).sort()

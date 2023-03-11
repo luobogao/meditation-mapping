@@ -85,13 +85,6 @@ export function updateAllCharts(reset = false) {
 }
 
 function buildPage() {
-
-    setup()
-
-
-}
-
-function setup() {
     d3.select("#main-container").style("display", "flex")
         .style("flex-direction", "column")
         .style("font-family", "Cabin")
@@ -223,8 +216,8 @@ function buildRightSidebar() {
     var clustersContainer = otherSelectors.append("div")
     buildClusterCounts(clustersContainer, "map")
 
-    otherSelectors.append("text").text("Resolution:")
-    var resolutionContainer = otherSelectors.append("div").style("display", "flex").style("flex-direction", "row")
+    var resolutionContainer = otherSelectors.append("div")
+    
     buildResolutionSelectors(resolutionContainer)
 
     // Show Hidden Waypoints

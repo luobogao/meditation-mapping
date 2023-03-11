@@ -2,6 +2,7 @@ import { updateAllCharts} from "../pages/map";
 import { rebuildChart } from "./runmodel";
 import { state } from "../index";
 import { users } from "./database";
+import { updateClusterGraphs } from "../pages/clusters";
 
 const d3 = require("d3");
 export const navHeight = 63
@@ -233,7 +234,12 @@ export function buildChartSelectors(div) {
     })
 
 }
-export function buildResolutionSelectors(div) {
+export function buildResolutionSelectors(container) {
+
+    container.style("margin", "5px")
+    container.append("text").text("Resolution:")
+    var div = container.append("div").style("display", "flex").style("flex-direction", "row")
+
     var res1, res10, res60 = false
     switch (state.resolution) {
         case 1:
@@ -247,9 +253,9 @@ export function buildResolutionSelectors(div) {
             break
 
     }
-    var res1box = addCheckbox(div, "1 Sec", res1, "12px", "radio")
-    var res10box = addCheckbox(div, "10 Sec", res10, "12px", "radio")
-    var res60box = addCheckbox(div, "60 Sec", res60, "12px", "radio")
+    var res1box = addCheckbox(div, "1 Sec", res1, "res1", "12px", "radio")
+    var res10box = addCheckbox(div, "10 Sec", res10, "res10", "12px", "radio")
+    var res60box = addCheckbox(div, "60 Sec", res60, "res60", "12px", "radio")
 
     res1box
         .attr("class", "resolution-checkbox")
@@ -258,6 +264,7 @@ export function buildResolutionSelectors(div) {
             d3.select(this).property("checked", true)
             state.resolution = 1
             updateAllCharts()
+            updateClusterGraphs()
         })
     res10box
         .attr("class", "resolution-checkbox")
@@ -266,6 +273,7 @@ export function buildResolutionSelectors(div) {
             d3.select(this).property("checked", true)
             state.resolution = 10
             updateAllCharts()
+            updateClusterGraphs()
         })
     res60box
         .attr("class", "resolution-checkbox")
@@ -275,6 +283,7 @@ export function buildResolutionSelectors(div) {
             state.resolution = 60
 
             updateAllCharts()
+            updateClusterGraphs()
         })
 
 }

@@ -13,7 +13,7 @@ import MultiRangeSlider from "multi-range-slider-react";
 import NavBarCustom from "../utils/navbar";
 import { getLastSession, deleteRecording, addOrReplaceSession, deleteAllrecordings, getAllRecordings, getRecordingById } from "../utils/indexdb";
 import { navHeight } from "../utils/ui"
-import { updateGraphs } from "./clusters";
+import { updateClusterGraphs } from "./clusters";
 const d3 = require("d3");
 
 //deleteAllSessions(function(){})
@@ -105,7 +105,7 @@ getLastSession(function (lastSession) {
     //selectedStartSecond = lastSession.recording.startSecond
     setTimeout(function () {
         validate(lastSession)
-        updateGraphs()
+        updateClusterGraphs()
     }, 2000)
 
 })
@@ -643,13 +643,7 @@ function prepareForNext(update = true) {
 
 }
 
-function handleStorage(event) {
-    console.log("----> STORAGE EVENT")
-    if (event.key == "waypoints-updated") {
-        console.error("WAYPOINTS UPDATED")
-    }
-}
-window.addEventListener("storage", handleStorage)
+
 export default function Validate() {
 
 

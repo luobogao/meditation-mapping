@@ -1,7 +1,7 @@
 import { dot, getRelativeVector, pca, findSlope, runModel, measureDistance, cosineSimilarity, euclideanDistance, combinedDistance, getRootVector } from "../utils/analysis";
 import { state } from "../index.js"
 import { updateChartWaypoints } from "./3d_charts";
-import { updateGraphs } from "../pages/clusters";
+import { updateClusterGraphs } from "../pages/clusters";
 import kmeans from '@jbeuckm/k-means-js'
 import { phamBestK } from '@jbeuckm/k-means-js'
 import { updateAllCharts } from "../pages/map";
@@ -107,6 +107,7 @@ export function rebuildChart(settings = { autoClusters: true, updateCharts: true
 
 
     }
+    findClusters(1)
     findClusters(10)
     findClusters(60)
     enableLogging()
@@ -154,6 +155,8 @@ export function rebuildChart(settings = { autoClusters: true, updateCharts: true
         })
     }
     findClosestClusterRow(60)
+    findClosestClusterRow(10)
+    findClosestClusterRow(1)
 
 
 
@@ -255,24 +258,28 @@ export function rebuildChart(settings = { autoClusters: true, updateCharts: true
     }
 
     // Make an array of similarities in each waypoint
-    function waypointMatches(rows, name) {
-        waypoints.forEach(waypoint => {
-            var matchesTimeseries = []
-            for (let x in rows.length) {
-                var dist = measureDistance(rows[x].relative_vector, waypoint.relative_vector)
-                matchesTimeseries.push({ x: x, y: dist })
-            }
-
-            waypoint[name] = matchesTimeseries
-
+    waypoints.forEach(waypoint =>
+        {
+            let avg = waypoint.averaging
+            var timeseriesSimilarity = state.data.map(row => 
+                {
+                    let rowVector = row["relative_vector_avg" + avg]
+                    let cosine = cosineSimilarity(rowVector, waypoint["relative_vector_avg" + avg] )
+                    return {
+                        seconds: row.seconds,
+                        cosine: cosine
+                    }
+                }
+                )
+            waypoint.timeseriesSimilarity = timeseriesSimilarity.filter(e => e.cosine != undefined)
 
         })
-    }
+    
     if (settings.updateCharts == true) {
         updateAllCharts()
     }
     if (settings.updateGraphs == true) {
-        updateGraphs()
+        updateClusterGraphs()
     }
 
 
