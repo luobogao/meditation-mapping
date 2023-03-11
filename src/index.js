@@ -10,7 +10,7 @@ import Layout from "./pages/layout"
 import Map from "./pages/map"
 import Record from "./pages/record"
 import Validate from "./pages/validate"
-import Graphs from "./pages/graphs"
+import Clusters from "./pages/clusters"
 import 'bootstrap/dist/css/bootstrap.min.css';
 
 
@@ -50,7 +50,7 @@ root.render(<BrowserRouter>
       <Route path="map" element={<Map />} />
       <Route path="record" element={<Record />} />
       <Route path="validate" element={<Validate />} />
-      <Route path="graphs" element={<Graphs />} />
+      <Route path="clusters" element={<Clusters />} />
     </Route>
   </Routes>
 </BrowserRouter>)

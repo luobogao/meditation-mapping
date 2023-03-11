@@ -1,5 +1,5 @@
-import {ratio, clone} from "../utils/functions";
-import {state} from "../index"
+import { ratio, clone } from "../utils/functions";
+import { state } from "../index"
 
 const d3 = require("d3");
 const math = require("mathjs");
@@ -32,15 +32,20 @@ var modelType = "cosine" // How to measure variances
 var standardizeType = "raw" // raw, ratio, or normal
 var distanceType = "combined"
 var eucAdjust = 0.8           // How much to adjust the Euclidean measurement compared with cos. 0.8 seems good to even out the cos data, anything more is far too dramatic
+const vector_columns_muse = [
+    "Delta_TP9", "Theta_TP9", "Alpha_TP9", "Beta_TP9", "Gamma_TP9",
+    "Delta_TP10", "Theta_TP10", "Alpha_TP10", "Beta_TP10", "Gamma_TP10",
+    "Delta_AF7", "Theta_AF7", "Alpha_AF7", "Beta_AF7", "Gamma_AF7",
+    "Delta_AF8", "Theta_AF8", "Alpha_AF8", "Beta_AF8", "Gamma_AF8"
+]
+const vector_columns_mindlink = ["delta", "theta", "alphaLow", "alphaHigh", "betaLow", "betaHigh", "gammaLow", "gammaMid"]
 
-function round(v)
-{
+
+function round(v) {
     return parseFloat(v.toFixed(3))
 }
-export function measureDistance(a, b)
-{
-    switch (distanceType)
-    {
+export function measureDistance(a, b) {
+    switch (distanceType) {
         case "euclidean":
             return euclideanDistance(a, b)
             break;
@@ -52,11 +57,10 @@ export function measureDistance(a, b)
             break;
     }
 }
-export function combinedDistance(a, b)
-{
+export function combinedDistance(a, b) {
     var cos = cosineSimilarity(a, b)
     var euc = euclideanDistance(a, b)
-    
+
     var combined = Math.sqrt((Math.pow(cos, 2) + (Math.pow(eucAdjust * euc, 2)))) / Math.sqrt(2)
     //var combined = Math.sqrt(cos * euc)
     if (cos < 0) combined = -1 * combined
@@ -68,37 +72,31 @@ export function cosineSimilarity(a, b)
 // Different from Eucleadean distance because it cares more about direction than magnitude
 // I propose that this measurement is best for measuring the "style" of a meditation vs the strength
 {
-    var similarity = dot(a, b) / (Math.sqrt(dot(a, a)) * Math.sqrt(dot(b, b)))
-    similarity = Math.round(similarity * 10000) / 100
-    //if (similarity < 0) similarity = 0
-    return round(similarity)
+    if (a != null && b != null && a.length > 0 && b.length > 0 && a.length == b.length) {
+        var similarity = dot(a, b) / (Math.sqrt(dot(a, a)) * Math.sqrt(dot(b, b)))
+        similarity = Math.round(similarity * 10000) / 100
+        //if (similarity < 0) similarity = 0
+        return round(similarity)
+    }
+
 }
-export function euclideanDistance(a, b)
-{
-    if (a.length != b.length) 
-    {
+export function euclideanDistance(a, b) {
+    if (a.length != b.length) {
         alert("wrong vector sizes!")
         return
     }
     var values = 0
-    for (let i = 0; i < a.length; a++)
-    {
+    for (let i = 0; i < a.length; a++) {
         var value = Math.pow(a[i] - b[i], 2)
         values += value
     }
-    
+
     // Normalize so bigger is progressively less than 100, but never less than 0
     var normalized = 100 - (100 * Math.pow((values / 10000), 0.8))
     if (normalized < 10) normalized = 10
     return round(normalized)
 }
-const vector_columns_muse = [
-    "Delta_TP9", "Theta_TP9", "Alpha_TP9", "Beta_TP9", "Gamma_TP9",
-    "Delta_TP10", "Theta_TP10", "Alpha_TP10", "Beta_TP10", "Gamma_TP10",
-    "Delta_AF7", "Theta_AF7", "Alpha_AF7", "Beta_AF7", "Gamma_AF7",
-    "Delta_AF8", "Theta_AF8", "Alpha_AF8", "Beta_AF8", "Gamma_AF8"
-]
-const vector_columns_mindlink = ["delta", "theta", "alphaLow", "alphaHigh", "betaLow", "betaHigh", "gammaLow", "gammaMid"]
+
 export function getRootVector(row) {
 
     var data = {}
@@ -136,7 +134,7 @@ export function getRelativeVector(rawVector, avg) {
 
 }
 export function vectorRaw(row, avg) {
-    
+
     var vector = []
 
     channels.forEach(channel => {
@@ -145,32 +143,29 @@ export function vectorRaw(row, avg) {
             // this is my method to avoid magnitude differences
             var key = band + "_" + channel + "_avg" + avg
             var value = Math.round(Math.log(row[key]) * 1000)
-            vector.push(value) 
+            vector.push(value)
         })
     })
-    if (vector.some(e => isNaN(e)))
-    {
+    if (vector.some(e => isNaN(e))) {
         return null
     }
     else return vector
 
 }
 
-function vectorNormalRatio(row, avg)
-{
+function vectorNormalRatio(row, avg) {
     // Just like 'ratio' type, but first normalizes the channels data - this helps to avoid drifting channel powers
     var normal = {}
     channels.forEach(channel => {
-        var totalPower = d3.sum( bands.map(band => row[band + "_" + channel + "_avg" + avg]))
-        bands.forEach(band =>
-            {
-                var key = band + "_" + channel + "_avg" + avg
-                var normalValue = row[key] / totalPower
-                normal[key] = normalValue
-            })
+        var totalPower = d3.sum(bands.map(band => row[band + "_" + channel + "_avg" + avg]))
+        bands.forEach(band => {
+            var key = band + "_" + channel + "_avg" + avg
+            var normalValue = row[key] / totalPower
+            normal[key] = normalValue
+        })
 
     })
-    
+
     var ratio = vectorRatio(normal)
     return ratio
 }
@@ -198,21 +193,20 @@ export function vectorRatio(row, avg) {
 
     function ratioMindLink() {
         var numers = ["delta", "theta", "alphaLow", "alphaHigh", "betaLow", "betaHigh",]
-        var denoms = [ "gammaLow", "gammaMid"]
-        
+        var denoms = ["gammaLow", "gammaMid"]
+
         numers.forEach(numer => {
             denoms.forEach(denom => {
-                if (numer != denom)
-                {
+                if (numer != denom) {
                     var r = ratio(row[numer], row[denom])
                     vector.push(r)
                 }
-                
+
             })
         })
     }
-    
-    
+
+
     switch (state.device) {
         case "Muse":
             ratioMuse();
@@ -221,8 +215,7 @@ export function vectorRatio(row, avg) {
             ratioMindLink()
             break;
     }
-    if (vector.some(e => isNaN(e)))
-    {
+    if (vector.some(e => isNaN(e))) {
         return null
     }
     else return vector
@@ -271,9 +264,9 @@ export function subtract_means(matrix)
         mean_subtracted_matrix.push(new_row)
     }
     return mean_subtracted_matrix
-    
 
- 
+
+
 
 }
 export function unit_scaling(matrix) {
@@ -400,10 +393,10 @@ export function runModel(rows)
 // Returns a list of x-y points, the location on 2-d space for each of those vectors
 
 {
-    var d = prepareDataset(rows)    
-    
+    var d = prepareDataset(rows)
+
     var mappedCoordinates = math.transpose(math.multiply(principals, d))
-    
+
     return mappedCoordinates
 }
 

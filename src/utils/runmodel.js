@@ -1,7 +1,7 @@
 import { dot, getRelativeVector, pca, findSlope, runModel, measureDistance, cosineSimilarity, euclideanDistance, combinedDistance } from "../utils/analysis";
 import { state } from "../index.js"
 import { updateChartWaypoints } from "./3d_charts";
-import { updateGraphs } from "../pages/graphs";
+import { updateGraphs } from "../pages/clusters";
 import kmeans from '@jbeuckm/k-means-js'
 import { phamBestK } from '@jbeuckm/k-means-js'
 import { updateAllCharts } from "../pages/map";
@@ -32,6 +32,7 @@ export function buildModel(vectors) {
 
 export function rebuildChart(settings = { autoClusters: true, updateCharts: true }) {
     console.log("--- Rebuilding Models ---")
+    
     state.zoom = 1
 
     // Remove waypoints from users de-selected by user
@@ -63,7 +64,10 @@ export function rebuildChart(settings = { autoClusters: true, updateCharts: true
     state.data.forEach(entry => entry.relative_vector_avg10 = getRelativeVector(entry, 10))
     state.data.forEach(entry => entry.relative_vector_avg60 = getRelativeVector(entry, 60))
 
-    // Find Clusters
+    // Find Clusters 
+    // -- Uses a k-means library to tag each row with a cluster number, and finds a "mean" vector for each cluster
+    // -- Every row will now have a key "cluster_avg1" (or 10, 60) with the cluster number
+    // -- A new key "cluster_means_similarities_avg1" (or 10, 60) is assigned to 'state' with the means for each vector
     disableLogging()
     function findClusters(avg) {
         var kmeansResult
@@ -116,22 +120,51 @@ export function rebuildChart(settings = { autoClusters: true, updateCharts: true
         })
         state["cluster_means_similarities_avg" + avg] = meanSimilarities
 
-        // Estimate the strongest meditation state in each cluster (NOT USED YET)
-        for (let cluster in 0..clusters) {
-            var clusterPoints = state.data.filter(point => point["cluster_avg" + avg] == cluster)
-
-            clusterPoints.forEach(point => {
-                state.data.map(testpoint => {
-
-                })
-            })
-        }
-
 
     }
     findClusters(10)
     findClusters(60)
     enableLogging()
+
+    // Find closest row to each mean cluster vector
+    // -- Using the mean vectors found for each cluster, loop through each row tagged with that cluster and find the closest row to that mean (using cosine)
+    // -- The purpose of this is to get a row with the original band-channel values, rather than the already relativized mean vector
+    console.log(state.data)
+    function findClosestClusterRow(avg)
+    {
+        let means = state["cluster_means_similarities_avg" + avg]
+        means.forEach(mean =>
+            {
+                
+                let i = mean.id
+                var clusterRows = state.data.filter(row => row["cluster_avg" + avg] == i)
+                console.log("Looking for best matches in: " + clusterRows.length)
+                var bestSimilarity = 0
+                var bestRow = null
+                clusterRows.forEach(row =>
+                    {
+                        var testVector = row["relative_vector_avg" + avg]
+                        var similarityToMean = cosineSimilarity(testVector, mean.vector)
+                        
+                        if (similarityToMean > bestSimilarity) 
+                        {
+                            
+                            bestSimilarity = similarityToMean
+                            bestRow = row
+
+                        }
+
+                    }
+                )
+                //console.log("Found best match: " + bestSimilarity)
+                mean.bestFullMatch = bestRow
+
+            })
+    }
+    findClosestClusterRow(60)
+    
+
+
 
 
     var userVectors = state.data.map(e => e.relative_vector_avg10).filter(e => e != null)

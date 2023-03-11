@@ -305,7 +305,7 @@ export function buildClusterCounts(container, page) {
     var c3box = addCheckbox(div, "3", cluster3, "12px", "radio")
     var c4box = addCheckbox(div, "4", cluster4, "12px", "radio")
 
-    var settings = {autoClusters: false, updateCharts: true}
+    var settings = {autoClusters: false, updateCharts: true, source: "clusterSelector"}
     if (page == "graphs")
     {
         settings = {autoClusters: false, updateGraphs: true}

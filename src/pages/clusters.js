@@ -80,7 +80,7 @@ function updateClusterTable() {
         .style("color", textColor)
         .style("margin-left", "10px")
         .style("margin-right", "10px")
-        .text(function (d, i) { return "Cluster " + i })
+        .text(function (d, i) { return "Cluster " + (i + 1) })
 
     rows.append("td")
         .style("border-top-right-radius", "5px")
@@ -285,7 +285,7 @@ function buildPage() {
 }
 
 
-export default function Graphs() {
+export default function Clusters() {
     useEffect(() => {
         buildPage()
         if (cleanedData != null && state != null) {

@@ -12,7 +12,7 @@ import { rebuildChart } from "../utils/runmodel";
 import NavBarCustom from "../utils/navbar";
 import { getLastSession, deleteRecording, addOrReplaceSession, deleteAllrecordings, getAllRecordings, getRecordingById } from "../utils/indexdb";
 import { navHeight } from "../utils/ui"
-import { updateGraphs } from "./graphs";
+import { updateGraphs } from "./clusters";
 const d3 = require("d3");
 
 //deleteAllSessions(function(){})
@@ -637,7 +637,7 @@ window.addEventListener("storage", handleStorage)
 export default function Validate() {
     useEffect(() => {
         buildPage()
-
+        
 
     }, [])
     useEffect(() => {
@@ -648,7 +648,7 @@ export default function Validate() {
                 buildRatioCharts()
 
             }
-        }, 500)
+        }, 100)
 
     })
 
