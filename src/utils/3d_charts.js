@@ -29,6 +29,7 @@ var loaded = false
 // Points
 var clusterWaypoints = []
 var userCircles = []
+var userCirclesLowRes = []
 var waypointCircles = []
 
 var rotateStart = false
@@ -150,6 +151,8 @@ export var zoom = d3.zoom()
     })
     .on("end", function () {
         zooming = false
+
+        
         readjustAllPoints(0, true)
     })
 
@@ -569,65 +572,7 @@ function addLabels(svg, data) {
         .text(function (d) { return " - " + d.fullentry.user })
 }
 
-function buildLinks(svg, waypointData) {
-
-
-    waypointLinks = []
-    function getWaypoint(id) {
-        var matches = waypointData.filter(e => e.id == id)
-        if (matches.length == 1) {
-
-            return matches[0]
-        }
-
-        else {
-            return null
-        }
-    }
-    if (link_mode == "center") {
-        var all_nodes = waypoints.filter(e => e.match == true).map(e => [e.id]) // Use ALL waypoints 
-        all_nodes.forEach(waypoint_id => {
-            var w1 = getWaypoint(waypoint_id)
-            if (w1 != null) {
-                waypointLinks.push([w1, { x: 0, y: 0, z: 0 }])
-            }
-
-        })
-    }
-    else {
-
-    }
-
-
-
-    var visibility = "flex"
-    if (link_mode == "none") {
-        visibility = "none"
-    }
-    svg.selectAll(".waypoint_link")
-        .data(waypointLinks)
-        .enter()
-        .append("line")
-        .attr("class", "waypoint_link")
-        .style("display", visibility)
-        .attr("x1", function (d) { return x(d[0].xp) })
-        .attr("y1", function (d) { return y(d[0].yp) })
-        .attr("x2", function (d) {
-            if (link_mode == "center") {
-                return x(0)
-            }
-            else return x(d[1].xp)
-        })
-        .attr("y2", function (d) {
-            if (link_mode == "center") {
-                return y(0)
-            }
-            else return y(d[1].yp)
-
-        })
-        .attr('stroke', "black")
-}
-function adjustLabels() {
+function buildLinks(svg, waypointData) {svg.selectAll(".userpointsLowRes").style("display", "none")
     // Use d3-labeler library to move each label so that it doesn't overlap
 
     function overlap(x1, y1, width1, height1, x2, y2) {
@@ -728,6 +673,7 @@ export function addUserPoints(data) {
     if (data.length > 30 && userSize == 40) userSize = 20
 
     userCircles = []
+
     var mapped = runModel(vectors)
 
     var index = 0
@@ -747,18 +693,46 @@ export function addUserPoints(data) {
     })
     cameraProject(userCircles)
 
-    addUserPointsN(vectors, "userpoints")
+    addUserPointsN(userCircles, "userpoints", true)
+
+    // Low Res
+    var vectorsLowRes = getEveryNth(vectors, 10)
+    userCirclesLowRes = []
+    var mappedLowRes = runModel(vectorsLowRes)
+    index = 0
+    mappedLowRes.forEach(entry => {
+        var moment = data[index]
+        var xi = entry[0]
+        var yi = entry[1]
+        var zi = entry[2]
+        svg.selectAll(".userpointsLowRes").style("display", "none")
+        index += 10
+        userCirclesLowRes.push({ x: xi, y: yi, z: zi, moment: moment, cluster: moment.cluster_avg10 })
+
+    })
+    cameraProject(userCirclesLowRes)
+    addUserPointsN(userCirclesLowRes, "userpointsLowRes", true)
+
+    addClusterWaypoints(svg)
+
+    var center = centroid(userCircles) // get the center of a point cloud
+    recenter(center)
+
 
 
 }
-function addUserPointsN(vectors, classname) {
+function addUserPointsN(data, classname, show) {
 
 
     svg
         .selectAll("." + classname)
-        .data(userCircles)
+        .data(data)
         .enter()
         .append("circle")
+        .style("display", function () {
+            if (show == true) return "flex"
+            else return "none"
+        })
         .attr("class", classname)
         .style("cursor", "pointer")
         .attr("cx", function (d, i) { return x(d.xp) })
@@ -850,10 +824,6 @@ function addUserPointsN(vectors, classname) {
             d3.select("#mini-marker").style("display", "none")
         })
 
-    addClusterWaypoints(svg)
-
-    var center = centroid(userCircles) // get the center of a point cloud
-    recenter(center)
 
 
 }
@@ -1047,9 +1017,11 @@ function rotate(pitch, yaw, roll) {
     // Rotate User Points
     if (userCircles.length > 0) {
         rotatethis(userCircles)
+        rotatethis(userCirclesLowRes)
     }
     if (clusterWaypoints.length > 0) {
         rotatethis(clusterWaypoints)
+
     }
 
     function rotatethis(matrix, type) {
@@ -1095,7 +1067,7 @@ function recenter(node, duration) {
 
 
 
-    var updates = [userCircles, waypointCircles, clusterWaypoints]
+    var updates = [userCircles, waypointCircles, clusterWaypoints, userCirclesLowRes]
     updates.forEach(arr => {
         arr.forEach(entry => {
             entry.x = entry.x - x
@@ -1115,6 +1087,7 @@ function readjustAllPoints(duration, allPoints) {
     }
     if (userCircles.length > 0) {
         cameraProject(userCircles)
+        cameraProject(userCirclesLowRes)
     }
     if (clusterWaypoints.length > 0) {
         cameraProject(clusterWaypoints)
@@ -1130,40 +1103,6 @@ function readjustAllPoints(duration, allPoints) {
             .attr("cy", function (d) {
                 return y(d.yp)
             })
-            .attr("r", function (d) {
-                if (classname == "userpoints") {
-                    //var size = userSizeScale(d.z)
-                    //if (size < 5) size = 5
-                    //return size
-                    return userSize + "px"
-                }
-                else {
-                    //var size = z(d.z)
-                    //if (size < 5) size = 5
-                    //return size
-                    return waypointSize + "px"
-
-                }
-
-
-            })
-            .style("opacity", function (d, i) {
-
-
-                if (classname == "userpoints") {
-                    //var opacity = opacityUser(z(d.z))
-                    //if (opacity < 0.1) opacity = 0.1
-                    //return opacity
-                    return userOpacity //userOpacity
-                }
-                else {
-                    //var opacity = opacityWaypoint(z(d.z))
-                    //if (opacity < 0.1) opacity = 0.1
-                    return waypointOpacity
-                }
-
-            })
-
             .attr("z", function (d) { return z(d.z) })
             .duration(duration)
     }
@@ -1235,21 +1174,23 @@ function readjustAllPoints(duration, allPoints) {
             .duration(duration)
 
     }
-    if (allPoints) {
-        // Updating user points is slow - only do it when user's rotation stops
-        updatePoints("userpoints")
-    }
-    else {
-        // Hide user points while rotating
-        svg.selectAll(".userpoints").style("display", "none")
-    }
-
+  
+    updatePoints("userpointsLowRes")
     updatePoints("clusterpoints")
     updatePoints("waypoints")
     updateLabels("label")
     updateNames("name")
     updateLines("waypoint_link")
-
+    if (allPoints) {
+        // Updating user points is slow - only do it when user's rotation stops
+        updatePoints("userpoints")
+        svg.selectAll(".userpointsLowRes").style("display", "none")
+    }
+    else {
+        // Hide user points while rotating
+        svg.selectAll(".userpoints").style("display", "none")
+        svg.selectAll(".userpointsLowRes").style("display", "flex")
+    }
 
 
 }
