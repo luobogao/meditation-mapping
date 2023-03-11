@@ -5,7 +5,7 @@ const d3 = require("d3");
 
 export function buildTimeslider() {
     var svg = d3.select("#timeslider")
-    if (svg.node() != null) {
+    if (svg.node() != null && state.data != null) {
         svg.selectAll("*").remove()
 
 

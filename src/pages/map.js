@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import { buildTimeslider } from "../utils/timeslider";
 import "firebaseui/dist/firebaseui.css"
 import { addCheckbox, buildChartSelectors, buildClusterCounts, buildResolutionSelectors, buildUserSelectors } from "../utils/ui";
-import {state, waypoints, userDataLoaded} from "../index"
+import { state, waypoints, userDataLoaded } from "../index"
 import { rebuildChart } from "../utils/runmodel";
 import { firstLoad, downloadCSV } from "../utils/database";
 
@@ -17,7 +17,7 @@ import { datastate } from "../utils/load";
 import { cleanedData } from "./validate";
 import { bands, channels } from "../utils/muse"
 import NavBarCustom from "../utils/navbar";
-import {navHeight} from "../utils/ui"
+import { navHeight } from "../utils/ui"
 
 
 
@@ -54,40 +54,32 @@ var email = null
 
 export function updateAllCharts(reset = false) {
 
-    if (reset == true) {
-        d3.select("#chartsvg").call(zoom.transform, d3.zoomIdentity)
-    }
-    //updateTimeseries("bottom-timeseries", state.highRes)
-    buildTimeslider()
-    var data;
-    switch (state.resolution) {
-        case 1:
-            data = state.raw
-            break;
-        case 10:
-            data = state.highRes
-            break;
-        case 60:
-            data = state.lowRes
-            break;
-    }
-    if (state.chartType == "pca") {
-        updateChartWaypoints()
-        addUserPoints(state.data)
-        //updateSimilarityChart("miniSimilarityChart")
-        //updateSimilarityChart("miniEuclideanChart", { lineColor: "black", highlightID: null, key: "euclidean", lineSize: 10 })
-    }
-    else if (state.chartType == "euclidean") {
-        updateSimilarityChart("chart", { lineColor: "black", highlightID: null, key: "euclidean", lineSize: 10, type: "absolute", points: 10 })
-    }
-    else if (state.chartType == "cosine") {
-        updateSimilarityChart("chart", { lineColor: "black", highlightID: null, key: "cosine", lineSize: 10, type: "absolute", points: 10 })
-    }
-    else if (state.chartType == "cosine*euclidean") {
-        updateSimilarityChart("chart", { lineColor: "black", highlightID: null, key: "cosine*euclidean", lineSize: 10, type: "absolute", points: 10 })
-    }
+    if (state.data != null) {
+        if (reset == true) {
+            d3.select("#chartsvg").call(zoom.transform, d3.zoomIdentity)
+        }
+        //updateTimeseries("bottom-timeseries", state.highRes)
+        buildTimeslider()
 
-    d3.selectAll(".user-selectors").style("display", "flex") // Show the other options now that waypoints are loaded
+        if (state.chartType == "pca") {
+            updateChartWaypoints()
+            addUserPoints(state.data)
+            //updateSimilarityChart("miniSimilarityChart")
+            //updateSimilarityChart("miniEuclideanChart", { lineColor: "black", highlightID: null, key: "euclidean", lineSize: 10 })
+        }
+        else if (state.chartType == "euclidean") {
+            updateSimilarityChart("chart", { lineColor: "black", highlightID: null, key: "euclidean", lineSize: 10, type: "absolute", points: 10 })
+        }
+        else if (state.chartType == "cosine") {
+            updateSimilarityChart("chart", { lineColor: "black", highlightID: null, key: "cosine", lineSize: 10, type: "absolute", points: 10 })
+        }
+        else if (state.chartType == "cosine*euclidean") {
+            updateSimilarityChart("chart", { lineColor: "black", highlightID: null, key: "cosine*euclidean", lineSize: 10, type: "absolute", points: 10 })
+        }
+
+        d3.selectAll(".user-selectors").style("display", "flex") // Show the other options now that waypoints are loaded
+
+    }
 
 
 }
@@ -150,7 +142,7 @@ function setup() {
 
     buildRightSidebar()
     buildBottomBar()
-    
+
 }
 
 function buildWelcome() {
@@ -273,7 +265,7 @@ function buildBottomBar() {
         .style("flex-direction", "column")
     //.style("background", "grey")
 
-    var width = (window.innerWidth - sidebarWidth ) * 0.75
+    var width = (window.innerWidth - sidebarWidth) * 0.75
 
     // Bottom-bar Gamma
     bar.append("svg")
@@ -309,20 +301,20 @@ function buildMiniCharts(div) {
 }
 
 export default function Live() {
+   
 
     useEffect(() => {
         buildPage()
 
-    }, [])
-    useEffect(() => {
-        
-        setTimeout(function()
-        {
+        setTimeout(function () {
             console.log("MAP is re-rending, rebuilding chart")
             updateAllCharts()
         }, 100)
-        
-        
+
+
+    }, [])
+    useEffect(() => {
+
     })
 
     return (
@@ -331,16 +323,19 @@ export default function Live() {
         <main id="main-container">
             <link href="https://fonts.googleapis.com/css?family=Cabin" rel="stylesheet"></link>
 
-            <NavBarCustom/>
-            
+            <NavBarCustom />
+
             <div id="body">
                 <svg id="chartsvg"></svg>
                 <div id="popup"></div>
                 <div id="menu"></div>
                 <div id="sidebar-right" className="sidebar"></div>
-                <div id="bottom-bar"></div>
+                <div id="bottom-bar">
+                  
+                </div>
                 <div id="top-bar"></div>
                 <div id="welcome"></div>
+
             </div>
 
         </main>

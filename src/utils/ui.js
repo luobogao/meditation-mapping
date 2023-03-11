@@ -73,7 +73,7 @@ export function notice(message, id) {
     return div
 }
 
-export function addCheckbox(div, name, checked, textSize, type = "checkbox") {
+export function addCheckbox(div, name, checked, id, textSize, type = "checkbox") {
     var checkboxDiv = div.append("div")
         .style("font-size", "30px")
         .style("margin", "8px")
@@ -83,6 +83,7 @@ export function addCheckbox(div, name, checked, textSize, type = "checkbox") {
 
     var checkbox = checkboxDiv.append("input")
         .attr("type", type)
+        .attr("id", id)
         .style("width", "20px")
         .style("height", "20px")
         .style("accent-color", "lightgreen")
@@ -102,10 +103,9 @@ export function addMenu(event, type) {
     // when type == options, the menu doesn't disappear when mouse is moved away from waypoint
     var x = event.pageX
     var y = event.pageY
-    var menu = d3.select("#menu")
+    d3.select("#menu").remove()
+    var menu = d3.select("body").append("div").attr("id", "menu")
 
-
-    menu.selectAll("*").remove()
     popUpremove()
     var div = menu
         .style("display", "flex")
@@ -159,12 +159,13 @@ export function buildUserSelectors() {
     // Build the checkboxes for the users
     var userDiv = d3.select('#user-selectors')
     userDiv.selectAll("*").remove()
+    var useri = 0
     users.forEach(name => {
 
         var checked = false
         if (state.selected_users.includes(name)) checked = true
 
-        var checkbox = addCheckbox(userDiv, name, checked, "20px")
+        var checkbox = addCheckbox(userDiv, name, "user" + useri, checked, "20px")
         checkbox.on("click", function () {
             const newState = this.checked
 
@@ -184,6 +185,7 @@ export function buildUserSelectors() {
             rebuildChart()
 
         })
+        useri ++
 
     })
 }
@@ -208,18 +210,15 @@ export function buildChartSelectors(div) {
             break;
 
     }
-    var chart1box = addCheckbox(div, "3-D", chart1, "12px", "radio")
-    var chart2box = addCheckbox(div, "Cosine", chart2, "12px", "radio")
-    var chart3box = addCheckbox(div, "Euclidean", chart3, "12px", "radio")
-    var chart4box = addCheckbox(div, "Cosine*Euclidean", chart4, "12px", "radio")
-    var chart5box = addCheckbox(div, "Gamma", chart5, "12px", "radio")
-
+    var chart1box = addCheckbox(div, "3-D", chart1, "a", "12px", "radio")
+    var chart2box = addCheckbox(div, "Cosine", chart2, "b", "12px", "radio")
+    var chart3box = addCheckbox(div, "Euclidean", chart3, "c", "12px", "radio")
+    
     var els = [
         { chart: chart1box, key: "pca" },
         { chart: chart2box, key: "cosine" },
-        { chart: chart3box, key: "euclidean" },
-        { chart: chart4box, key: "cosine*euclidean" },
-        { chart: chart5box, key: "bands" },
+        { chart: chart3box, key: "euclidean" }
+        
     ]
     els.forEach(el => {
 
@@ -300,10 +299,10 @@ export function buildClusterCounts(container, page) {
             break
 
     }
-    var c1box = addCheckbox(div, "1", cluster1, "12px", "radio")
-    var c2box = addCheckbox(div, "2", cluster2, "12px", "radio")
-    var c3box = addCheckbox(div, "3", cluster3, "12px", "radio")
-    var c4box = addCheckbox(div, "4", cluster4, "12px", "radio")
+    var c1box = addCheckbox(div, "1", cluster1, "cluster1", "12px", "radio")
+    var c2box = addCheckbox(div, "2", cluster2, "cluster2", "12px", "radio")
+    var c3box = addCheckbox(div, "3", cluster3, "cluster3", "12px", "radio")
+    var c4box = addCheckbox(div, "4", cluster4, "cluster4", "12px", "radio")
 
     var settings = {autoClusters: false, updateCharts: true, source: "clusterSelector"}
     if (page == "graphs")

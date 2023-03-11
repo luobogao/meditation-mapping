@@ -9,6 +9,7 @@ import { datastate } from "../utils/load";
 import { clone, formatDate, getEveryNth } from '../utils/functions';
 import { bands, channels } from "../utils/muse"
 import { rebuildChart } from "../utils/runmodel";
+import MultiRangeSlider from "multi-range-slider-react";
 import NavBarCustom from "../utils/navbar";
 import { getLastSession, deleteRecording, addOrReplaceSession, deleteAllrecordings, getAllRecordings, getRecordingById } from "../utils/indexdb";
 import { navHeight } from "../utils/ui"
@@ -18,7 +19,23 @@ const d3 = require("d3");
 //deleteAllSessions(function(){})
 
 // data
-var record = null
+export var record = null
+
+// ----- RECORD documentation --------------------
+/* {
+    "filename": "Meditation_1665360784694",
+    "user": "Steffan",
+    "notes": "Insight",
+    "timestamp": 1665360784694,
+    "startSecond": 56,
+    "addedTime": 1678511907939,
+    "addedBy": "EjC2ZdEyhJQz34VzzuU4V8CRYfL2",
+    "id": "UUXvTN0Ycv4qss1ierBI",
+    "updatedTime": 1678512626909
+  } */
+// ----------------------------------------------
+
+
 var workingData = null
 var rawData = null
 
@@ -63,8 +80,11 @@ export function showLoadingValidate() {
     notice("Loading...", "loading")
 }
 export function validate(recording) {
-    
+
     record = recording
+
+    console.log("RECORD:")
+    console.timeLog(record)
 
     selectedStartSecond = recording.metadata.startSecond
     rawData = record.data
@@ -84,9 +104,9 @@ getLastSession(function (lastSession) {
     setCurrentRecording(lastSession.metadata)
     //selectedStartSecond = lastSession.recording.startSecond
     setTimeout(function () {
-         validate(lastSession) 
-         updateGraphs()
-        }, 2000)
+        validate(lastSession)
+        updateGraphs()
+    }, 2000)
 
 })
 function loadRecording(entry) {
@@ -397,7 +417,7 @@ function updateRecordingTable() {
         d.exit().remove()
         var row = d.enter()
             .append("tr")
-            .attr("id", function(d){return "row" + d.id})
+            .attr("id", function (d) { return "row" + d.id })
             .attr("class", "recordrow")
             .style("cursor", "pointer")
             .on("click", function (event, d) {
@@ -420,7 +440,7 @@ function updateRecordingTable() {
                 if (d.id == record.id) newcolor = "green"
                 d3.select(this).style("background", newcolor).style("color", "black")
             })
-            
+
 
         row
             .append("td")
@@ -431,7 +451,7 @@ function updateRecordingTable() {
             .style("margin-left", "5px")
             .style("margin-right", "5px")
             .style("color", textColor)
-            
+
             .text(function (recording) {
                 return formatDate(recording.timestamp)
             })
@@ -459,21 +479,18 @@ function updateRecordingTable() {
             .text("✖")
             .style("opacity", 0.7)
             .style("color", "red")
-            .on("click", function(event, d)
-            {
+            .on("click", function (event, d) {
                 event.stopPropagation()
                 console.log("removing: " + d.id)
                 var row = d3.select("#row" + d.id)
                 row.remove()
-                deleteRecording(d.id, function()
-                {
+                deleteRecording(d.id, function () {
                     console.log("------> Deleted!")
-                    deleteRecordingFirebase(d.metadata).then(() =>
-                    {
+                    deleteRecordingFirebase(d.metadata).then(() => {
                         console.log("-----------> Deleted from Firebase!")
                     })
                 })
-                
+
 
             })
 
@@ -576,26 +593,25 @@ function prepareForNext(update = true) {
     updateRecording(record.metadata).then(() => {
         //console.log("UPDATED FIREBASE")
         addOrReplaceSession(record, function () {
-        
+
             updateRecordingTable()
         })
 
     })
-    .catch((error)=> 
-    {
-        console.error("Doc does not exist yet!")
-        addRecording(record.metadata)
-        .then((doc) => {
-            console.log("----> Added recording: " + doc.id)                          
-            record.metadata.id = doc.id
-            addOrReplaceSession(record, function () {
-        
-                updateRecordingTable()
-            })
-        })
-    })
+        .catch((error) => {
+            console.error("Doc does not exist yet!")
+            addRecording(record.metadata)
+                .then((doc) => {
+                    console.log("----> Added recording: " + doc.id)
+                    record.metadata.id = doc.id
+                    addOrReplaceSession(record, function () {
 
-    
+                        updateRecordingTable()
+                    })
+                })
+        })
+
+
 
 
     // Convert all band powers to percentages of the first value
@@ -635,9 +651,19 @@ function handleStorage(event) {
 }
 window.addEventListener("storage", handleStorage)
 export default function Validate() {
+
+
+    const [minValue, set_minValue] = useState(25);
+    const [maxValue, set_maxValue] = useState(75);
+    const handleInput = (e) => {
+        set_minValue(e.minValue);
+        set_maxValue(e.maxValue);
+        console.log(e)
+    };
+
     useEffect(() => {
         buildPage()
-        
+
 
     }, [])
     useEffect(() => {
@@ -660,7 +686,18 @@ export default function Validate() {
             <div id="subcontainer">
                 <div id="rightsidebar"> </div>
                 <div id="bodydiv">
-                    <div id="relative"></div>
+                    <div id="relative">
+                        <MultiRangeSlider
+                            min={0}
+                            max={100}
+                            step={1}
+                            minValue={minValue}
+                            maxValue={maxValue}
+                            onInput={(e) => {
+                                handleInput(e);
+                            }}
+                        />
+                    </div>
                     <div id="ratios"></div>
                 </div>
 

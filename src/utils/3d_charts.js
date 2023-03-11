@@ -48,6 +48,7 @@ var labelColor = "black"
 var userSize = 4
 var waypointSize = 10    // Size of waypoint circles
 var userOpacity = 0.1
+var userLowResOpacity = 1
 var waypointOpacity = 0.9
 var userPointColor = "grey"
 var waypointColor = "blue"
@@ -744,7 +745,14 @@ function addUserPointsN(data, classname, show) {
         .style("mix-blend-mode", "multiply") // How the opacity behaves with overlaps
 
 
-        .attr("opacity", userOpacity)
+        .attr("opacity", function()
+        {
+            if (show == true)
+            {
+                return userOpacity
+            }
+            else return userLowResOpacity
+        })
         //.attr("fill", userPointColor)
         .attr("fill", function (d) {
 
@@ -828,7 +836,7 @@ function addUserPointsN(data, classname, show) {
 
 }
 function addClusterWaypoints(svg) {
-    var vectors = state["cluster_means_avg10"]
+    var vectors = state["cluster_means_avg10"].map(e => e.vector)
 
     var mapped = runModel(vectors)
 

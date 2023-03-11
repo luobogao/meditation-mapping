@@ -254,7 +254,8 @@ export function addWaypoint(waypoint) {
         var entry = {
             version: waypoint.version,
             user: waypoint.user, addedBy: userid, label: waypoint.label, vector: waypoint.vector,
-            notes: waypoint.notes, delete: false, addedTime: millis, resolution: waypoint.resolution
+            notes: waypoint.notes, delete: false, addedTime: millis, resolution: waypoint.resolution,
+            sourceFilename: waypoint.sourceFilename, recordID: waypoint.recordID
 
         }
         var filteredObj = Object.keys(entry)
@@ -338,7 +339,7 @@ export function getAllMarkers() {
     return promise
 }
 export function getAllWaypoints() {
-    var q = query(collection(db, "waypoints"), where("version", "==", "1.0"))
+    var q = query(collection(db, "waypoints"), where("version", "==", "1.1"))
     var promise = getDocs(q)
     return promise
 }

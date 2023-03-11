@@ -97,11 +97,11 @@ export function euclideanDistance(a, b) {
     return round(normalized)
 }
 
-export function getRootVector(row) {
+export function getRootVector(row, avg) {
 
     var data = {}
     vector_columns_muse.forEach(key => {
-        data[key] = row[key]
+        data[key] = row[key + "_avg" + avg]
     })
 
     return data
