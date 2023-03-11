@@ -4,7 +4,7 @@ import { notice } from "../utils/ui";
 import { buildBrowseFile } from "../utils/load";
 import { sliderBottom } from 'd3-simple-slider';
 import { state } from "../index"
-import { currentRecording, deleteRecordingFirebase, setCurrentRecording, updateRecording } from "../utils/database";
+import { addRecording, currentRecording, deleteRecordingFirebase, setCurrentRecording, updateRecording } from "../utils/database";
 import { datastate } from "../utils/load";
 import { clone, formatDate, getEveryNth } from '../utils/functions';
 import { bands, channels } from "../utils/muse"
@@ -572,14 +572,30 @@ function prepareForNext(update = true) {
 
     record.metadata.startSecond = selectedStartSecond
 
+    console.log("Updating: " + record.metadata.id)
     updateRecording(record.metadata).then(() => {
         //console.log("UPDATED FIREBASE")
+        addOrReplaceSession(record, function () {
+        
+            updateRecordingTable()
+        })
 
     })
-    addOrReplaceSession(record, function () {
+    .catch((error)=> 
+    {
+        console.error("Doc does not exist yet!")
+        addRecording(record.metadata)
+        .then((doc) => {
+            console.log("----> Added recording: " + doc.id)                          
+            record.metadata.id = doc.id
+            addOrReplaceSession(record, function () {
         
-        updateRecordingTable()
+                updateRecordingTable()
+            })
+        })
     })
+
+    
 
 
     // Convert all band powers to percentages of the first value

@@ -1,11 +1,11 @@
-import {chartWidth, rebuildCharts, chartHeight, mode3d, updateAllCharts } from "../pages/map"
+import { chartWidth, rebuildCharts, chartHeight, mode3d, updateAllCharts } from "../pages/map"
 import { popUp, popUpremove, addMenu, menuRemove, moveMenu } from "./ui";
 import { getRelativeVector, runModel } from "./analysis";
 import { addWaypoint, user, deleteWaypoint, updateWaypoint, anonymous } from "./database"
 import { getEveryNth } from "./functions";
 import { rebuildChart } from "./runmodel";
 import { centroid, clone } from "./functions";
-import {state} from "../index"
+import { state } from "../index"
 import { waypoints, userDataLoaded } from "./database";
 import { x_mini } from "./minichart";
 import { updateSimilarityChart } from "./minicharts";
@@ -55,10 +55,6 @@ var lastTransform
 
 // Modes
 var link_mode = "center"  // "center" or "between" - center links all nodes to origin 0,0
-
-
-// 2D mode
-
 
 
 var x;
@@ -154,7 +150,7 @@ export var zoom = d3.zoom()
     })
     .on("end", function () {
         zooming = false
-
+        readjustAllPoints(0, true)
     })
 
 
@@ -721,28 +717,20 @@ function adjustLabels() {
     }
 
 }
-export function updateChartUser(data) {
-
+export function addUserPoints(data) {
     clearInterval(rotateOpening)
 
     var vectors = data.map(e => getRelativeVector(e, state.resolution)).filter(e => e != null)
 
-
-
     // FOR TESTING: use the waypoints as user point, they should match PERFECTLY with waypoinst
     //var vectors = waypoints.filter(e => e.match == true).map(e => getRelativeVector(e.vector))
 
-
     if (data.length > 30 && userSize == 40) userSize = 20
 
-
+    userCircles = []
     var mapped = runModel(vectors)
 
     var index = 0
-
-    var lineData = []
-
-    userCircles = []
 
     mapped.forEach(entry => {
 
@@ -758,26 +746,22 @@ export function updateChartUser(data) {
 
     })
     cameraProject(userCircles)
-    
 
-    // svg.append("path")
-    //     .attr("fill", "none")
-    //     .attr("stroke", "black")
-    //     .attr("stroke-width", "10px")
-    //     .attr("opacity", 0.3)
-    //     .attr("d", line(lineData))
+    addUserPointsN(vectors, "userpoints")
 
 
+}
+function addUserPointsN(vectors, classname) {
 
-    // USER'S POINTS
+
     svg
-        .selectAll(".userpoints")
+        .selectAll("." + classname)
         .data(userCircles)
         .enter()
         .append("circle")
-        .attr("class", "userpoints")
+        .attr("class", classname)
         .style("cursor", "pointer")
-        .attr("cx", function (d, i) {return x(d.xp)})
+        .attr("cx", function (d, i) { return x(d.xp) })
         .attr("cy", function (d) { return y(d.yp) })
         .attr("r", function (d) { return userSizeScale(d.z) })
         .attr("seconds", function (d) {
@@ -867,17 +851,17 @@ export function updateChartUser(data) {
         })
 
     addClusterWaypoints(svg)
-    
+
     var center = centroid(userCircles) // get the center of a point cloud
     recenter(center)
-    
+
 
 }
 function addClusterWaypoints(svg) {
     var vectors = state["cluster_means_avg10"]
-    
+
     var mapped = runModel(vectors)
-    
+
     clusterWaypoints = []
 
     var cluster = 0
@@ -888,7 +872,7 @@ function addClusterWaypoints(svg) {
         var zi = entry[2]
 
         clusterWaypoints.push({ x: xi, y: yi, z: zi, cluster: cluster })
-        cluster ++
+        cluster++
 
     })
 
@@ -898,7 +882,7 @@ function addClusterWaypoints(svg) {
         .enter()
         .append("circle")
         .attr("class", "clusterpoints")
-        .attr("cx", function (d, i) {return x(d.xp)})
+        .attr("cx", function (d, i) { return x(d.xp) })
         .attr("cy", function (d) { return y(d.yp) })
         .attr("r", 10)
         .attr("fill", "green")
@@ -1064,8 +1048,7 @@ function rotate(pitch, yaw, roll) {
     if (userCircles.length > 0) {
         rotatethis(userCircles)
     }
-    if (clusterWaypoints.length > 0)
-    {
+    if (clusterWaypoints.length > 0) {
         rotatethis(clusterWaypoints)
     }
 
@@ -1084,7 +1067,7 @@ function rotate(pitch, yaw, roll) {
 
 
     // Move the SVGs to new rotated coordinates
-    readjustAllPoints(rotateDuration)
+    readjustAllPoints(rotateDuration, false)
 }
 
 function cameraProject(matrix) {
@@ -1122,25 +1105,23 @@ function recenter(node, duration) {
 
     })
 
-    readjustAllPoints(duration)
+    readjustAllPoints(duration, true)
 
 }
-function readjustAllPoints(duration) {
+function readjustAllPoints(duration, allPoints) {
 
-    if (waypointCircles.length > 0)
-    {
+    if (waypointCircles.length > 0) {
         cameraProject(waypointCircles)
     }
     if (userCircles.length > 0) {
         cameraProject(userCircles)
     }
-    if (clusterWaypoints.length > 0)
-    {
+    if (clusterWaypoints.length > 0) {
         cameraProject(clusterWaypoints)
     }
 
     function updatePoints(classname) {
-
+        svg.selectAll("." + classname).style("display", "flex")
         svg.selectAll("." + classname)
             .transition()
             .attr("cx", function (d) {
@@ -1254,7 +1235,15 @@ function readjustAllPoints(duration) {
             .duration(duration)
 
     }
-    updatePoints("userpoints")
+    if (allPoints) {
+        // Updating user points is slow - only do it when user's rotation stops
+        updatePoints("userpoints")
+    }
+    else {
+        // Hide user points while rotating
+        svg.selectAll(".userpoints").style("display", "none")
+    }
+
     updatePoints("clusterpoints")
     updatePoints("waypoints")
     updateLabels("label")

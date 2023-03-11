@@ -10,7 +10,7 @@ import { firstLoad, downloadCSV } from "../utils/database";
 
 import { updateTimeseries, buildSimilarityChart, updateSimilarityChart } from "../utils/minicharts";
 
-import { zoom, updateChartWaypoints, updateChartUser } from "../utils/3d_charts"
+import { zoom, updateChartWaypoints, addUserPoints } from "../utils/3d_charts"
 
 import { buildBrowseFile } from "../utils/load";
 import { datastate } from "../utils/load";
@@ -73,7 +73,7 @@ export function updateAllCharts(reset = false) {
     }
     if (state.chartType == "pca") {
         updateChartWaypoints()
-        updateChartUser(state.data)
+        addUserPoints(state.data)
         //updateSimilarityChart("miniSimilarityChart")
         //updateSimilarityChart("miniEuclideanChart", { lineColor: "black", highlightID: null, key: "euclidean", lineSize: 10 })
     }

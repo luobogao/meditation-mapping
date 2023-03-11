@@ -12,7 +12,7 @@ import firebase from "firebase/compat/app"
 import { bands, channels } from "../utils/muse"
 import { getRelativeVector } from '../utils/analysis';
 import {buildModel, rebuildChart} from "../utils/runmodel"
-import { zoom, updateChartWaypoints, updateChartUser } from "./3d_charts"
+import { zoom, updateChartWaypoints, addUserPoints } from "./3d_charts"
 import { getAnalytics } from "firebase/analytics";
 import {state} from "../index"
 import { buildUserSelectors } from "../utils/ui";
@@ -290,7 +290,8 @@ export function setCurrentRecording(recording)
 }
 export function updateRecording(recording)
 {
-    
+    console.log("UPDATING RECORDING")
+    console.log(recording)
     if (recording.id != null)
     {
         
