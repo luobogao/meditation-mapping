@@ -1,7 +1,7 @@
 import { getFirestore, collection, getDocs, setDoc, doc, deleteDoc, updateDoc, query, where, addDoc } from 'firebase/firestore/lite';
 import { processCSV } from "./load"
 import { getStorage, ref as storageRef, getBlob, uploadString, getDownloadURL, updateMetadata } from "firebase/storage"
-import { arraysEqual, unique } from './functions';
+import { arraysEqual, clone, unique } from './functions';
 import { getDatabase, ref as dbref, onValue, off, get } from "firebase/database"
 import { resetRecord, startRecording } from '../pages/record';
 import { initializeApp } from "firebase/app";
@@ -11,10 +11,10 @@ import "firebaseui/dist/firebaseui.css"
 import firebase from "firebase/compat/app"
 import { bands, channels } from "../utils/muse"
 import { getRelativeVector } from '../utils/analysis';
-import {buildModel, rebuildChart} from "../utils/runmodel"
+import { buildModel, rebuildChart } from "../utils/runmodel"
 import { zoom, updateChartWaypoints, addUserPoints } from "./3d_charts"
 import { getAnalytics } from "firebase/analytics";
-import {state} from "../index"
+import { state } from "../index"
 import { buildUserSelectors } from "../utils/ui";
 
 
@@ -274,39 +274,50 @@ export function addRecording(recording) {
 
         recording.addedTime = millis
         recording.addedBy = userid
+        recording.delete = false
 
-        var promise = addDoc(collection(db, "recordings"), recording)
+        var r = clone(recording)
+        delete r.data
+
+        var promise = addDoc(collection(db, "recordings"), r)
         return promise
     }
 
 
 }
-export function setCurrentRecording(recording)
-{
+export function setCurrentRecording(recording) {
     currentRecording = recording
 }
-export function updateRecording(recording)
-{
-    console.log("UPDATING RECORDING")
-    console.log(recording)
-    if (recording.id != null)
-    {
-        
+export function updateRecording(recording) {
+    
+    
+    var r = clone(recording)
+    delete r.data
+    if (r.id != null) {
+
         var date = new Date()
         var millis = date.getTime()
-        recording.updatedTime = millis
-        var promise = updateDoc(doc(db, "recordings", recording.id), recording)
+        r.updatedTime = millis
+        console.log("-> Updating recording in Firebase:")
+        console.log(r)
+        var promise = updateDoc(doc(db, "recordings", r.id), r)
+        return promise
+    }
+    else {
+        console.error("recording does not have ID yet")
+    }
+}
+
+export function deleteRecordingFirebase(recording, permanent) {
+    if (permanent) {
+        var promise = deleteDoc(doc(db, "recordings", recording.id))
         return promise
     }
     else
     {
-        console.error("recording does not have ID yet")
+        var promise = updateDoc(doc(db, "recordings", recording.id), { delete: true })
+        return promise
     }
-}
-export function deleteRecordingFirebase(recording)
-{
-    var promise = deleteDoc(doc(db, "recordings", recording.id))
-    return promise
 }
 export function addMarker(eegdata, markerName) {
     var date = new Date()
@@ -564,7 +575,7 @@ export function downloadWaypoints() {
         else {
             buildModel_waypoint()
         }
-        
+
 
         //buildSimilarityChart()
         updateChartWaypoints()

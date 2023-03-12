@@ -129,8 +129,9 @@ export function rebuildChart(settings = { autoClusters: true, updateCharts: true
             var bestRow = null
             clusterRows.forEach(row => {
                 var testVector = row["relative_vector_avg" + avg]
+                
                 var similarityToMean = cosineSimilarity(testVector, mean.vector)
-
+                
                 if (similarityToMean > bestSimilarity) {
 
                     bestSimilarity = similarityToMean
@@ -140,6 +141,9 @@ export function rebuildChart(settings = { autoClusters: true, updateCharts: true
 
             }
             )
+            console.log("best match: " + bestSimilarity)
+
+            // Take the best match and make a timeseries of matches with every other point in this recording
             let similarityTimeseries = state.data.map(row => {
                 var cosine = cosineSimilarity(row["relative_vector_avg" + avg], bestRow["relative_vector_avg" + avg])
                 return {

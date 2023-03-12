@@ -47,7 +47,7 @@ var textColor = "white"
 var chartBackground = "lightgrey"
 var selectedStartSecond = 0
 const margin = 10
-var sidebarWidth = 400
+var sidebarWidth = 280
 var width = ((window.innerWidth - sidebarWidth) / 2) - (margin * 4)
 var height = (width / 2)
 
@@ -110,7 +110,7 @@ function bootLast() {
             recordings.push(recording)
         })
         recordings = recordings.sort((a, b) => b.updatedTime - a.updatedTime)
-        var sortedByView = recordings.filter(a => a.updatedTime != null).sort((a, b) => b.updatedTime - a.updatedTime)
+        var sortedByView = recordings.filter(a => a.delete != true).sort((a, b) => b.updatedTime - a.updatedTime)
         if (sortedByView.length > 0) {
             record = sortedByView[0]
             console.log("---> Last record viewed:")
@@ -442,12 +442,14 @@ function buildSidebar() {
 
 }
 export function updateRecordingTable(entries) {
+
+    var nonDeletedEntries = entries.filter(e => e.delete != true)
     var table = d3.select("#recordingTable")
         .style("margin", "10px")
         .style("border-collapse", "separate")
         .style("border-spacing", "0 5px")
 
-    var d = table.selectAll('tr').data(entries)
+    var d = table.selectAll('tr').data(nonDeletedEntries)
 
     d.style("background", function (d) {
         if (d.id == record.id) return "green"
@@ -533,8 +535,8 @@ export function updateRecordingTable(entries) {
             row.remove()
             deleteRecording(d.filename, function () {
                 console.log("------> Deleted!")
-                deleteRecordingFirebase(d).then(() => {
-                    console.log("-----------> Deleted from Firebase!")
+                deleteRecordingFirebase(d, false).then(() => {
+                    console.log("-----------> Deleted from Firebase (not permanent)")
                 })
             })
 
