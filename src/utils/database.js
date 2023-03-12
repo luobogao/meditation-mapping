@@ -24,7 +24,6 @@ const d3 = require("d3");
 export var waypoints
 export var users;
 export var userDataLoaded = false
-export var recordings
 
 export var currentRecording = null // Holds the firebase JSON entry of the active recording
 
@@ -242,7 +241,6 @@ function registerUser() {
     var user = auth.currentUser
     addDoc(collection(db, "users"), { id: user.uid, userName: user.displayName, userID: user.uid })
 }
-
 export function addWaypoint(waypoint) {
 
     if (!anonymous) {
@@ -267,8 +265,6 @@ export function addWaypoint(waypoint) {
     }
 
 }
-
-// Recordings
 export function addRecording(recording) {
     // Uploads a doc containing info about a recording, including the filename that has already been uploaded to Storage
     if (!anonymous) {
@@ -312,8 +308,6 @@ export function deleteRecordingFirebase(recording)
     var promise = deleteDoc(doc(db, "recordings", recording.id))
     return promise
 }
-
-
 export function addMarker(eegdata, markerName) {
     var date = new Date()
     var millis = date.getTime()
@@ -580,14 +574,7 @@ export function downloadWaypoints() {
 
 
     })
-    getAllRecordings().then((snapshot) => {
-        recordings = []
-        snapshot.forEach((doc) => {
-            var recording = doc.data()
-            recording.id = doc.id
-            recordings.push(recording)
-        })
-    })
+
 
 }
 

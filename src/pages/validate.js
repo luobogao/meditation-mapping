@@ -4,14 +4,14 @@ import { notice } from "../utils/ui";
 import { buildBrowseFile } from "../utils/load";
 import { sliderBottom } from 'd3-simple-slider';
 import { state } from "../index"
-import { addRecording, currentRecording, deleteRecordingFirebase, setCurrentRecording, updateRecording } from "../utils/database";
+import { getAllRecordings, addRecording, currentRecording, deleteRecordingFirebase, setCurrentRecording, updateRecording } from "../utils/database";
 import { datastate } from "../utils/load";
 import { clone, formatDate, getEveryNth } from '../utils/functions';
 import { bands, channels } from "../utils/muse"
 import { rebuildChart } from "../utils/runmodel";
 import MultiRangeSlider from "multi-range-slider-react";
 import NavBarCustom from "../utils/navbar";
-import { getLastSession, deleteRecording, addOrReplaceSession, deleteAllrecordings, getAllRecordings, getRecordingById } from "../utils/indexdb";
+import { deleteRecording, addOrReplaceSession, deleteAllrecordings, getRecordingById } from "../utils/indexdb";
 import { navHeight } from "../utils/ui"
 import { updateClusterGraphs } from "./clusters";
 const d3 = require("d3");
@@ -20,6 +20,9 @@ const d3 = require("d3");
 
 // data
 export var record = null
+export var recordings = []
+
+var firstBoot = true
 
 // ----- RECORD documentation --------------------
 /* {
@@ -44,7 +47,7 @@ var textColor = "white"
 var chartBackground = "lightgrey"
 var selectedStartSecond = 0
 const margin = 10
-var sidebarWidth = 300
+var sidebarWidth = 400
 var width = ((window.innerWidth - sidebarWidth) / 2) - (margin * 4)
 var height = (width / 2)
 
@@ -79,44 +82,84 @@ export var cleanedData = null
 export function showLoadingValidate() {
     notice("Loading...", "loading")
 }
-export function validate(recording) {
+export function validate(fulldata, selectedRecord) {
 
-    record = recording
 
-    console.log("RECORD:")
-    console.timeLog(record)
-
-    selectedStartSecond = recording.metadata.startSecond
-    rawData = record.data
+    rawData = fulldata.data
+    record = selectedRecord
     workingData = getEveryNth(rawData.filter(e => e.avg60 == true), 10) // Remove the first few rows
 
     d3.selectAll(".loading").remove()
     buildValidationChart()
     buildRatioCharts()
-    updateRecordingTable()
+    prepareForNext(false)
     updateRelative(selectedStartSecond)
     d3.select("#acceptBtn").style("display", "flex")
+    d3.select("#loading" + record.id).style("display", "none")
 
 }
-getLastSession(function (lastSession) {
-    state.data = lastSession.data
+function bootLast() {
 
-    setCurrentRecording(lastSession.metadata)
-    //selectedStartSecond = lastSession.recording.startSecond
-    setTimeout(function () {
-        validate(lastSession)
-        updateClusterGraphs()
-    }, 2000)
+    getAllRecordings().then((snapshot) => {
+        recordings = []
+        console.log("found recordings:")
+        console.log(snapshot)
+        snapshot.forEach((doc) => {
+            var recording = doc.data()
+            recording.id = doc.id
+            recordings.push(recording)
+        })
+        recordings = recordings.sort((a, b) => b.updatedTime - a.updatedTime)
+        var sortedByView = recordings.filter(a => a.updatedTime != null).sort((a, b) => b.updatedTime - a.updatedTime)
+        if (sortedByView.length > 0) {
+            record = sortedByView[0]
+            console.log("---> Last record viewed:")
+            console.log(record)
+            loadRecordData(record)
+            updateRecordingTable(recordings)
+        }
 
-})
-function loadRecording(entry) {
 
-    state.data = entry.data
+    })
+}
 
-    setCurrentRecording(entry.metadata)
-    validate(entry)
+// getLastSession(function (lastSession) {
+//     state.data = lastSession.data
+
+//     setCurrentRecording(lastSession.metadata)
+//     //selectedStartSecond = lastSession.recording.startSecond
+//     setTimeout(function () {
+//         validate(lastSession)
+//         updateClusterGraphs()
+//     }, 2000)
+
+// })
+
+function loadRecordData(selectedRecord) {
+    d3.select("#loading" + selectedRecord.id).style("display", "flex")
+    record = selectedRecord
+    selectedStartSecond = selectedRecord.startSecond
+    if (selectedRecord.data != null) {
+        state.data = selectedRecord.data
+        validate(selectedRecord.data, record)
+    }
+    else {
+        getRecordingById(record.filename, function (data) {
+            if (data == null) {
+                console.error("Can't find record in IndexDB")
+            }
+            else {
+                state.data = data
+                record.data = data
+                validate(data, record)
+            }
+
+
+        })
+    }
 
 }
+
 
 function buildValidationChart(data) {
     // Purpose: use the slider to select a different starting minute, all values are recalculated to be a % of the first value
@@ -237,7 +280,7 @@ function buildValidationChart(data) {
     })
 
 
-    prepareForNext(false) // Default to zero in case user just wants to move immediately to map
+
 
 
 }
@@ -385,7 +428,6 @@ function buildSidebar() {
     // Saved Recordings
     topDiv.append("div").append("table").attr("id", "recordingTable")
 
-    updateRecordingTable()
 
     div
         .append("div").style("margin", "10px")
@@ -393,114 +435,117 @@ function buildSidebar() {
         .on("click", function () {
             deleteAllrecordings().then(() => {
                 console.log("DELETED ALL RECORDS")
-                updateRecordingTable()
+
             })
         })
 
 
 }
-function updateRecordingTable() {
+export function updateRecordingTable(entries) {
     var table = d3.select("#recordingTable")
         .style("margin", "10px")
         .style("border-collapse", "separate")
         .style("border-spacing", "0 5px")
 
-    getAllRecordings().then(entries => {
+    var d = table.selectAll('tr').data(entries)
 
-        var d = table.selectAll('tr').data(entries)
+    d.style("background", function (d) {
+        if (d.id == record.id) return "green"
+        else return "none"
+    })
 
-        d.style("background", function (d) {
-            if (d.id == record.id) return "green"
+    d.exit().remove()
+    var row = d.enter()
+        .append("tr")
+        .attr("id", function (d) { return "row" + d.id })
+        .attr("class", "recordrow")
+        .style("cursor", "pointer")
+        .style("background", function (d) {
+            if (d.filename == record.filename) {
+                return "green"
+            }
             else return "none"
         })
-
-        d.exit().remove()
-        var row = d.enter()
-            .append("tr")
-            .attr("id", function (d) { return "row" + d.id })
-            .attr("class", "recordrow")
-            .style("cursor", "pointer")
-            .on("click", function (event, d) {
-                d3.selectAll(".recordrow").style("background", "none")
-                d3.select("#row" + d.id).style("background", "green")
-                setTimeout(function () { loadRecording(d) }, 80)
+        .on("click", function (event, d) {
+            d3.selectAll(".recordrow").style("background", "none")
+            d3.select("#row" + d.id).style("background", "green")
+            setTimeout(function () { loadRecordData(d) }, 80)
 
 
-            })
-            .on("mouseover", function (i, d) {
-                var newcolor = "black"
-                if (d.id == record.id) {
-                    newcolor = "darkgreen"
-                }
 
-                d3.select(this).style("background", newcolor).style("color", "white")
-            })
-            .on("mouseout", function (i, d) {
-                var newcolor = "none"
-                if (d.id == record.id) newcolor = "green"
-                d3.select(this).style("background", newcolor).style("color", "black")
-            })
+        })
+        .on("mouseover", function (i, d) {
+            var newcolor = "black"
+            if (d.id == record.id) {
+                newcolor = "darkgreen"
+            }
+
+            d3.select(this).style("background", newcolor).style("color", "white")
+        })
+        .on("mouseout", function (i, d) {
+            var newcolor = "none"
+            if (d.id == record.id) newcolor = "green"
+            d3.select(this).style("background", newcolor).style("color", "black")
+        })
 
 
-        row
-            .append("td")
-            .style("border-top-left-radius", "5px")
-            .style("border-bottom-left-radius", "5px")
-            .style("border", "1px solid " + textColor)
-            .append("div")
-            .style("margin-left", "5px")
-            .style("margin-right", "5px")
-            .style("color", textColor)
+    row
+        .append("td")
+        .style("border-top-left-radius", "5px")
+        .style("border-bottom-left-radius", "5px")
+        .style("border", "1px solid " + textColor)
+        .append("div")
+        .style("margin-left", "5px")
+        .style("margin-right", "5px")
+        .style("color", textColor)
 
-            .text(function (recording) {
-                return formatDate(recording.timestamp)
-            })
+        .text(function (recording) {
+            return formatDate(recording.timestamp)
+        })
 
-        row
-            .append("td")
-            .style("border-left-style", "none")
-            .style("margin", "5px")
-            .style("border", "1px solid " + textColor)
-            .append("div")
-            .style("margin-left", "5px")
-            .style("margin-right", "5px")
-            .style("color", textColor)
-            .text(function (recording) {
-                return recording.metadata.user
-            })
-        row.append("td")
-            .style("border-top-right-radius", "5px")
-            .style("border-bottom-right-radius", "5px")
-            .style("border", "1px solid " + textColor)
-            .style("margin", "5px")
-            .append("div")
-            .style("margin-left", "5px")
-            .style("margin-right", "5px")
-            .text("✖")
-            .style("opacity", 0.7)
-            .style("color", "red")
-            .on("click", function (event, d) {
-                event.stopPropagation()
-                console.log("removing: " + d.id)
-                var row = d3.select("#row" + d.id)
-                row.remove()
-                deleteRecording(d.id, function () {
-                    console.log("------> Deleted!")
-                    deleteRecordingFirebase(d.metadata).then(() => {
-                        console.log("-----------> Deleted from Firebase!")
-                    })
+    row
+        .append("td")
+        .style("border-left-style", "none")
+        .style("margin", "5px")
+        .style("border", "1px solid " + textColor)
+        .append("div")
+        .style("margin-left", "5px")
+        .style("margin-right", "5px")
+        .style("color", textColor)
+        .text(function (recording) {
+            return recording.user
+        })
+    row.append("td")
+        .style("border-top-right-radius", "5px")
+        .style("border-bottom-right-radius", "5px")
+        .style("border", "1px solid " + textColor)
+        .style("margin", "5px")
+        .append("div")
+        .style("margin-left", "5px")
+        .style("margin-right", "5px")
+        .text("✖")
+        .style("opacity", 0.7)
+        .style("color", "red")
+        .on("click", function (event, d) {
+            event.stopPropagation()
+            console.log("removing: " + d.id)
+            var row = d3.select("#row" + d.id)
+            row.remove()
+            deleteRecording(d.filename, function () {
+                console.log("------> Deleted!")
+                deleteRecordingFirebase(d).then(() => {
+                    console.log("-----------> Deleted from Firebase!")
                 })
-
-
             })
 
 
+        })
+    row.append("td")
+        .append("div")
+        .attr("id", function (d) { return "loading" + d.id })
+        .text("...")
+        .style("display", "none")
 
-
-
-    }).catch(error => {
-
-    })
 
 }
 function updateRatioGraphs() {
@@ -587,32 +632,7 @@ function prepareForNext(update = true) {
     var filteredData = clone(rawData.filter(row => row.seconds >= selectedStartSecond && row.avg60 == true))
     var firstRow = filteredData[0]
 
-    record.metadata.startSecond = selectedStartSecond
-
-    console.log("Updating: " + record.metadata.id)
-    updateRecording(record.metadata).then(() => {
-        //console.log("UPDATED FIREBASE")
-        addOrReplaceSession(record, function () {
-
-            updateRecordingTable()
-        })
-
-    })
-        .catch((error) => {
-            console.error("Doc does not exist yet!")
-            addRecording(record.metadata)
-                .then((doc) => {
-                    console.log("----> Added recording: " + doc.id)
-                    record.metadata.id = doc.id
-                    addOrReplaceSession(record, function () {
-
-                        updateRecordingTable()
-                    })
-                })
-        })
-
-
-
+    record.startSecond = selectedStartSecond
 
     // Convert all band powers to percentages of the first value
     filteredData.forEach(row => {
@@ -657,13 +677,20 @@ export default function Validate() {
 
     useEffect(() => {
         buildPage()
+        setTimeout(function () {
+            if (firstBoot == true) {
+                firstBoot = false
+                bootLast()
+            }
 
+        }, 1000)
 
     }, [])
     useEffect(() => {
         setTimeout(function () {
             if (workingData != null) {
 
+                updateRecordingTable(recordings)
                 buildValidationChart()
                 buildRatioCharts()
 

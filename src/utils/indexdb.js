@@ -30,6 +30,7 @@ export function getRecordingById(id, callback) {
     const db = event.target.result;
     const tx = db.transaction('recordings', 'readonly');
     const store = tx.objectStore('recordings');
+    console.log("Searching db for: " + id)
     const getRequest = store.get(id);
     getRequest.onsuccess = function (event) {
       const session = event.target.result;
@@ -50,60 +51,7 @@ export function deleteRecording(id, callback) {
     }
   }
 }
-// Function to retrieve the last session object added to the 'recordings' table
-export function getLastSession(callback) {
-  const request = window.indexedDB.open(dbName, dbVersion);
-  request.onsuccess = function (event) {
-    const db = event.target.result;
-    const tx = db.transaction('recordings', 'readonly');
-    const store = tx.objectStore('recordings');
-    const countRequest = store.count();
-    countRequest.onsuccess = function (event) {
-      const count = event.target.result;
-      const getRequest = store.openCursor(null, 'prev');
-      let i = 0;
-      getRequest.onsuccess = function (event) {
-        const cursor = event.target.result;
-        if (cursor) {
-          if (i == 0) {
-            const session = cursor.value;
-            callback(session);
-          } else {
-            i++;
-            cursor.continue();
-          }
-        }
-      }
-    }
-  }
-}
-export function getAllRecordings() {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(dbName);
-    let entries = [];
 
-    request.onerror = () => {
-      reject(request.error);
-    };
-
-    request.onsuccess = (event) => {
-      const db = event.target.result;
-      const transaction = db.transaction("recordings", 'readonly');
-      const objectStore = transaction.objectStore("recordings");
-
-      objectStore.openCursor().onsuccess = (event) => {
-        const cursor = event.target.result;
-
-        if (cursor) {
-          entries.push(cursor.value);
-          cursor.continue();
-        } else {
-          resolve(entries);
-        }
-      };
-    };
-  });
-}
 export function deleteAllrecordings() {
   return new Promise((resolve, reject) => {
     const request = window.indexedDB.open(dbName, dbVersion);
