@@ -4,9 +4,9 @@ import { notice } from "../utils/ui";
 import { buildBrowseFile } from "../utils/load";
 import { sliderBottom } from 'd3-simple-slider';
 import { state } from "../index"
-import { getAllRecordings, addRecording, currentRecording, deleteRecordingFirebase, setCurrentRecording, updateRecording } from "../utils/database";
+import { getAllRecordings, addRecording, currentRecording, deleteRecordingFirebase, setCurrentRecording, updateRecording, waypoints } from "../utils/database";
 import { datastate } from "../utils/load";
-import { clone, formatDate, getEveryNth } from '../utils/functions';
+import { round, clone, formatDate, getEveryNth } from '../utils/functions';
 import { bands, channels } from "../utils/muse"
 import { rebuildChart } from "../utils/runmodel";
 import MultiRangeSlider from "multi-range-slider-react";
@@ -41,11 +41,25 @@ var firstBoot = true
 
 var workingData = null
 var rawData = null
+var fullData = null
+
+// slider
+var brushg
+var brush;
+var range_width;
+var range_x;
+var sliding = false
+var sliderMargin = 10
+var lastStartSecond = -1
+var lastEndSecond = -1
+
+
 
 // Style
 var textColor = "white"
 var chartBackground = "lightgrey"
 var selectedStartSecond = 0
+var selectedEndSecond = 100000
 const margin = 10
 var sidebarWidth = 280
 var width = ((window.innerWidth - sidebarWidth) / 2) - (margin * 4)
@@ -82,63 +96,60 @@ export var cleanedData = null
 export function showLoadingValidate() {
     notice("Loading...", "loading")
 }
-export function validate(fulldata, selectedRecord) {
+export function validate(newFullData, selectedRecord) {
 
-
-    rawData = fulldata.data
+    fullData = newFullData
+    rawData = newFullData.data
     record = selectedRecord
+    selectedStartSecond = selectedRecord.startSecond
+    selectedEndSecond = selectedRecord.endSecond
     workingData = getEveryNth(rawData.filter(e => e.avg60 == true), 10) // Remove the first few rows
 
     d3.selectAll(".loading").remove()
-    buildValidationChart()
+    buildValidationChart(workingData)
     buildRatioCharts()
     prepareForNext(false)
-    updateRelative(selectedStartSecond)
+    updateRelative(selectedStartSecond, selectedEndSecond)
+    updateRecordingTable(recordings)
     d3.select("#acceptBtn").style("display", "flex")
-    d3.select("#loading" + record.id).style("display", "none")
+
+    brush.move(brushg, [selectedStartSecond, selectedEndSecond].map(range_x));
+    
+    // Hide any loading bars in the history table
+    d3.select("#loading" + selectedRecord.id).style("display", "none")
 
 }
 function bootLast() {
 
     getAllRecordings().then((snapshot) => {
         recordings = []
-        console.log("found recordings:")
-        console.log(snapshot)
-        snapshot.forEach((doc) => {
-            var recording = doc.data()
-            recording.id = doc.id
-            recordings.push(recording)
-        })
-        recordings = recordings.sort((a, b) => b.updatedTime - a.updatedTime)
-        var sortedByView = recordings.filter(a => a.delete != true).sort((a, b) => b.updatedTime - a.updatedTime)
-        if (sortedByView.length > 0) {
-            record = sortedByView[0]
-            console.log("---> Last record viewed:")
-            console.log(record)
-            loadRecordData(record)
-            updateRecordingTable(recordings)
+        if (snapshot.length == 0) {
+            console.error("---> No recordings in Firebase!")
+        }
+        else {
+            snapshot.forEach((doc) => {
+                var recording = doc.data()
+                recording.id = doc.id
+                recordings.push(recording)
+            })
+            recordings = recordings.sort((a, b) => b.updatedTime - a.updatedTime)
+            var sortedByView = recordings.filter(a => a.delete != true).sort((a, b) => b.updatedTime - a.updatedTime)
+            if (sortedByView.length > 0) {
+                record = sortedByView[0]
+                loadRecordData(record)
+                updateRecordingTable(recordings)
+            }
+
         }
 
 
     })
 }
-
-// getLastSession(function (lastSession) {
-//     state.data = lastSession.data
-
-//     setCurrentRecording(lastSession.metadata)
-//     //selectedStartSecond = lastSession.recording.startSecond
-//     setTimeout(function () {
-//         validate(lastSession)
-//         updateClusterGraphs()
-//     }, 2000)
-
-// })
-
 function loadRecordData(selectedRecord) {
     d3.select("#loading" + selectedRecord.id).style("display", "flex")
     record = selectedRecord
     selectedStartSecond = selectedRecord.startSecond
+    selectedStartSecond = selectedRecord.endSecond
     if (selectedRecord.data != null) {
         state.data = selectedRecord.data
         validate(selectedRecord.data, record)
@@ -159,8 +170,6 @@ function loadRecordData(selectedRecord) {
     }
 
 }
-
-
 function buildValidationChart(data) {
     // Purpose: use the slider to select a different starting minute, all values are recalculated to be a % of the first value
     // Does not change original data - once user decides on a starting minute, the values from that minute will be stored as a starting vector
@@ -170,8 +179,8 @@ function buildValidationChart(data) {
     var end = workingData.slice(-1)[0].seconds
 
     var div = d3.select("#relative")
-
     div.selectAll("*").remove()
+
 
     x = d3.scaleLinear()
         .domain([start, end])
@@ -262,30 +271,14 @@ function buildValidationChart(data) {
 
     updateValidChart(dataLines)
 
-    const slider = sliderBottom().min(20).default(selectedStartSecond).max(300).ticks(10).step(1).width(width - (4 * margin));
-    // Slider SVG
-    var svg = div.append("svg")
-        .attr("width", width + "px")
-        .attr("height", sliderHeight + "px")
-        .style("margin", margin + "px")
-        .append('g')
-        .attr("transform", "translate(" + margin + "," + margin + ")")
-
-    // https://www.npmjs.com/package/d3-simple-slider
-    svg.call(slider)
-    slider.on("end", function (d) { prepareForNext() })
-    slider.on("onchange", function (second) {
-
-        updateRelative(second)
-    })
+    var sliderdiv = div.append("div").style("width", "400px")
+    setupTimeRange(sliderdiv, data)
 
 
 
 
 
 }
-
-// Update chart - called each time graph needs to be changed
 function updateValidChart(data) {
     graphSVG.selectAll(".line")
         .data(data)
@@ -297,18 +290,21 @@ function updateValidChart(data) {
 
 
 }
-function updateRelative(newSecond) {
+function updateRelative(newStartSecond, newEndSecond) {
     // Takes the second that user has selected for the chart to "start" from
     var newMax = minRatio
     var newMin = -1 * minRatio
-    selectedStartSecond = newSecond
+    selectedStartSecond = newStartSecond
+    selectedEndSecond = newEndSecond
 
+    // Move the vertical line showing where it starts
     d3.select("#varLine")
         .attr("x1", x(selectedStartSecond))
         .attr("x2", x(selectedStartSecond))
 
+    // Filter data to new range
     dataLines = dataLinesOriginal.map(l => {
-        var filtered = l.filter(e => e.seconds > selectedStartSecond && e.y10 != null)
+        var filtered = l.filter(e => e.seconds > selectedStartSecond && e.y10 != null && e.seconds < selectedEndSecond)
         var firstValue = filtered[0].y60
 
         filtered.forEach(e => e.ratio1 = Math.log(e.y1 / firstValue))
@@ -407,7 +403,6 @@ function buildRatioCharts() {
 
 
 }
-
 function buildSidebar() {
     var div = d3.select("#rightsidebar")
         .style("width", sidebarWidth + "px")
@@ -435,6 +430,16 @@ function buildSidebar() {
         .on("click", function () {
             deleteAllrecordings().then(() => {
                 console.log("DELETED ALL RECORDS")
+                recordings.forEach(r => {
+                    if (r.delete == false) {
+                        r.delete = true
+                        updateRecording(r)
+                    }
+
+                }
+                )
+                updateRecordingTable(recordings)
+
 
             })
         })
@@ -459,6 +464,7 @@ export function updateRecordingTable(entries) {
     d.exit().remove()
     var row = d.enter()
         .append("tr")
+        .style("font-size", "16px")
         .attr("id", function (d) { return "row" + d.id })
         .attr("class", "recordrow")
         .style("cursor", "pointer")
@@ -629,12 +635,15 @@ function buildPage() {
 }
 
 function prepareForNext(update = true) {
+    console.error("compiling")
 
     // Create a new dataset from the raw dataset which starts at the selected time, and definitely has values for the avg60 values
     var filteredData = clone(rawData.filter(row => row.seconds >= selectedStartSecond && row.avg60 == true))
     var firstRow = filteredData[0]
 
     record.startSecond = selectedStartSecond
+    record.endSecond = selectedEndSecond
+    updateRecording(record)
 
     // Convert all band powers to percentages of the first value
     filteredData.forEach(row => {
@@ -661,40 +670,123 @@ function prepareForNext(update = true) {
     state.data = cleanedData
 
 
-    rebuildChart({ autoClusters: true, updateCharts: false })
+    rebuildChart({ autoClusters: true, updateCharts: false, updateGraphs: true})
+
 
 }
 
 
+function brushed() {
+    
+    var range = d3.brushSelection(this)
+        .map(range_x.invert);
+
+    var low = round(range[0])
+    var high = round(range[1])
+    state["timestamp_low"] = low
+    state["timestamp_high"] = high
+
+    record.startSecond = low
+    record.endSecond = high
+    updateRelative(low, high)
+
+}
+
+function brushend() {
+    // Called when user stops moving the timeslider
+    if (record.startSecond != lastStartSecond || record.endSecond != lastEndSecond) {
+        lastStartSecond = record.startSecond
+        lastEndSecond = record.endSecond    
+        prepareForNext(false)
+    }
+}
+
+function setupTimeRange(div, data) {
+    range_width = width
+    var min = data[0].seconds
+    var max = data[data.length - 1].seconds
+    let margin = 10
+    state["timestamp_low"] = min
+    state["timestamp_high"] = max
+
+    div.selectAll("*").remove()
+    var svg = div.append("svg")
+        .style("opacity", 0.7)
+        .style("height", "25px")
+        .style("margin-left", margin + "px")
+        .style("width", (width - (2 * margin)) + "px")
+
+
+    range_x = d3.scaleLinear()
+        .domain([min, max])
+        .range([margin, range_width - (2 * margin)]);
+
+    brush = d3.brushX()
+        .handleSize(20)
+        .extent([[0, 0], [range_width - (2 * margin) - 10, 20]])
+        .on("brush", brushed)
+        .on("end", brushend)
+
+    brushg = svg.append("g")
+        .attr("class", "brush")
+        .call(brush)
+
+
+    let rangeSVG = svg.append("g")
+        .attr("id", "range-svg-id")
+        .attr("transform", "translate(10,0)")
+
+    rangeSVG
+        .call(d3.axisBottom()
+            .tickFormat(function (d) {
+                if (d == 0) return ""
+                else return parseInt(d / 60)
+            })
+
+            .scale(range_x)
+            .ticks(5));
+
+    brush.move(brushg, [selectedStartSecond, selectedEndSecond].map(range_x));
+
+    svg.selectAll(".selection")
+        .style("stroke", "none")
+    svg.selectAll(".handle")
+        .style("fill", "black")
+        .style("opacity", 0.3)
+        .on("mouseover", function (d) {
+            d3.select(this).style("cursor", "ew-resize");
+        })
+
+        .on("mouseout", function (d) {
+            d3.select(this).style("cursor", "default");
+        })
+
+
+}
+
+
+setTimeout(function(){
+    firstBoot = false
+    bootLast()}, 500)
 export default function Validate() {
 
-
-    const [minValue, set_minValue] = useState(25);
-    const [maxValue, set_maxValue] = useState(75);
-    const handleInput = (e) => {
-        set_minValue(e.minValue);
-        set_maxValue(e.maxValue);
-        console.log(e)
-    };
 
     useEffect(() => {
         buildPage()
         setTimeout(function () {
-            if (firstBoot == true) {
-                firstBoot = false
+            if (firstBoot != true) {
+                
                 bootLast()
+                
             }
 
-        }, 1000)
+        }, 400)
 
     }, [])
     useEffect(() => {
         setTimeout(function () {
-            if (workingData != null) {
-
-                updateRecordingTable(recordings)
-                buildValidationChart()
-                buildRatioCharts()
+            if (fullData != null && !firstBoot) {
+                validate(fullData, record)
 
             }
         }, 100)
@@ -710,16 +802,7 @@ export default function Validate() {
                 <div id="rightsidebar"> </div>
                 <div id="bodydiv">
                     <div id="relative">
-                        <MultiRangeSlider
-                            min={0}
-                            max={100}
-                            step={1}
-                            minValue={minValue}
-                            maxValue={maxValue}
-                            onInput={(e) => {
-                                handleInput(e);
-                            }}
-                        />
+
                     </div>
                     <div id="ratios"></div>
                 </div>

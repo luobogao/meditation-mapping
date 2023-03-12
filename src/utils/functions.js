@@ -2,7 +2,7 @@
 const d3 = require("d3");
 
 const moment = require("moment")
-const originalConsoleLog = console.log; 
+const originalConsoleLog = console.log;
 
 debug = false
 export function interpolate(data, key, n) {
@@ -150,14 +150,35 @@ export function formatDate(epoch) {
     const seconds = ('0' + date.getSeconds()).slice(-2);
     return `${year}-${month}-${day} ${hours}:${minutes}`;
 }
-export function disableLogging()
-{
-    
-    console.log = function() {
+export function disableLogging() {
+
+    console.log = function () {
         // temporarily disable console logging, because this libary uses it too much
-      };
+    };
 }
-export function enableLogging()
-{
+export function enableLogging() {
     console.log = originalConsoleLog
+}
+
+export function saveCSV(rows) {
+
+    var stringOut = "data:text/csv;charset=utf-8,"
+    // EEG + Tags
+
+    var keys = Object.keys(rows[0])
+
+    keys.forEach(key => {
+        stringOut += key + ","
+    })
+    stringOut += "\r\n"
+
+    rows.forEach(row => {
+        keys.forEach(key => {
+            stringOut += row[key] + ","
+        })
+        stringOut += "\r\n"
+    })
+    var encodeduri = encodeURI(stringOut)
+    window.open(encodeduri)
+
 }

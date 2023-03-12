@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { state } from "../index"
 import { user } from "../utils/database"
 import { cleanedData } from "./validate";
-import { getEveryNth } from "../utils/functions";
+import { getEveryNth, saveCSV } from "../utils/functions";
 import { Link } from "react-router-dom";
 import { waypoints } from "../utils/database";
 import NavBarCustom from "../utils/navbar";
@@ -25,7 +25,7 @@ var sidebarWidth = 300
 const backgroundColor = "#d9d9d9"
 
 
-const clusterColors = ["darkred", "blue", "orange", "lightgreen", "purple"]
+const clusterColors = ["darkred", "blue", "orange", "lightgreen", "purple", "red"]
 
 function buildClusterTable() {
     var table = d3.select("#clustertable")
@@ -103,7 +103,7 @@ function updateClusterTable() {
 
 export function updateClusterGraphs() {
 
-
+    console.log("updating clusters")
     if (state != null && state["cluster_means_avg60"] != null) {
         var svg = d3.select("#cosinesvg")
         svg.selectAll("*").remove()
@@ -113,6 +113,7 @@ export function updateClusterGraphs() {
 
         updateClusterTable()
 
+        
 
         var minY = 90
 
@@ -131,6 +132,20 @@ export function updateClusterGraphs() {
                 }
             }), getNth)
 
+        })
+
+        svg.on("click", function()
+        {
+            var newRows = []
+            for (let i = 0; i < data[0].length; i++)
+            {
+                var r = {}
+                r.a = data[0][i].y
+                r.b = data[1][i].y
+                newRows.push(r)
+
+            }
+            saveCSV(newRows)
         })
 
         x = d3.scaleLinear()
@@ -202,19 +217,18 @@ export function updateClusterGraphs() {
 }
 export function updateMatchesGraph() {
     var svg = d3.select("#communitysvg")
+    svg.selectAll('*').remove()
 
     start = cleanedData[0].seconds
     end = cleanedData.slice(-1)[0].seconds
 
-    console.log(waypoints)
-
-
+    var labelMargin = 120 // margin to show the names beside each cosine line
     x = d3.scaleLinear()
         .domain([start, end])
-        .range([margin, width - margin])
+        .range([margin, width - margin - labelMargin])
 
     y = d3.scaleLinear()
-        .domain([-70, 105])
+        .domain([40, 105])
         .range([height - margin, margin])
 
     line = d3.line()
@@ -224,19 +238,113 @@ export function updateMatchesGraph() {
         .curve(d3.curveMonotoneX) // apply smoothing to the line
 
 
-    svg.selectAll(".clusterline")
+        // Add indexes to the wapoints so that a click event can get that index
+    var i = 0
+    waypoints.forEach(w => 
+        {
+            w.id = i
+            i++
+        })
+    svg.selectAll(".matchesLine")
         .data(waypoints)
         .enter()
         .append("path")
-        .attr("id", function (d, i) { return "clusterLine" + i })
-        .attr("class", "clusterline")
+        .attr("id", function (d, i) { return "matchesLine" + i })
+        .attr("class", "matchesLine")
         .attr("fill", "none")
+        .on("click", function(event, waypoint)
+        {
+            
+            d3.select(this).remove()
+            d3.select("#text-legend-" + waypoint.id).remove()
+        })
         .on('mouseover', function (event, d) {
             console.log(d)
         })
         .attr("stroke", function (d, i) { return clusterColors[i] })
         .attr("stroke-width", 3)
-        .attr("d", function (d) { return line(d.timeseriesSimilarity) })
+        .attr("d", function (d) {
+            var getNth = d.averaging / 2  // Every waypoint has it's own 'averaging' value (1,10,60)
+            if (getNth < 1) getNth = 1
+
+            return line(getEveryNth(d["timeseriesSimilarity"], getNth))
+        })
+
+    var legend = []
+    var i = -1
+    waypoints.forEach(waypoint => {
+        var lastEntry = waypoint["timeseriesSimilarity"].slice(-1)[0]
+        i++
+
+        svg.append("text")
+            .attr("id", "text-legend-" + i)
+            .text(waypoint.user)
+            .style("fill", function () { return clusterColors[i] })
+            .attr("x", x(lastEntry.seconds) + 10)
+            .attr("y", y(lastEntry.cosine))
+        legend.push({ y: y(lastEntry.cosine), id: i })
+    })
+    addLegend(svg, legend)
+}
+function addLegend(svg, legends) {
+    // Sorts legends in an SVG
+    // "legends" is a list with 'id' and 'y'
+    const labelMinMargin = 20
+    function compare(a, b) {
+        if (a.y < b.y) {
+            return 1;
+        }
+        if (a.y > b.y) {
+            return -1;
+        }
+        return 0;
+    }
+    let sorted_legend = legends.sort(compare)
+
+    let N_2 = Math.floor(sorted_legend.length / 2)
+    for (let n = 0; n <= N_2; n++) {
+
+        sorted_legend[n].direction = 1
+        sorted_legend[sorted_legend.length - n - 1].direction = -1
+    }
+
+
+    let move = 1
+    let iterations = 0
+    while (move > 0) {
+        move = 0
+        iterations++
+        if (iterations > 100) {
+            move = 0
+        }
+        else {
+            for (let i = 0; i < sorted_legend.length; i++) {
+                let entry = sorted_legend[i]
+                let t = svg.select("#text-legend-" + entry.id)
+                let y1 = t.attr("y")
+
+                for (let i2 = 0; i2 < sorted_legend.length; i2++) {
+                    if (i2 != i) {
+                        let comparison_entry = sorted_legend[i2]
+                        let t2 = svg.select("#text-legend-" + comparison_entry.id)
+                        let y2 = t2.attr("y")
+
+                        let diff = Math.abs(y2 - y1)
+                        if (diff < labelMinMargin) {
+                            var direction = 1
+                            if (y1 < y2) direction = -1
+                            move = 1
+                            let newY = parseInt(y1) + (1 * direction)
+                            y1 = newY
+                            t.attr("y", newY)
+                        }
+                    }
+                }
+
+            }
+
+        }
+    }
 }
 function newWaypoint(cluster) {
 

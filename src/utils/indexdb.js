@@ -30,11 +30,15 @@ export function getRecordingById(id, callback) {
     const db = event.target.result;
     const tx = db.transaction('recordings', 'readonly');
     const store = tx.objectStore('recordings');
-    console.log("Searching db for: " + id)
+    //console.log("Searching db for: " + id)
     const getRequest = store.get(id);
     getRequest.onsuccess = function (event) {
       const session = event.target.result;
       callback(session);
+    }
+    getRequest.onerror = function (event)
+    {
+      console.log("---> FAILED to get entry from IndexDB: " + id)
     }
   }
 }

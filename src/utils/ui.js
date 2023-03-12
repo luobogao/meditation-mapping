@@ -50,7 +50,7 @@ export function notice(message, id) {
         .attr("class", "notice " + id)
         .style("width", "fit-content")
         .style("height", "fit-content")
-        .style("background", "grey")
+        .style("background", "white")
         .style("border", "2px solid black")
         .style("border-radius", "5px")
         .style("position", "absolute")

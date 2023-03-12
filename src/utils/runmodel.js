@@ -34,6 +34,12 @@ export function rebuildChart(settings = { autoClusters: true, updateCharts: true
     
     state.zoom = 1
 
+    if (waypoints == null || waypoints.length == 0)
+    {
+        console.error("Waypoints not ready yet for analysis")
+        return
+    }
+
     // Remove waypoints from users de-selected by user
     waypoints.forEach(waypoint => {
         waypoint.match = state.selected_users.includes(waypoint.user)
@@ -140,8 +146,7 @@ export function rebuildChart(settings = { autoClusters: true, updateCharts: true
                 }
 
             }
-            )
-            console.log("best match: " + bestSimilarity)
+            )            
 
             // Take the best match and make a timeseries of matches with every other point in this recording
             let similarityTimeseries = state.data.map(row => {
@@ -154,7 +159,7 @@ export function rebuildChart(settings = { autoClusters: true, updateCharts: true
             })
             mean.similarityTimeseries = similarityTimeseries
             mean.bestFullMatch = bestRow
-            mean.keyValues = getRootVector(bestRow, 60) // This will be what is actually recorded as the cluster mean vector - the original keys, so a relative vector can be re-build from it
+            mean.keyValues = getRootVector(bestRow, avg) // This will be what is actually recorded as the cluster mean vector - the original keys, so a relative vector can be re-build from it
 
         })
     }
@@ -283,8 +288,9 @@ export function rebuildChart(settings = { autoClusters: true, updateCharts: true
         updateAllCharts()
     }
     if (settings.updateGraphs == true) {
-        updateClusterGraphs()
+        
     }
+    updateClusterGraphs()
 
 
 }
