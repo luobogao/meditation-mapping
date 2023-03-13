@@ -1,8 +1,8 @@
-import { updateAllCharts} from "../pages/map";
+import { updateAllCharts } from "../pages/map";
 import { rebuildChart } from "./runmodel";
 import { state } from "../index";
 import { users } from "./database";
-import { updateClusterGraphs } from "../pages/clusters";
+import { updateClusterGraphs, updateMatchesGraph } from "../pages/clusters";
 
 const d3 = require("d3");
 export const navHeight = 63
@@ -33,7 +33,7 @@ export function popUp(event, html) {
 
 export function notice(message, id) {
     // Blanks out background then adds a foreground div
-    
+
     d3.selectAll(".notice").remove()
 
     d3.select("body").append("div")
@@ -186,7 +186,7 @@ export function buildUserSelectors() {
             rebuildChart()
 
         })
-        useri ++
+        useri++
 
     })
 }
@@ -214,12 +214,12 @@ export function buildChartSelectors(div) {
     var chart1box = addCheckbox(div, "3-D", chart1, "a", "12px", "radio")
     var chart2box = addCheckbox(div, "Cosine", chart2, "b", "12px", "radio")
     var chart3box = addCheckbox(div, "Euclidean", chart3, "c", "12px", "radio")
-    
+
     var els = [
         { chart: chart1box, key: "pca" },
         { chart: chart2box, key: "cosine" },
         { chart: chart3box, key: "euclidean" }
-        
+
     ]
     els.forEach(el => {
 
@@ -313,10 +313,9 @@ export function buildClusterCounts(container, page) {
     var c3box = addCheckbox(div, "3", cluster3, "cluster3", "12px", "radio")
     var c4box = addCheckbox(div, "4", cluster4, "cluster4", "12px", "radio")
 
-    var settings = {autoClusters: false, updateCharts: true, source: "clusterSelector"}
-    if (page == "graphs")
-    {
-        settings = {autoClusters: false, updateGraphs: true}
+    var settings = { autoClusters: false, updateCharts: true, source: "clusterSelector" }
+    if (page == "graphs") {
+        settings = { autoClusters: false, updateGraphs: true }
     }
 
     c1box
@@ -334,7 +333,7 @@ export function buildClusterCounts(container, page) {
             d3.select(this).property("checked", true)
             state.clusters = 2
             rebuildChart(settings)
-            
+
         })
     c3box
         .attr("class", "clusters-checkbox")
@@ -343,7 +342,7 @@ export function buildClusterCounts(container, page) {
             d3.select(this).property("checked", true)
             state.clusters = 3
             rebuildChart(settings)
-            
+
 
         })
     c4box
@@ -353,8 +352,46 @@ export function buildClusterCounts(container, page) {
             d3.select(this).property("checked", true)
             state.clusters = 4
             rebuildChart(settings)
-            
+
 
         })
+
+}
+export function buildSimilaritySelectors(container) {
+    container.style("margin", "5px")
+    container.append("text").text("Similarity Method:")
+    var div = container.append("div").style("display", "flex").style("flex-direction", "row")
+
+    var d1 = false
+    var d2 = false
+    switch (state.similarityType) {
+        case "cosine":
+            d1 = true
+            break;
+        case "euclidean":
+            d2 = true
+            break;
+    }
+    var cosine = addCheckbox(div, "Cosine", d1, "cosineType", "12px", "radio")
+    var euclidean = addCheckbox(div, "Euclidean", d2, "euclideanType", "12px", "radio")
+
+    cosine
+        .attr("class", "similaritySelector")
+        .on("click", function () {
+            d3.selectAll(".similaritySelector").property("checked", false)
+            d3.select(this).property("checked", true)
+            state.similarityType = "cosine"
+            updateMatchesGraph()
+        })
+    euclidean
+        .attr("class", "similaritySelector")
+        .on("click", function () {
+            d3.selectAll(".similaritySelector").property("checked", false)
+            d3.select(this).property("checked", true)
+            state.similarityType = "euclidean"
+            updateMatchesGraph()
+        })
+
+
 
 }

@@ -80,21 +80,21 @@ export function cosineSimilarity(a, b)
     }
 
 }
-export function euclideanDistance(a, b) {
-    if (a.length != b.length) {
-        alert("wrong vector sizes!")
-        return
-    }
-    var values = 0
-    for (let i = 0; i < a.length; a++) {
-        var value = Math.pow(a[i] - b[i], 2)
-        values += value
+
+export function euclideanDistance(vector1, vector2) {
+    if (vector1 == null || vector2 == null || vector1.length !== vector2.length) {
+        console.error("Vectors are null or wrong size")
+        return 0
     }
 
-    // Normalize so bigger is progressively less than 100, but never less than 0
-    var normalized = 100 - (100 * Math.pow((values / 10000), 0.8))
-    if (normalized < 10) normalized = 10
-    return round(normalized)
+    let distance = 0;
+    for (let i = 0; i < vector1.length; i++) {
+        distance += (vector1[i] - vector2[i]) ** 2;
+    }
+
+    distance = Math.sqrt(distance);
+
+    return 100 - (150 * distance / Math.sqrt(vector1.length));
 }
 
 export function getRootVector(row, avg) {
@@ -174,13 +174,13 @@ export function vectorRatio(row, avg) {
 
     function ratioMuse() {
 
-        var ratios = [["TP10", "TP9"], ["AF8", "AF7"], ["TP10", "AF8"], ["TP9", "AF7"]]
-        //var ratios = [["TP10", "TP9"], ["AF8", "AF7"]]
+        var ratios = state.modelRatios
+        var bands = state.modelBands
         bands.forEach(band => {
             ratios.forEach(ratio_keys => {
                 var key = band + "_" + ratio_keys[0] + "_avg" + avg
                 var key2 = band + "_" + ratio_keys[1] + "_avg" + avg
-                var value = Math.log(row[key], row[key2])
+                var value = Math.log(row[key] / row[key2])
 
                 vector.push(value)
             })

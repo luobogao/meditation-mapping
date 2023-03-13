@@ -31,11 +31,10 @@ export function buildModel(vectors) {
 }
 
 export function rebuildChart(settings = { autoClusters: true, updateCharts: true }) {
-    
+
     state.zoom = 1
 
-    if (waypoints == null || waypoints.length == 0)
-    {
+    if (waypoints == null || waypoints.length == 0) {
         console.error("Waypoints not ready yet for analysis")
         return
     }
@@ -61,7 +60,7 @@ export function rebuildChart(settings = { autoClusters: true, updateCharts: true
     }
     if (filtered_waypoints_user.length == 0) {
         console.error("No Waypoints?")
-        
+
     }
 
     // Find nearby waypoints to user's data - use every 60 seconds
@@ -135,9 +134,9 @@ export function rebuildChart(settings = { autoClusters: true, updateCharts: true
             var bestRow = null
             clusterRows.forEach(row => {
                 var testVector = row["relative_vector_avg" + avg]
-                
+
                 var similarityToMean = cosineSimilarity(testVector, mean.vector)
-                
+
                 if (similarityToMean > bestSimilarity) {
 
                     bestSimilarity = similarityToMean
@@ -146,7 +145,7 @@ export function rebuildChart(settings = { autoClusters: true, updateCharts: true
                 }
 
             }
-            )            
+            )
 
             // Take the best match and make a timeseries of matches with every other point in this recording
             let similarityTimeseries = state.data.map(row => {
@@ -233,62 +232,43 @@ export function rebuildChart(settings = { autoClusters: true, updateCharts: true
     var filtered_waypoints = waypoints.filter(e => e.match == true)
 
     // Re-build the PCA using only the top-N waypoints
-    //let vectors = waypoints.filter(w => w.match == true).map(e => getRelativeVector(e.vector))
-
-    // Rebuild PCA using the USER's data (seems to give much better results that top N vectors)
-
-    buildModel(userVectors)
-
-    // Find similarity to each waypoint for each row
-    function addWaypointDistances(rows) {
-        rows.forEach(row => {
-            var relativeVector = getRelativeVector(row.vector)
-            row.relative_vector = relativeVector
-            var distances = []
-            filtered_waypoints.forEach(waypoint => {
-
-                var distance = measureDistance(relativeVector, waypoint.relative_vector)
-
-
-                var label = waypoint.label + " (" + waypoint.user + ")"
-
-                distances.push({ label: label, distance: distance, waypoint: waypoint })
-
-            })
-            distances.sort(function (a, b) {
-                return b.distance - a.distance
-            })
-
-            row.distances = distances
-
-        })
-
-
-    }
+    //buildModel(userVectors)
 
     // Make an array of similarities in each waypoint
-    waypoints.forEach(waypoint =>
-        {
-            let avg = waypoint.averaging
-            var timeseriesSimilarity = state.data.map(row => 
-                {
-                    let rowVector = row["relative_vector_avg" + avg]
-                    let cosine = cosineSimilarity(rowVector, waypoint["relative_vector_avg" + avg] )
-                    return {
-                        seconds: row.seconds,
-                        cosine: cosine
-                    }
+    waypoints.forEach(waypoint => {
+        let avg = waypoint.averaging
+        let waypointVector = waypoint["relative_vector_avg" + avg]
+        var timeseriesSimilarity;
+        if (waypointVector == null) {
+            console.error("Waypoint does not have vector with this avg: " + avg)
+        }
+        else {
+            var timeseriesSimilarity = state.data.map(row => {
+                let rowVector = row["relative_vector_avg" + avg]
+
+                let cosine = cosineSimilarity(rowVector, waypointVector)
+                let euclidean = euclideanDistance(rowVector, waypointVector)
+                var combined = (cosine + euclidean) / 2
+                return {
+                    seconds: row.seconds,
+                    cosine: cosine,
+                    euclidean: combined
                 }
-                )
+            }
+            )
             waypoint.timeseriesSimilarity = timeseriesSimilarity.filter(e => e.cosine != undefined)
 
-        })
-    
+        }
+        
+        
+
+    })
+
     if (settings.updateCharts == true) {
         updateAllCharts()
     }
     if (settings.updateGraphs == true) {
-        
+
     }
     updateClusterGraphs()
 

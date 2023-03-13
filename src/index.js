@@ -31,7 +31,12 @@ export var state =
     "mapped": null, // Mapped x-y coordinates of each standard vector
 
   },
-  "avg10": []
+  "avg10": [],
+
+  "similarityType": "cosine",
+  "modelRatios": [["TP10", "TP9"], ["AF8", "AF7"], ["TP10", "AF8"], ["TP9", "AF7"]],
+  "modelBands": ["Delta", "Theta", "Alpha", "Beta", "Gamma"]
+  
 
 }
 

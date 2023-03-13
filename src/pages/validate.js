@@ -638,7 +638,7 @@ function prepareForNext(update = true) {
     console.error("compiling")
 
     // Create a new dataset from the raw dataset which starts at the selected time, and definitely has values for the avg60 values
-    var filteredData = clone(rawData.filter(row => row.seconds >= selectedStartSecond && row.avg60 == true))
+    var filteredData = clone(rawData.filter(row => row.seconds >= selectedStartSecond && row.avg60 == true && row.seconds <= selectedEndSecond))
     var firstRow = filteredData[0]
 
     record.startSecond = selectedStartSecond

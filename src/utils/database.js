@@ -289,8 +289,8 @@ export function setCurrentRecording(recording) {
     currentRecording = recording
 }
 export function updateRecording(recording) {
-    
-    
+
+
     var r = clone(recording)
     delete r.data
     if (r.id != null) {
@@ -298,8 +298,6 @@ export function updateRecording(recording) {
         var date = new Date()
         var millis = date.getTime()
         r.updatedTime = millis
-        console.log("-> Updating recording in Firebase:")
-        console.log(r)
         var promise = updateDoc(doc(db, "recordings", r.id), r)
         return promise
     }
@@ -313,8 +311,7 @@ export function deleteRecordingFirebase(recording, permanent) {
         var promise = deleteDoc(doc(db, "recordings", recording.id))
         return promise
     }
-    else
-    {
+    else {
         var promise = updateDoc(doc(db, "recordings", recording.id), { delete: true })
         return promise
     }
@@ -547,6 +544,7 @@ export function downloadWaypoints() {
 
 
         })
+        console.log(waypoints)
         var d = new Date()
         var millis = d.getTime()
         localStorage.setItem("waypoints-updated", millis) // Set this so that other pages can know the waypoints are updated
@@ -560,22 +558,10 @@ export function downloadWaypoints() {
         // Build model of meditation states using the "vectors.js" file
         // This first time, include ALL the waypoints
 
-        function buildModel_waypoint() {
-            let vectors = waypoints.filter(e => e.exclude != true)
-                .filter(e => state.selected_users.includes(e.user))
-                .map(e => e.relative_vector_avg60)
-            buildModel(vectors)
-        }
 
-        if (userDataLoaded) {
-
-            buildModel_waypoint()
-
-        }
-        else {
-            buildModel_waypoint()
-        }
-
+        let vectors = waypoints.filter(e => e.exclude != true)
+            .map(e => e.relative_vector_avg60)
+        buildModel(vectors)
 
         //buildSimilarityChart()
         updateChartWaypoints()
