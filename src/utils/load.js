@@ -1,5 +1,5 @@
 
-import { validate, showLoadingValidate, updateRecordingTable } from "../pages/validate";
+import { validate, showLoadingValidate, updateRecordingTable, validateAfterLoad } from "../pages/validate";
 import { uploadCSV,updateRecording, addRecording, user, setCurrentRecording } from "./database";
 import { recordings } from "../pages/validate";
 import { addOrReplaceSession } from "./indexdb";
@@ -177,9 +177,8 @@ function uploadNewCSV(dataJSON) {
                         addOrReplaceSession(dataJSON, function () {
                             console.log("-----------> Added to IndexDB")
                         })
-                        recordings.push(newRecord)
-                        validate(dataJSON, newRecord)
-                        updateRecordingTable(recordings)
+        
+                        validateAfterLoad(dataJSON, newRecord)
                         d3.selectAll(".notice").remove()
 
                     })

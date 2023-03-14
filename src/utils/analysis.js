@@ -395,9 +395,8 @@ export function runModel(rows, avg)
 
 {
     var d = prepareDataset(rows)
-
     var mappedCoordinates = math.transpose(math.multiply(state.models["principals_avg" + avg], d))
-
+    console.log("---> Done")
     return mappedCoordinates
 }
 

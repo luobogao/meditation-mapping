@@ -99,5 +99,10 @@ export function addOrReplaceSession(session, callback) {
       }
       callback();
     }
+    getRequest.onerror = function(error)
+    {
+      console.error("----> Failed to add file to IndexDB:")
+      console.log(error)
+    }
   }
 }

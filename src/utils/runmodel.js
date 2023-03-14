@@ -47,7 +47,7 @@ export function rebuildChart(settings = { autoClusters: true, updateCharts: true
     
             var label = waypoint.user + " " + waypoint.label
     
-            waypoint["projected_avg" + 60] = { match: waypoint.match, x: xi, y: yi, z: zi, fullentry: waypoint, id: entry.id, label: label, coordinates: [xi, yi, zi]}
+            waypoint["projected_avg" + 60] = { match: waypoint.match, x: xi, y: yi, z: zi, id: entry.id, label: label, coordinates: [xi, yi, zi]}
             i ++
     
         })
@@ -71,8 +71,8 @@ export function rebuildChart(settings = { autoClusters: true, updateCharts: true
 
 function rebuild(avg, settings) {
 
-    let waypoints = waypoints.filter(waypoint => waypoint["relative_vector_avg" + avg] != null)
-    if (waypoints.length == 0) {
+    let waypointsAvg = waypoints.filter(waypoint => waypoint["relative_vector_avg" + avg] != null)
+    if (waypointsAvg.length == 0) {
         console.error("No waypoints found with avg: " + avg)
         return
     }
@@ -154,7 +154,7 @@ function rebuild(avg, settings) {
         )
 
         // Take the best match and make a timeseries of matches with every other point in this recording
-        let similarityTimeseries = state.data.map(row => {
+        let similarityTimeseries = state.data.relative.map(row => {
             var cosine = cosineSimilarity(row["relative_vector_avg" + avg], bestRow["relative_vector_avg" + avg])
             return {
                 seconds: row.seconds,
@@ -168,11 +168,11 @@ function rebuild(avg, settings) {
 
     })
 
-    var userVectors = state.data.map(e => e["relative_vector_avg" + avg]).filter(e => e != null)
+    var userVectors = state.data.relative.map(e => e["relative_vector_avg" + avg]).filter(e => e != null)
     var distanceIds = {}
     userVectors.forEach(uservector => {
 
-        waypoints.forEach(waypoint => {
+        waypointsAvg.forEach(waypoint => {
 
             var id = waypoint.id
             var distance = measureDistance(uservector, waypoint["relative_vector_avg" + avg])
@@ -211,11 +211,11 @@ function rebuild(avg, settings) {
     }
     else {
         // Use ALL waypoints
-        filtered_waypoint_ids = waypoints.map(e => e.id)
+        filtered_waypoint_ids = waypointsAvg.map(e => e.id)
     }
 
     // Update ALL waypoints with match=true if their ids match
-    waypoints.forEach(waypoint => {
+    waypointsAvg.forEach(waypoint => {
 
         if (filtered_waypoint_ids.includes(waypoint.id)) {
             waypoint.match = true
@@ -225,22 +225,22 @@ function rebuild(avg, settings) {
     })
 
     // Re-build the PCA using only the top-N waypoints
-    var topNwaypoint = waypoints.filter(waypoint => waypoint.match == true).map(waypoint => waypoint["relative_vector_avg" + avg])
+    var topNwaypoint = waypointsAvg.filter(waypoint => waypoint.match == true).map(waypoint => waypoint["relative_vector_avg" + avg])
     buildModel(topNwaypoint, avg)
 
     // Build x-y points for each waypoint and store them
-    let waypointCoordinates = runModel(waypoints.map(e => e["relative_vector_avg" + avg]))
+    let waypointCoordinates = runModel(waypointsAvg.map(e => e["relative_vector_avg" + avg]), avg)
     var i = 0
     waypointCoordinates.forEach(entry => {
 
         var xi = entry[0]
         var yi = entry[1]
         var zi = entry[2]
-        var waypoint = topNwaypoint[i]
+        var waypoint = waypointsAvg[i]
 
         var label = waypoint.user + " " + waypoint.label
 
-        waypoint["projected_avg" + avg] = { match: waypoint.match, x: xi, y: yi, z: zi, fullentry: entry, id: entry.id, label: label }
+        waypoint["projected_avg" + avg] = { match: waypoint.match, x: xi, y: yi, z: zi, fullentry: entry, id: entry.id, label: label, coordinates: [xi, yi, zi] }
         i ++
 
     })
@@ -249,7 +249,7 @@ function rebuild(avg, settings) {
 
 
     // Make an array of similarities in each waypoint
-    waypoints.forEach(waypoint => {
+    waypointsAvg.forEach(waypoint => {
         let avg = waypoint.averaging
         let waypointVector = waypoint["relative_vector_avg" + avg]
         var timeseriesSimilarity;
@@ -257,7 +257,7 @@ function rebuild(avg, settings) {
             console.error("Waypoint does not have vector with this avg: " + avg)
         }
         else {
-            var timeseriesSimilarity = state.data.map(row => {
+            var timeseriesSimilarity = state.data.relative.map(row => {
                 let rowVector = row["relative_vector_avg" + avg]
 
                 let cosine = cosineSimilarity(rowVector, waypointVector)
@@ -292,7 +292,7 @@ function rebuild(avg, settings) {
 
         index++
 
-        moment["projected_avg" + avg] = { x: xi, y: yi, z: zi, moment: moment, cluster: moment.cluster_avg10 }
+        moment["projected_avg" + avg] = { x: xi, y: yi, z: zi, cluster: moment["cluster_avg" + avg] }
 
     })
 

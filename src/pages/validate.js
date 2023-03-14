@@ -95,6 +95,14 @@ export var cleanedData = null
 export function showLoadingValidate() {
     notice("Loading...", "loading")
 }
+export function validateAfterLoad(loadedData, newRecording)
+{
+    recordings.push(newRecording)
+    record = newRecording
+    updateRecordingTable(recordings)
+    state.data.averaged = loadedData.data
+    validate()
+}
 export function validate() {
 
     selectedStartSecond = record.startSecond
@@ -102,7 +110,7 @@ export function validate() {
     workingData = getEveryNth(state.data.averaged.filter(e => e.avg60 == true), 10) // Remove the first few rows
 
     d3.selectAll(".loading").remove()
-    buildValidationChart(workingData)
+    buildValidationChart()
     buildRatioCharts()
     prepareForNext(false)
     updateRelative(selectedStartSecond, selectedEndSecond)
@@ -115,12 +123,12 @@ export function validate() {
     d3.select("#loading" + record.id).style("display", "none")
 
 }
-function bootLast() {
-
+export function bootLast() {
+    // Downloads all recordings (should be for this user!), select the last viewed, and plot
     getAllRecordings().then((snapshot) => {
         recordings = []
         if (snapshot.length == 0) {
-            console.error("---> No recordings in Firebase!")
+            console.error("No recordings in Firebase!")
         }
         else {
             snapshot.forEach((doc) => {
@@ -128,13 +136,23 @@ function bootLast() {
                 recording.id = doc.id
                 recordings.push(recording)
             })
-            recordings = recordings.sort((a, b) => b.updatedTime - a.updatedTime)
-            var sortedByView = recordings.filter(a => a.delete != true).sort((a, b) => b.updatedTime - a.updatedTime)
-            if (sortedByView.length > 0) {
-                var lastrecord = sortedByView[0]
-                record = lastrecord
-                loadRecordData(lastrecord)
-                updateRecordingTable()
+            if (recordings.length == 0) {
+                console.error("User has no recordings yet!")
+            }
+            else {
+                // Sort recordings by view time
+                recordings = recordings.sort((a, b) => b.updatedTime - a.updatedTime)
+
+                // Get last viewed and load it
+                var sortedByView = recordings.filter(a => a.delete != true).sort((a, b) => b.updatedTime - a.updatedTime)
+                if (sortedByView.length > 0) {
+                    var lastrecord = sortedByView[0]
+                    record = lastrecord
+                    loadRecordData(lastrecord)
+                    updateRecordingTable()
+                }
+                else console.error("---> User's recordings can't be sorted?")
+
             }
 
         }
@@ -157,8 +175,8 @@ function loadRecordData(selectedRecord) {
                 console.error("Can't find record in IndexDB")
             }
             else {
-                state.data.averaged = savedData.averaged                
-                record.averaged = savedData.averaged
+                state.data.averaged = savedData.data
+                record.averaged = savedData.data
                 validate()
             }
 
@@ -167,7 +185,7 @@ function loadRecordData(selectedRecord) {
     }
 
 }
-function buildValidationChart(data) {
+function buildValidationChart() {
     // Purpose: use the slider to select a different starting minute, all values are recalculated to be a % of the first value
     // Does not change original data - once user decides on a starting minute, the values from that minute will be stored as a starting vector
 
@@ -269,7 +287,7 @@ function buildValidationChart(data) {
     updateValidChart(dataLines)
 
     var sliderdiv = div.append("div").style("width", "400px")
-    setupTimeRange(sliderdiv, data)
+    setupTimeRange(sliderdiv, workingData)
 
 
 
@@ -739,8 +757,9 @@ function setupTimeRange(div, data) {
             .scale(range_x)
             .ticks(5));
 
-    brush.move(brushg, [selectedStartSecond, selectedEndSecond].map(range_x));
 
+    //brush.move(brushg, [selectedStartSecond, selectedEndSecond].map(range_x));
+    console.log("1")
     svg.selectAll(".selection")
         .style("stroke", "none")
     svg.selectAll(".handle")
@@ -753,15 +772,11 @@ function setupTimeRange(div, data) {
         .on("mouseout", function (d) {
             d3.select(this).style("cursor", "default");
         })
+    console.log("2")
 
 
 }
 
-
-setTimeout(function () {
-    firstBoot = false
-    bootLast()
-}, 500)
 export default function Validate() {
 
 
@@ -770,7 +785,7 @@ export default function Validate() {
         setTimeout(function () {
             if (firstBoot != true) {
 
-                bootLast()
+                
 
             }
 

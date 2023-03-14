@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { state } from "../index"
 import { user } from "../utils/database"
-import { cleanedData } from "./validate";
 import { getEveryNth, saveCSV } from "../utils/functions";
 import { Link } from "react-router-dom";
 import { waypoints } from "../utils/database";
@@ -23,7 +22,7 @@ var textColor = "white"
 var sidebarWidth = 300
 const backgroundColor = "#d9d9d9"
 
-
+var cleanedData;
 const clusterColors = ["darkred", "blue", "orange", "lightgreen", "purple", "red", "pink", "yellow", "teal"]
 
 function buildClusterTable() {
@@ -102,8 +101,10 @@ function updateClusterTable() {
 
 export function updateClusterGraphs() {
 
+
     console.log("updating clusters")
     if (state != null && state["cluster_means_avg60"] != null) {
+        cleanedData = state.data.relative
         var svg = d3.select("#cosinesvg")
         svg.selectAll("*").remove()
         var clusters = state["cluster_means_avg" + state.resolution]

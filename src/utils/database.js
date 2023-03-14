@@ -16,6 +16,7 @@ import { zoom, updateChartWaypoints, addUserPoints } from "./3d_charts"
 import { getAnalytics } from "firebase/analytics";
 import { state } from "../index"
 import { buildUserSelectors } from "../utils/ui";
+import { bootLast } from '../pages/validate';
 
 
 
@@ -277,7 +278,8 @@ export function addRecording(recording) {
         recording.delete = false
 
         var r = clone(recording)
-        delete r.data
+        delete r.averaged
+        delete r.relative
 
         var promise = addDoc(collection(db, "recordings"), r)
         return promise
@@ -292,7 +294,11 @@ export function updateRecording(recording) {
 
 
     var r = clone(recording)
-    delete r.data
+    
+    delete r.averaged
+    delete r.relative
+    
+    console.log(recording)
     if (r.id != null) {
 
         var date = new Date()
@@ -417,7 +423,7 @@ function signOut() {
 onAuthStateChanged(auth, (fbuser) => {
     // Called anything the authentication state changes: login, log out, anonymous login
     listenLiveUsers()
-    downloadWaypoints()
+    
 
     if (fbuser && fbuser.email == null) {
         anonymous = true
@@ -427,10 +433,9 @@ onAuthStateChanged(auth, (fbuser) => {
 
         user = fbuser
         anonymous = false
-        console.log("Authenticated user:")
-        console.log(user.displayName)
+        console.log("Authenticated user: " + user.displayName)
         d3.select("#user").text("Logged in as: " + user.email)
-
+        downloadWaypoints()
 
         // Automatically start listening for realtime db updates for this user (data from Muse probably)
 
@@ -470,7 +475,7 @@ onAuthStateChanged(auth, (fbuser) => {
                 })
             d3.select("#loginElement").style("display", "flex")
 
-
+            
 
             // Download all waypoints
             var text = d3.select("#welcome-auth")
@@ -558,7 +563,8 @@ export function downloadWaypoints() {
             state.selected_users = users
 
             buildUserSelectors()
-            rebuildChart()
+            rebuildChart() // Plot the waypoints without user points, first
+            bootLast()
 
         })
        

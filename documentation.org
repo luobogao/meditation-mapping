@@ -1,3 +1,10 @@
+* Boot Sequence
+1 - Authenticate
+2 - After an authentication, automatically download waypoints
+3 - Plot waypoints by themselves
+4 - Trigger 'validate' to download this user's recordings
+5 - Load the user's last data file, process the data, and plot
+
 * Data processing flow
 1 - Data is loaded from raw file
 2 - Every band+channel value is converted from log10 back to absolute value, then averaged over 1,10, and 60 seconds

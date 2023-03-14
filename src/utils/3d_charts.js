@@ -188,7 +188,10 @@ export function updateChartWaypoints() {
     }
 
     // Get min/max only from the selected waypoints
-    var standardCoordinates = waypoints.filter(e => e.match == true).map(e => e["projected_avg" + state.resolution]).map(e => e.coordinates)
+    var standardCoordinates = waypoints.filter(e => e.match == true && e.averaging == state.resolution).map(e => e["projected_avg" + state.resolution]).map(e => e.coordinates)
+
+    console.log('coords:')
+    console.log(waypoints)
 
 
     // Find the minimum and maxiumum range of the model, set the chart size a bit larger than those bounds
@@ -345,8 +348,8 @@ function addWaypoints(svg, data) {
             var entry = d3.select(this)
 
             // New waypoint added by user - flash to show where it is
-            if (d.fullentry.new) {
-                d.fullentry.new = null
+            if (d.new) {
+                d.new = null
                 setTimeout(function () {
                     entry
                         .attr("r", 50)
@@ -375,7 +378,7 @@ function addWaypoints(svg, data) {
                     .text("Edit")
                     .on("click", function () {
 
-                        editWaypoint(d.fullentry, menu)
+                        editWaypoint(d, menu)
 
                     })
 
@@ -385,8 +388,8 @@ function addWaypoints(svg, data) {
                     .text("Hide")
                     .on("click", function () {
                         waypoints.forEach(waypoint => {
-                            if (waypoint.id == d.fullentry.id) {
-                                console.log("hiding: " + d.fullentry.id)
+                            if (waypoint.id == d.id) {
+                                console.log("hiding: " + d.id)
                                 waypoint.hide = true
                             }
                         })
@@ -402,9 +405,9 @@ function addWaypoints(svg, data) {
                         menuRemove()
                         var response = window.confirm("Are you sure you want to DELETE this point for all users?")
                         if (response) {
-                            deleteWaypoint(d.fullentry).then(() => {
+                            deleteWaypoint(d).then(() => {
                                 console.log("waypoints: " + waypoints.length)
-                                waypoints.forEach(waypoint => { if (waypoint.id == d.fullentry.id) waypoint.remove = true })
+                                waypoints.forEach(waypoint => { if (waypoint.id == d.id) waypoint.remove = true })
                                 console.log("waypoints2: " + waypoints.length)
                                 rebuildChart()
                             })
@@ -418,7 +421,7 @@ function addWaypoints(svg, data) {
         .on("click", function (i, d) {
             // Toggle red/blue for selected waypoint
             var waypoint = d3.select(this)
-            console.log(d.fullentry)
+            console.log(d)
             var selected = waypoint.attr("selected")
             if (selected) {
                 waypoint.attr("fill", "blue")
@@ -438,13 +441,13 @@ function addWaypoints(svg, data) {
         .on("mouseover", function (event, d) {
 
             if (zooming == false) {
-                var note = d.fullentry.notes
+                var note = d.notes
                 d3.select(this).style("fill", "red")
 
-                const user = d.fullentry.user
+                const user = d.user
                 const menu = addMenu(event, "")
-                menu.append("text").text(d.fullentry.label).style("font-size", "30px")
-                menu.append("text").text(d.fullentry.user).style("font-size", "20px").style("opacity", 0.5)
+                menu.append("text").text(d.label).style("font-size", "30px")
+                menu.append("text").text(d.user).style("font-size", "20px").style("opacity", 0.5)
 
                 // NOTES
                 if (note != undefined) {
@@ -454,8 +457,8 @@ function addWaypoints(svg, data) {
                 }
 
                 // SIMIARITY CHART
-                if (d.fullentry.similarityTimeseries != null) {
-                    //var maxEuclidean = d3.max(d.fullentry.similarityTimeseries.map(e => e.euclideanDistance))
+                if (d.similarityTimeseries != null) {
+                    //var maxEuclidean = d3.max(d.similarityTimeseries.map(e => e.euclideanDistance))
                     //menu.append("text").text("Euclidean: " + parseInt(maxEuclidean)).style("font-size", "30px")
                     menu.append("div")
                         .style("display", "flex")
@@ -466,7 +469,7 @@ function addWaypoints(svg, data) {
                         .style("margin-top", "20px").attr("id", "popup-minichart")
                         .attr("width", 300)
                         .attr("height", 200)
-                    var settings = { lineColor: "white", highlightID: d.fullentry.id, lineSize: 3, type: "absolute", points: 10, size: "mini", key: "cosine" }
+                    var settings = { lineColor: "white", highlightID: d.id, lineSize: 3, type: "absolute", points: 10, size: "mini", key: "cosine" }
                     updateSimilarityChart("popup-minichart", settings)
 
                 }
@@ -503,7 +506,7 @@ function addWaypoints(svg, data) {
     if (r == true && loaded == false) {
         loaded = true
         // Start off already centered on "Parks Mindfulness"
-        //recenter(data.filter(d => d.fullentry.id == "mBpFkiZuZYIopEuHMUtY")[0], 0)
+        //recenter(data.filter(d => d.id == "mBpFkiZuZYIopEuHMUtY")[0], 0)
         rotate(Math.random(), 0, Math.random())
         rotateOpening = setInterval(function () {
             rotateDuration = 100
@@ -513,7 +516,7 @@ function addWaypoints(svg, data) {
     }
     else {
 
-        //    recenter(data.filter(d => d.fullentry.id == bestWaypointMatch)[0], 0)
+        //    recenter(data.filter(d => d.id == bestWaypointMatch)[0], 0)
 
     }
 
@@ -540,7 +543,7 @@ function addLabels(svg, data) {
             return labelSize
         })
 
-        .text(function (d) { return d.fullentry.label })
+        .text(function (d) { return d.label })
 
     names = svg.selectAll(".name")
         .data(data)
@@ -562,7 +565,7 @@ function addLabels(svg, data) {
             return nameSize
         })
 
-        .text(function (d) { return " - " + d.fullentry.user })
+        .text(function (d) { return " - " + d.user })
 }
 
 function buildLinks(svg, waypointData) {
@@ -660,6 +663,8 @@ export function addUserPoints() {
     clearInterval(rotateOpening)
 
     userCircles = state.data.relative.map(e => e["projected_avg" + state.resolution])
+    console.log("user circles:")
+    console.log(userCircles)
 
     cameraProject(userCircles)
 
@@ -698,7 +703,7 @@ function addUserPointsN(data, classname, show) {
         .attr("cy", function (d) { return y(d.yp) })
         .attr("r", function (d) { return userSizeScale(d.z) })
         .attr("seconds", function (d) {
-            return d.moment.seconds
+            return d.seconds
         })
         .style("mix-blend-mode", "multiply") // How the opacity behaves with overlaps
 
@@ -736,7 +741,7 @@ function addUserPointsN(data, classname, show) {
                         .style("margin-top", "20px")
                         .text("Add this Waypoint")
                         .on("click", function () {
-                            addUserWaypoint(d.moment, menu)
+                            addUserWaypoint(d, menu)
 
                         })
                 }
@@ -754,7 +759,7 @@ function addUserPointsN(data, classname, show) {
 
                 // Move the mini-chart marker to the same point
 
-                var seconds = d.moment.seconds
+                var seconds = d.seconds
 
             }
 
@@ -765,7 +770,7 @@ function addUserPointsN(data, classname, show) {
             // Click on a user point
 
             console.log("vector at this point:")
-            console.log(d.moment)
+            console.log(d)
 
             var node = d3.select(this)
 
@@ -792,7 +797,7 @@ function addUserPointsN(data, classname, show) {
 
 }
 function addClusterWaypoints(svg) {
-    var vectors = state["cluster_means_avg10"].map(e => e.vector)
+    var vectors = state["cluster_means_avg" + state.resolution].map(e => e.vector)
 
     var mapped = runModel(vectors)
 
