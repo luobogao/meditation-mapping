@@ -14,6 +14,7 @@ import NavBarCustom from "../utils/navbar";
 import { deleteRecording, addOrReplaceSession, deleteAllrecordings, getRecordingById } from "../utils/indexdb";
 import { navHeight } from "../utils/ui"
 import { updateClusterGraphs } from "./clusters";
+
 const d3 = require("d3");
 
 //deleteAllSessions(function(){})
@@ -40,8 +41,6 @@ var firstBoot = true
 
 
 var workingData = null
-var rawData = null
-var fullData = null
 
 // slider
 var brushg
@@ -96,14 +95,11 @@ export var cleanedData = null
 export function showLoadingValidate() {
     notice("Loading...", "loading")
 }
-export function validate(newFullData, selectedRecord) {
+export function validate() {
 
-    fullData = newFullData
-    rawData = newFullData.data
-    record = selectedRecord
-    selectedStartSecond = selectedRecord.startSecond
-    selectedEndSecond = selectedRecord.endSecond
-    workingData = getEveryNth(rawData.filter(e => e.avg60 == true), 10) // Remove the first few rows
+    selectedStartSecond = record.startSecond
+    selectedEndSecond = record.endSecond
+    workingData = getEveryNth(state.data.averaged.filter(e => e.avg60 == true), 10) // Remove the first few rows
 
     d3.selectAll(".loading").remove()
     buildValidationChart(workingData)
@@ -114,9 +110,9 @@ export function validate(newFullData, selectedRecord) {
     d3.select("#acceptBtn").style("display", "flex")
 
     brush.move(brushg, [selectedStartSecond, selectedEndSecond].map(range_x));
-    
+
     // Hide any loading bars in the history table
-    d3.select("#loading" + selectedRecord.id).style("display", "none")
+    d3.select("#loading" + record.id).style("display", "none")
 
 }
 function bootLast() {
@@ -135,9 +131,10 @@ function bootLast() {
             recordings = recordings.sort((a, b) => b.updatedTime - a.updatedTime)
             var sortedByView = recordings.filter(a => a.delete != true).sort((a, b) => b.updatedTime - a.updatedTime)
             if (sortedByView.length > 0) {
-                record = sortedByView[0]
-                loadRecordData(record)
-                updateRecordingTable(recordings)
+                var lastrecord = sortedByView[0]
+                record = lastrecord
+                loadRecordData(lastrecord)
+                updateRecordingTable()
             }
 
         }
@@ -150,19 +147,19 @@ function loadRecordData(selectedRecord) {
     record = selectedRecord
     selectedStartSecond = selectedRecord.startSecond
     selectedStartSecond = selectedRecord.endSecond
-    if (selectedRecord.data != null) {
-        state.data = selectedRecord.data
-        validate(selectedRecord.data, record)
+    if (selectedRecord.averaged != null) {
+        state.data.averaged = selectedRecord.averaged
+        validate()
     }
     else {
-        getRecordingById(record.filename, function (data) {
-            if (data == null) {
+        getRecordingById(record.filename, function (savedData) {
+            if (savedData == null) {
                 console.error("Can't find record in IndexDB")
             }
             else {
-                state.data = data
-                record.data = data
-                validate(data, record)
+                state.data.averaged = savedData.averaged                
+                record.averaged = savedData.averaged
+                validate()
             }
 
 
@@ -446,9 +443,9 @@ function buildSidebar() {
 
 
 }
-export function updateRecordingTable(entries) {
+export function updateRecordingTable() {
 
-    var nonDeletedEntries = entries.filter(e => e.delete != true)
+    var nonDeletedEntries = recordings.filter(e => e.delete != true)
     var table = d3.select("#recordingTable")
         .style("margin", "10px")
         .style("border-collapse", "separate")
@@ -638,7 +635,7 @@ function prepareForNext(update = true) {
     console.error("compiling")
 
     // Create a new dataset from the raw dataset which starts at the selected time, and definitely has values for the avg60 values
-    var filteredData = clone(rawData.filter(row => row.seconds >= selectedStartSecond && row.avg60 == true && row.seconds <= selectedEndSecond))
+    var filteredData = clone(state.data.averaged.filter(row => row.seconds >= selectedStartSecond && row.avg60 == true && row.seconds <= selectedEndSecond))
     var firstRow = filteredData[0]
 
     record.startSecond = selectedStartSecond
@@ -646,7 +643,8 @@ function prepareForNext(update = true) {
     updateRecording(record)
 
     // Convert all band powers to percentages of the first value
-    filteredData.forEach(row => {
+    for (let i = 0; i < filteredData.length; i++) {
+        var row = filteredData[i]
         channels.forEach(channel => {
             bands.forEach(band => {
                 var avgs = [1, 10, 60]
@@ -662,22 +660,17 @@ function prepareForNext(update = true) {
 
             })
         })
-    })
+    }
+    state.data.relative = filteredData
 
-
-
-    cleanedData = filteredData
-    state.data = cleanedData
-
-
-    rebuildChart({ autoClusters: true, updateCharts: false, updateGraphs: true})
+    rebuildChart({ autoClusters: true, updateCharts: false, updateGraphs: true })
 
 
 }
 
 
 function brushed() {
-    
+
     var range = d3.brushSelection(this)
         .map(range_x.invert);
 
@@ -696,7 +689,7 @@ function brushend() {
     // Called when user stops moving the timeslider
     if (record.startSecond != lastStartSecond || record.endSecond != lastEndSecond) {
         lastStartSecond = record.startSecond
-        lastEndSecond = record.endSecond    
+        lastEndSecond = record.endSecond
         prepareForNext(false)
     }
 }
@@ -765,9 +758,10 @@ function setupTimeRange(div, data) {
 }
 
 
-setTimeout(function(){
+setTimeout(function () {
     firstBoot = false
-    bootLast()}, 500)
+    bootLast()
+}, 500)
 export default function Validate() {
 
 
@@ -775,9 +769,9 @@ export default function Validate() {
         buildPage()
         setTimeout(function () {
             if (firstBoot != true) {
-                
+
                 bootLast()
-                
+
             }
 
         }, 400)
@@ -785,8 +779,8 @@ export default function Validate() {
     }, [])
     useEffect(() => {
         setTimeout(function () {
-            if (fullData != null && !firstBoot) {
-                validate(fullData, record)
+            if (record != null && workingData != null) {
+                validate()
 
             }
         }, 100)

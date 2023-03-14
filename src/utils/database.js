@@ -520,58 +520,48 @@ export function downloadWaypoints() {
     users = []
     getAllWaypoints().then((snapshot) => {
 
-        snapshot.forEach((doc) => {
-            var waypoint = doc.data()
-            waypoint.id = doc.id
+        
+            snapshot.forEach((doc) => {
+                var waypoint = doc.data()
+                waypoint.id = doc.id
 
-            if (waypoint.id != undefined && waypoint.vector != undefined && waypoint.label != undefined && waypoint.user != undefined) {
+                if (waypoint.id != undefined && waypoint.vector != undefined && waypoint.label != undefined && waypoint.user != undefined) {
 
-                // Migration method - adds a "_avg60" to the end of each vector
-                var newVector = {}
-                bands.forEach(band => {
-                    channels.forEach(channel => {
-                        var key = band + "_" + channel
-                        newVector[key + "_avg60"] = waypoint.vector[key]
+                    // Migration method - adds a "_avg60" to the end of each vector
+                    var newVector = {}
+                    bands.forEach(band => {
+                        channels.forEach(channel => {
+                            var key = band + "_" + channel
+                            newVector[key + "_avg60"] = waypoint.vector[key]
+                        })
                     })
-                })
-                waypoint.relative_vector_avg1 = getRelativeVector(newVector, 1)
-                waypoint.relative_vector_avg10 = getRelativeVector(newVector, 10)
-                waypoint.relative_vector_avg60 = getRelativeVector(newVector, 60)
+                    waypoint.relative_vector_avg1 = getRelativeVector(newVector, 1)
+                    waypoint.relative_vector_avg10 = getRelativeVector(newVector, 10)
+                    waypoint.relative_vector_avg60 = getRelativeVector(newVector, 60)
 
-                waypoints.push(waypoint)
-                users.push(waypoint.user)
+                    waypoints.push(waypoint)
+                    users.push(waypoint.user)
+                }
+                
+
+            })
+            
+
+            var d = new Date()
+            var millis = d.getTime()
+            
+            if (waypoints.length == 0 || users.length == 0) {
+                alert("No waypoints found on server!")
+                return
             }
+            users = unique(users).sort()
+            state.selected_users = users
 
+            buildUserSelectors()
+            rebuildChart()
 
         })
-        console.log(waypoints)
-        var d = new Date()
-        var millis = d.getTime()
-        localStorage.setItem("waypoints-updated", millis) // Set this so that other pages can know the waypoints are updated
-        if (waypoints.length == 0 || users.length == 0) {
-            alert("No waypoints found on server!")
-            return
-        }
-        users = unique(users).sort()
-        state.selected_users = users
-
-        // Build model of meditation states using the "vectors.js" file
-        // This first time, include ALL the waypoints
-
-
-        let vectors = waypoints.filter(e => e.exclude != true)
-            .map(e => e.relative_vector_avg60)
-        buildModel(vectors)
-
-        //buildSimilarityChart()
-        updateChartWaypoints()
-        buildUserSelectors()
-        rebuildChart()
-
-
-
-    })
-
+       
 
 }
 

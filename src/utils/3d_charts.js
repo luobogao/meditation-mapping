@@ -153,7 +153,7 @@ export var zoom = d3.zoom()
     .on("end", function () {
         zooming = false
 
-        
+
         readjustAllPoints(0, true)
     })
 
@@ -188,7 +188,7 @@ export function updateChartWaypoints() {
     }
 
     // Get min/max only from the selected waypoints
-    var standardCoordinates = waypoints.filter(e => e.exclude != true).filter(e => e.match == true).map(e => e.coordinates)
+    var standardCoordinates = waypoints.filter(e => e.match == true).map(e => e["projected_avg" + state.resolution]).map(e => e.coordinates)
 
 
     // Find the minimum and maxiumum range of the model, set the chart size a bit larger than those bounds
@@ -259,16 +259,8 @@ export function updateChartWaypoints() {
         .range([0.4, 1])
 
 
-    waypoints.forEach(entry => {
 
-        var xi = entry.coordinates[0]
-        var yi = entry.coordinates[1]
-        var zi = entry.coordinates[2]
-
-        var label = entry.user + " " + entry.label
-        waypointCircles.push({ match: entry.match, x: xi, y: yi, z: zi, fullentry: entry, id: entry.id, label: label })
-
-    })
+    waypointCircles = waypoints.filter(waypoint => waypoint["projected_avg" + state.resolution] != null).map(w => w["projected_avg" + state.resolution])
 
     cameraProject(waypointCircles)
 
@@ -573,7 +565,8 @@ function addLabels(svg, data) {
         .text(function (d) { return " - " + d.fullentry.user })
 }
 
-function buildLinks(svg, waypointData) {svg.selectAll(".userpointsLowRes").style("display", "none")
+function buildLinks(svg, waypointData) {
+    svg.selectAll(".userpointsLowRes").style("display", "none")
     // Use d3-labeler library to move each label so that it doesn't overlap
 
     function overlap(x1, y1, width1, height1, x2, y2) {
@@ -663,54 +656,19 @@ function buildLinks(svg, waypointData) {svg.selectAll(".userpointsLowRes").style
     }
 
 }
-export function addUserPoints(data) {
+export function addUserPoints() {
     clearInterval(rotateOpening)
 
-    var vectors = data.map(e => getRelativeVector(e, state.resolution)).filter(e => e != null)
+    userCircles = state.data.relative.map(e => e["projected_avg" + state.resolution])
 
-    // FOR TESTING: use the waypoints as user point, they should match PERFECTLY with waypoinst
-    //var vectors = waypoints.filter(e => e.match == true).map(e => getRelativeVector(e.vector))
-
-    if (data.length > 30 && userSize == 40) userSize = 20
-
-    userCircles = []
-
-    var mapped = runModel(vectors)
-
-    var index = 0
-
-    mapped.forEach(entry => {
-
-
-        var moment = data[index]
-        var xi = entry[0]
-        var yi = entry[1]
-        var zi = entry[2]
-
-        index++
-
-        userCircles.push({ x: xi, y: yi, z: zi, moment: moment, cluster: moment.cluster_avg10 })
-
-    })
     cameraProject(userCircles)
 
     addUserPointsN(userCircles, "userpoints", true)
 
     // Low Res
-    var vectorsLowRes = getEveryNth(vectors, 10)
-    userCirclesLowRes = []
-    var mappedLowRes = runModel(vectorsLowRes)
-    index = 0
-    mappedLowRes.forEach(entry => {
-        var moment = data[index]
-        var xi = entry[0]
-        var yi = entry[1]
-        var zi = entry[2]
-        svg.selectAll(".userpointsLowRes").style("display", "none")
-        index += 10
-        userCirclesLowRes.push({ x: xi, y: yi, z: zi, moment: moment, cluster: moment.cluster_avg10 })
 
-    })
+    userCirclesLowRes = clone(getEveryNth(userCircles, 10))
+
     cameraProject(userCirclesLowRes)
     addUserPointsN(userCirclesLowRes, "userpointsLowRes", true)
 
@@ -745,10 +703,8 @@ function addUserPointsN(data, classname, show) {
         .style("mix-blend-mode", "multiply") // How the opacity behaves with overlaps
 
 
-        .attr("opacity", function()
-        {
-            if (show == true)
-            {
+        .attr("opacity", function () {
+            if (show == true) {
                 return userOpacity
             }
             else return userLowResOpacity
@@ -988,7 +944,6 @@ function addUserWaypoint(user_point, menu) {
         })
 
 }
-
 function rotate(pitch, yaw, roll) {
 
 
@@ -1049,7 +1004,6 @@ function rotate(pitch, yaw, roll) {
     // Move the SVGs to new rotated coordinates
     readjustAllPoints(rotateDuration, false)
 }
-
 function cameraProject(matrix) {
     var m = []
     matrix.forEach(row => {
@@ -1065,7 +1019,6 @@ function cameraProject(matrix) {
         matrix[i].yp = matrix[i].y // p[1]
     }
 }
-
 function recenter(node, duration) {
 
     var x = node.x
@@ -1182,7 +1135,7 @@ function readjustAllPoints(duration, allPoints) {
             .duration(duration)
 
     }
-  
+
     updatePoints("userpointsLowRes")
     updatePoints("clusterpoints")
     updatePoints("waypoints")

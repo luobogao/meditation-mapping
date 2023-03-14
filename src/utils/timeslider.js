@@ -5,12 +5,12 @@ const d3 = require("d3");
 
 export function buildTimeslider() {
     var svg = d3.select("#timeslider")
-    if (svg.node() != null && state.data != null) {
+    if (svg.node() != null && state.data.relative != null) {
         svg.selectAll("*").remove()
 
 
         var width = parsePx(svg.attr("width"))
-        var data = state.data
+        var data = state.data.relative
         var minSeconds = data[0].seconds
         var maxSeconds = data.slice(-1)[0].seconds
         var totalSeconds = maxSeconds - minSeconds

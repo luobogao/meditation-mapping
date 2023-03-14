@@ -1,0 +1,17 @@
+* Data processing flow
+1 - Data is loaded from raw file
+2 - Every band+channel value is converted from log10 back to absolute value, then averaged over 1,10, and 60 seconds
+3 - "Validate" divides every band+channel value by the starting value for a % change, multiplying+rounding by 1000
+4 - "Analyze" builds a vector by dividing each band+channel by it's opposite side value (tp10/tp9), then taking the LOG of this percentage to get values in the range of -5 to 5
+5 - "RunModel" builds a PCA using these vectors, and also builds a timeseries of cosine/euclidean matches with other waypoints
+
+* State
+- "data":
+   - "averaged":   rows that have been converted to absolute values and averaged
+     ["GammaTP10avg1", "GammaTP10avg10"...]
+
+   - "relative":    values are now a percentage of either the original value or previous values
+     ["GammaTP10avg1relative", "GammaTP10avg10relative"...]
+
+   - "projected"
+

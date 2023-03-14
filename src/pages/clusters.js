@@ -24,7 +24,7 @@ var sidebarWidth = 300
 const backgroundColor = "#d9d9d9"
 
 
-const clusterColors = ["darkred", "blue", "orange", "lightgreen", "purple", "red", "pink", "yellow"]
+const clusterColors = ["darkred", "blue", "orange", "lightgreen", "purple", "red", "pink", "yellow", "teal"]
 
 function buildClusterTable() {
     var table = d3.select("#clustertable")

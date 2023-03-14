@@ -4,12 +4,12 @@ import { Link } from "react-router-dom";
 import { buildTimeslider } from "../utils/timeslider";
 import "firebaseui/dist/firebaseui.css"
 import { addCheckbox, buildChartSelectors, buildClusterCounts, buildResolutionSelectors, buildUserSelectors } from "../utils/ui";
-import { state, waypoints, userDataLoaded } from "../index"
+import { state, userDataLoaded } from "../index"
 import { rebuildChart } from "../utils/runmodel";
 import { firstLoad, downloadCSV } from "../utils/database";
 
 import { updateTimeseries, buildSimilarityChart, updateSimilarityChart } from "../utils/minicharts";
-
+import { waypoints } from "../utils/database";
 import { zoom, updateChartWaypoints, addUserPoints } from "../utils/3d_charts"
 
 import { buildBrowseFile } from "../utils/load";
@@ -52,35 +52,12 @@ const miniChartMargin = 10
 
 var email = null
 
-export function updateAllCharts(reset = false) {
-
-    if (state.data != null) {
-        if (reset == true) {
-            d3.select("#chartsvg").call(zoom.transform, d3.zoomIdentity)
-        }
-        //updateTimeseries("bottom-timeseries", state.highRes)
+export function updateAllCharts() {
+    if (waypoints != null && state.data.relative != null) {
         buildTimeslider()
-
-        if (state.chartType == "pca") {
-            updateChartWaypoints()
-            addUserPoints(state.data)
-            //updateSimilarityChart("miniSimilarityChart")
-            //updateSimilarityChart("miniEuclideanChart", { lineColor: "black", highlightID: null, key: "euclidean", lineSize: 10 })
-        }
-        else if (state.chartType == "euclidean") {
-            updateSimilarityChart("chart", { lineColor: "black", highlightID: null, key: "euclidean", lineSize: 10, type: "absolute", points: 10 })
-        }
-        else if (state.chartType == "cosine") {
-            updateSimilarityChart("chart", { lineColor: "black", highlightID: null, key: "cosine", lineSize: 10, type: "absolute", points: 10 })
-        }
-        else if (state.chartType == "cosine*euclidean") {
-            updateSimilarityChart("chart", { lineColor: "black", highlightID: null, key: "cosine*euclidean", lineSize: 10, type: "absolute", points: 10 })
-        }
-
-        d3.selectAll(".user-selectors").style("display", "flex") // Show the other options now that waypoints are loaded
-
+        updateChartWaypoints()
+        addUserPoints()
     }
-
 
 }
 
@@ -217,7 +194,7 @@ function buildRightSidebar() {
     buildClusterCounts(clustersContainer, "map")
 
     var resolutionContainer = otherSelectors.append("div")
-    
+
     buildResolutionSelectors(resolutionContainer)
 
     // Show Hidden Waypoints
@@ -294,7 +271,7 @@ function buildMiniCharts(div) {
 }
 
 export default function Live() {
-   
+
 
     useEffect(() => {
         buildPage()
@@ -324,7 +301,7 @@ export default function Live() {
                 <div id="menu"></div>
                 <div id="sidebar-right" className="sidebar"></div>
                 <div id="bottom-bar">
-                  
+
                 </div>
                 <div id="top-bar"></div>
                 <div id="welcome"></div>

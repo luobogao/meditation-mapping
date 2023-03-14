@@ -330,7 +330,7 @@ export function covarianceMatrix(matrix) {
 
 }
 
-export function pca(data)
+export function pca(data, avg)
 // Pricipal Component Analysis
 // Takes a matrix and finds a single 2-d vector which can generate a 2-d map of this data
 {
@@ -373,7 +373,8 @@ export function pca(data)
 
     // Take only the two largest vectors (this involves taking the last two COLUMNS of EACH vector)
     var take_N = eigen_vectors.map(e => [e[e.length - 1], e[e.length - 2], e[e.length - 3]])
-    principals = math.transpose(take_N)
+    var principals = math.transpose(take_N)
+    state.models["principals_avg" + avg] = principals
 
 }
 
@@ -388,14 +389,14 @@ export function prepareDataset(rows) {
 
 }
 
-export function runModel(rows)
+export function runModel(rows, avg)
 // Takes rows of vectors calculated from the Muse data, and the principals (output from PCA export function)
 // Returns a list of x-y points, the location on 2-d space for each of those vectors
 
 {
     var d = prepareDataset(rows)
 
-    var mappedCoordinates = math.transpose(math.multiply(principals, d))
+    var mappedCoordinates = math.transpose(math.multiply(state.models["principals_avg" + avg], d))
 
     return mappedCoordinates
 }
