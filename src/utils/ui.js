@@ -2,7 +2,7 @@ import { updateAllCharts } from "../pages/map";
 import { rebuildChart } from "./runmodel";
 import { state } from "../index";
 import { users } from "./database";
-import { updateClusterGraphs, updateMatchesGraph } from "../pages/clusters";
+import { updateClusterGraphs, updateClusters, updateCommunityGraph } from "../pages/clusters";
 
 const d3 = require("d3");
 export const navHeight = 63
@@ -264,7 +264,7 @@ export function buildResolutionSelectors(container) {
             d3.select(this).property("checked", true)
             state.resolution = 1
             updateAllCharts()
-            updateClusterGraphs()
+            updateClusters()
         })
     res10box
         .attr("class", "resolution-checkbox")
@@ -273,7 +273,7 @@ export function buildResolutionSelectors(container) {
             d3.select(this).property("checked", true)
             state.resolution = 10
             updateAllCharts()
-            updateClusterGraphs()
+            updateClusters()
         })
     res60box
         .attr("class", "resolution-checkbox")
@@ -283,7 +283,7 @@ export function buildResolutionSelectors(container) {
             state.resolution = 60
 
             updateAllCharts()
-            updateClusterGraphs()
+            updateClusters()
         })
 
 }
@@ -381,7 +381,7 @@ export function buildSimilaritySelectors(container) {
             d3.selectAll(".similaritySelector").property("checked", false)
             d3.select(this).property("checked", true)
             state.similarityType = "cosine"
-            updateMatchesGraph()
+            updateCommunityGraph()
         })
     euclidean
         .attr("class", "similaritySelector")
@@ -389,7 +389,7 @@ export function buildSimilaritySelectors(container) {
             d3.selectAll(".similaritySelector").property("checked", false)
             d3.select(this).property("checked", true)
             state.similarityType = "euclidean"
-            updateMatchesGraph()
+            updateCommunityGraph()
         })
 
 

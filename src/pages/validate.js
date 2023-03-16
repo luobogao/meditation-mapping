@@ -4,7 +4,7 @@ import { notice } from "../utils/ui";
 import { buildBrowseFile } from "../utils/load";
 import { sliderBottom } from 'd3-simple-slider';
 import { state } from "../index"
-import { getAllRecordings, addRecording, currentRecording, deleteRecordingFirebase, setCurrentRecording, updateRecording, waypoints } from "../utils/database";
+import { getAllRecordings, addRecording, currentRecording, deleteRecordingFirebase, setCurrentRecording, updateRecording, waypoints, getRecordingFromStorage } from "../utils/database";
 import { datastate } from "../utils/load";
 import { round, clone, formatDate, getEveryNth } from '../utils/functions';
 import { bands, channels } from "../utils/muse"
@@ -13,7 +13,7 @@ import MultiRangeSlider from "multi-range-slider-react";
 import NavBarCustom from "../utils/navbar";
 import { deleteRecording, addOrReplaceSession, deleteAllrecordings, getRecordingById } from "../utils/indexdb";
 import { navHeight } from "../utils/ui"
-import { updateClusterGraphs } from "./clusters";
+
 
 const d3 = require("d3");
 
@@ -95,8 +95,7 @@ export var cleanedData = null
 export function showLoadingValidate() {
     notice("Loading...", "loading")
 }
-export function validateAfterLoad(loadedData, newRecording)
-{
+export function validateAfterLoad(loadedData, newRecording) {
     recordings.push(newRecording)
     record = newRecording
     updateRecordingTable(recordings)
@@ -105,22 +104,27 @@ export function validateAfterLoad(loadedData, newRecording)
 }
 export function validate() {
 
-    selectedStartSecond = record.startSecond
-    selectedEndSecond = record.endSecond
-    workingData = getEveryNth(state.data.averaged.filter(e => e.avg60 == true), 10) // Remove the first few rows
+    if (state.data.averaged != null) {
+        selectedStartSecond = record.startSecond
+        selectedEndSecond = record.endSecond
+        workingData = getEveryNth(state.data.averaged.filter(e => e.avg60 == true), 10) // Remove the first few rows
 
-    d3.selectAll(".loading").remove()
-    buildValidationChart()
-    buildRatioCharts()
-    prepareForNext(false)
-    updateRelative(selectedStartSecond, selectedEndSecond)
-    updateRecordingTable(recordings)
-    d3.select("#acceptBtn").style("display", "flex")
+        d3.selectAll(".loading").remove()
+        buildValidationChart()
+        buildRatioCharts()
+        prepareForNext(false)
+        updateRelative(selectedStartSecond, selectedEndSecond)
+        updateRecordingTable(recordings)
+        d3.select("#acceptBtn").style("display", "flex")
 
-    brush.move(brushg, [selectedStartSecond, selectedEndSecond].map(range_x));
+        brush.move(brushg, [selectedStartSecond, selectedEndSecond].map(range_x));
 
-    // Hide any loading bars in the history table
-    d3.select("#loading" + record.id).style("display", "none")
+        // Hide any loading bars in the history table
+        d3.select("#loading" + record.id).style("display", "none")
+
+    }
+
+
 
 }
 export function bootLast() {
@@ -129,6 +133,7 @@ export function bootLast() {
         recordings = []
         if (snapshot.length == 0) {
             console.error("No recordings in Firebase!")
+
         }
         else {
             snapshot.forEach((doc) => {
@@ -163,6 +168,7 @@ export function bootLast() {
 function loadRecordData(selectedRecord) {
     d3.select("#loading" + selectedRecord.id).style("display", "flex")
     record = selectedRecord
+    console.log("Loading record: " + record.filename)
     selectedStartSecond = selectedRecord.startSecond
     selectedStartSecond = selectedRecord.endSecond
     if (selectedRecord.averaged != null) {
@@ -172,7 +178,8 @@ function loadRecordData(selectedRecord) {
     else {
         getRecordingById(record.filename, function (savedData) {
             if (savedData == null) {
-                console.error("Can't find record in IndexDB")
+                console.error("--> Can't find record in IndexDB, checking on Firebase storage")
+                getRecordingFromStorage(record.filename)
             }
             else {
                 state.data.averaged = savedData.data
@@ -650,7 +657,8 @@ function buildPage() {
 }
 
 function prepareForNext(update = true) {
-    console.error("compiling")
+    console.log("---- COMPILING RELATIVE DATA ----")
+    
 
     // Create a new dataset from the raw dataset which starts at the selected time, and definitely has values for the avg60 values
     var filteredData = clone(state.data.averaged.filter(row => row.seconds >= selectedStartSecond && row.avg60 == true && row.seconds <= selectedEndSecond))
@@ -681,7 +689,7 @@ function prepareForNext(update = true) {
     }
     state.data.relative = filteredData
 
-    rebuildChart({ autoClusters: true, updateCharts: false, updateGraphs: true })
+    rebuildChart()
 
 
 }
@@ -759,7 +767,7 @@ function setupTimeRange(div, data) {
 
 
     //brush.move(brushg, [selectedStartSecond, selectedEndSecond].map(range_x));
-    console.log("1")
+    
     svg.selectAll(".selection")
         .style("stroke", "none")
     svg.selectAll(".handle")
@@ -772,9 +780,7 @@ function setupTimeRange(div, data) {
         .on("mouseout", function (d) {
             d3.select(this).style("cursor", "default");
         })
-    console.log("2")
-
-
+    
 }
 
 export default function Validate() {
@@ -785,7 +791,7 @@ export default function Validate() {
         setTimeout(function () {
             if (firstBoot != true) {
 
-                
+
 
             }
 

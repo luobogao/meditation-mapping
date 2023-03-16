@@ -133,11 +133,9 @@ function uploadNewCSV(dataJSON) {
         addOrReplaceSession(dataJSON, function () {
             console.log("-----------> Added to IndexDB")
         })
+                        
+        validateAfterLoad(dataJSON, recording)
         
-
-        validate(dataJSON, recording)
-        updateRecordingTable(recordings)
-
         return
     }
     else {

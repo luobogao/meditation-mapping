@@ -5,7 +5,9 @@ const d3 = require("d3");
 
 export function buildTimeslider() {
     var svg = d3.select("#timeslider")
+        
     if (svg.node() != null && state.data.relative != null) {
+        
         svg.selectAll("*").remove()
 
 
@@ -50,7 +52,7 @@ export function buildTimeslider() {
                                 break;
                         }
 
-                        var diff = Math.abs(d.moment.percent - percent)
+                        var diff = Math.abs(d.percent - percent)
 
                         var inverse = 100 - Math.pow(diff * 100, decay)
                         if (inverse < 0) inverse = 0
@@ -71,7 +73,7 @@ export function buildTimeslider() {
                                 break;
                         }
                         decay = 5
-                        var diff = Math.abs(d.moment.percent - percent)
+                        var diff = Math.abs(d.percent - percent)
                         var inverse = 100 - Math.pow(diff * 100, decay)
                         if (inverse < 0) inverse = 0
                         return (inverse / 20) + "px"

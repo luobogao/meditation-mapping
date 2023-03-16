@@ -8,7 +8,7 @@ import About from "./pages/about"
 import Home from "./pages/home"
 import Layout from "./pages/layout"
 import Map from "./pages/map"
-import Record from "./pages/record"
+import Record, { stopListeners } from "./pages/record"
 import Validate from "./pages/validate"
 import Clusters from "./pages/clusters"
 import 'bootstrap/dist/css/bootstrap.min.css';
@@ -48,7 +48,6 @@ export var state =
   }
 
 }
-
 
 
 

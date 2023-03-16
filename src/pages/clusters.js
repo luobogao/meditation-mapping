@@ -15,15 +15,20 @@ const d3 = require("d3");
 var x, y, line, start, end, line
 var cluster = { id: -1 } // currently selected cluster
 const margin = 10
+const labelMargin = 120 // margin to show the names beside each cosine line
 const navHeight = 63
 const width = window.innerWidth * 0.8
+const availableHeight = window.innerHeight - navHeight - 4 * margin
+const userHeight = availableHeight * 0.382  // golden ratio
+const communityHeight = availableHeight - userHeight
 const height = (window.innerHeight - navHeight) * 0.4
 var textColor = "white"
 var sidebarWidth = 300
 const backgroundColor = "#d9d9d9"
 
 var cleanedData;
-const clusterColors = ["darkred", "blue", "orange", "lightgreen", "purple", "red", "pink", "yellow", "teal"]
+const clusterColors = ["darkred", "blue", "orange", "lightgreen",
+    "purple", "red", "pink", "yellow", "teal", "green", "darkorange"]
 
 function buildClusterTable() {
     var table = d3.select("#clustertable")
@@ -101,17 +106,11 @@ function updateClusterTable() {
 
 export function updateClusterGraphs() {
 
-
-    console.log("updating clusters")
     if (state != null && state["cluster_means_avg60"] != null) {
-        cleanedData = state.data.relative
+
         var svg = d3.select("#cosinesvg")
         svg.selectAll("*").remove()
         var clusters = state["cluster_means_avg" + state.resolution]
-        start = cleanedData[0].seconds
-        end = cleanedData.slice(-1)[0].seconds
-
-        updateClusterTable()
 
 
 
@@ -134,6 +133,8 @@ export function updateClusterGraphs() {
 
         })
 
+
+
         svg.on("click", function () {
             var newRows = []
             for (let i = 0; i < data[0].length; i++) {
@@ -147,13 +148,10 @@ export function updateClusterGraphs() {
             saveCSV(newRows)
         })
 
-        x = d3.scaleLinear()
-            .domain([start, end])
-            .range([margin, width - margin])
 
         y = d3.scaleLinear()
             .domain([minY, 105])
-            .range([height - margin, margin])
+            .range([userHeight - margin, margin])
 
         line = d3.line()
             .x(function (d, i) { return x(d.seconds); })
@@ -181,6 +179,21 @@ export function updateClusterGraphs() {
             .attr("cy", 0)
             .attr("r", 10)
             .attr("fill", "blue")
+
+        // Find the median of each time-series, make a new key "yVar" showing variance from median
+        for (let i = 0; i < data[0].length; i++) {
+            var medianAvgArr = []
+            for (let j = 0; j < data.length; j++) {
+                medianAvgArr.push(data[j][i].y)
+            }
+            var median = d3.median(medianAvgArr)
+            data.forEach(cluster => {
+                cluster[i].median = median
+                cluster[i].yVar = cluster[i].y - median
+                cluster[i].y = cluster[i].yVar
+            })
+        }
+
 
         // Moouseover the graph - this requires a separate rect to watch for mouse events
         svg.append("svg:rect")
@@ -211,40 +224,25 @@ export function updateClusterGraphs() {
             })
 
     }
-    updateMatchesGraph()
+    updateCommunityGraph()
 
 }
-export function updateMatchesGraph() {
+export function updateCommunityGraph() {
     var svg = d3.select("#communitysvg")
     if (svg.node() != null) {
         svg.selectAll('*').remove()
 
-        start = cleanedData[0].seconds
-        end = cleanedData.slice(-1)[0].seconds
-
-        var labelMargin = 120 // margin to show the names beside each cosine line
-        x = d3.scaleLinear()
-            .domain([start, end])
-            .range([margin, width - margin - labelMargin])
 
 
         var matchType = state.similarityType
-
-        var minY = 40
-        if (matchType == "euclidean")
-        {
-            minY = -30
-        }
-        y = d3.scaleLinear()
-            .domain([minY, 100])
-            .range([height - margin, margin])
+        var matchTypeVariance = state.similarityType + "_var"
 
 
 
         line = d3.line()
             .x(function (d, i) { return x(d.seconds); })
-            .y(function (d, i) { return y(d[matchType]) })
-            .defined(((d, i) => !isNaN(d[matchType])))
+            .y(function (d, i) { return y(d[matchTypeVariance]) })
+            .defined(((d, i) => !isNaN(d[matchTypeVariance])))
             .curve(d3.curveMonotoneX) // apply smoothing to the line
 
 
@@ -252,10 +250,69 @@ export function updateMatchesGraph() {
         var i = 0
         waypoints.forEach(w => {
             w.id = i
+            w.match = false
             i++
         })
+
+        // Build graph data - for each cluster, return a list of time-series matches
+        var getNth = 60
+        var data = waypoints.map(waypoint => {
+            return getEveryNth(waypoint.timeseriesSimilarity, getNth)
+        })
+
+
+        // Find the median of each time-series, make a new key "_var" showing variance from median
+        for (let i = 0; i < data[0].length; i++) {
+            var medianAvgArr = []
+            for (let j = 0; j < data.length; j++) {
+                medianAvgArr.push(data[j][i][matchType])
+            }
+            var median = d3.median(medianAvgArr)
+            data.forEach(cluster => {
+                cluster[i].median = median
+                cluster[i][matchTypeVariance] = cluster[i][matchType] - median
+
+            })
+        }
+
+        // Find min/max of all time-series
+        var minY = 0
+        var maxY = 0
+        if (matchType == "euclidean") {
+            minY = -30
+        }
+        data.forEach(line => {
+            line.forEach(row => {
+                if (row[matchTypeVariance] < minY) {
+                    minY = row[matchTypeVariance]
+                }
+                if (row[matchTypeVariance] > maxY) {
+                    maxY = row[matchTypeVariance]
+                }
+            })
+        })
+
+        // Find the top 4 waypoint matches
+        var topMatches = []
+        for (let i = 0; i < data.length; i++) {
+            topMatches.push({ i: i, max: d3.max(data[i].map(d => d[matchTypeVariance])) })
+        }
+        var colori = 0
+        topMatches.sort((a, b) => b.max - a.max).map(e => e.i).slice(0, 4).forEach(i => {
+            var waypoint = waypoints[i]
+            waypoint.color = clusterColors[colori]
+            waypoint.match = true
+            colori++
+        })
+
+
+        y = d3.scalePow()
+            .exponent(1)
+            .domain([minY, maxY])
+            .range([communityHeight - margin, margin])
+
         svg.selectAll(".matchesLine")
-            .data(waypoints)
+            .data(data)
             .enter()
             .append("path")
             .attr("id", function (d, i) { return "matchesLine" + i })
@@ -269,28 +326,46 @@ export function updateMatchesGraph() {
             .on('mouseover', function (event, d) {
                 console.log(d)
             })
-            .attr("stroke", function (d, i) { return clusterColors[i] })
+            .attr("stroke", function (d, i) {
+                if (waypoints[i].match == true) {
+                    return waypoints[i].color
+                }
+                else return "lightgray"
+
+            })
+            .style("opacity", function (d, i) {
+                if (waypoints[i].match == true) {
+                    return 1
+                }
+                else return 0.2
+
+            })
             .attr("stroke-width", 3)
             .attr("d", function (d) {
                 var getNth = d.averaging / 2  // Every waypoint has it's own 'averaging' value (1,10,60)
                 if (getNth < 1) getNth = 1
 
-                return line(getEveryNth(d["timeseriesSimilarity"], getNth))
+                return line(d)
             })
 
+        // Add a legend
         var legend = []
         var i = -1
-        waypoints.forEach(waypoint => {
-            var lastEntry = waypoint["timeseriesSimilarity"].slice(-1)[0]
+        data.forEach(series => {
+            var lastEntry = series.slice(-1)[0]
             i++
 
-            svg.append("text")
-                .attr("id", "text-legend-" + i)
-                .text(waypoint.user)
-                .style("fill", function () { return clusterColors[i] })
-                .attr("x", x(lastEntry.seconds) + 10)
-                .attr("y", y(lastEntry[matchType]))
-            legend.push({ y: y(lastEntry[matchType]), id: i })
+            var waypoint = waypoints[i]
+            if (waypoint.match == true) {
+                svg.append("text")
+                    .attr("id", "text-legend-" + i)
+                    .text(waypoints[i].user)
+                    .style("fill", function () { return waypoint.color })
+                    .attr("x", x(lastEntry.seconds) + 10)
+                    .attr("y", y(lastEntry[matchTypeVariance]))
+                legend.push({ y: y(lastEntry[matchTypeVariance]), id: i })
+            }
+
         })
         addLegend(svg, legend)
     }
@@ -411,15 +486,15 @@ function buildPage() {
 
     // User's clusters SVG
     d3.select("#cosine").append("svg").attr("id", "cosinesvg")
-        .style("margin", "10px")
+        .style("margin", margin + "px")
         .attr("width", width + "px")
-        .attr("height", height + "px")
+        .attr("height", userHeight + "px")
 
     // Community graph SVG
     d3.select("#cosine").append("svg").attr("id", "communitysvg")
-        .style("margin", "10px")
+        .style("margin", margin + "px")
         .attr("width", width + "px")
-        .attr("height", height + "px")
+        .attr("height", communityHeight + "px")
 
 
     // Sidebar
@@ -456,22 +531,37 @@ function buildPage() {
 
 
 }
+export function updateClusters() {
+    if (state.data.relative == null) {
+        console.error("No data to show clusters")
+        return
+    }
+    cleanedData = state.data.relative
 
+    start = cleanedData[0].seconds
+    end = cleanedData.slice(-1)[0].seconds
+
+    x = d3.scaleLinear()
+        .domain([start, end])
+        .range([margin, width - margin - labelMargin])
+
+    updateClusterTable()
+    updateClusterGraphs()
+    updateCommunityGraph()
+}
 
 export default function Clusters() {
     useEffect(() => {
         buildPage()
         if (cleanedData != null && state != null) {
-            updateClusterGraphs()
-            updateMatchesGraph()
+            updateClusters()
         }
 
 
     }, [])
     useEffect(() => {
         if (cleanedData != null) {
-            updateClusterGraphs()
-            updateMatchesGraph()
+            updateClusters()
         }
     })
 

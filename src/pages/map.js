@@ -6,7 +6,7 @@ import "firebaseui/dist/firebaseui.css"
 import { addCheckbox, buildChartSelectors, buildClusterCounts, buildResolutionSelectors, buildUserSelectors } from "../utils/ui";
 import { state, userDataLoaded } from "../index"
 import { rebuildChart } from "../utils/runmodel";
-import { firstLoad, downloadCSV } from "../utils/database";
+import { firstLoad } from "../utils/database";
 
 import { updateTimeseries, buildSimilarityChart, updateSimilarityChart } from "../utils/minicharts";
 import { waypoints } from "../utils/database";
@@ -168,7 +168,7 @@ function buildWelcome() {
     addBtn("Use Random Example")
         .on("click", function () {
             d3.select("#welcome").remove()
-            downloadCSV("Self-Inquiry - BEST.csv")
+            alert("This feature is not yet implemented. Please upload a Muse file.")
         })
 
 
@@ -185,7 +185,7 @@ function buildRightSidebar() {
         .attr("id", "user-selectors")
 
     var otherSelectors = sidebar.append("div").style("margin", "10px").style("margin-top", "50px")
-        .style("display", "none")
+        .style("display", "flex")
         .style("flex-direction", "column")
         .attr("class", "user-selectors")
 
@@ -228,7 +228,7 @@ function buildBottomBar() {
     bar.style("position", "absolute")
         //.style("height", "50px")
         .attr("class", "user-selectors")
-        .style("display", "none")
+        .style("display", "flex")
         .style("bottom", 0 + "px")
         .style("left", "100px")
         .style("justify-content", "center")

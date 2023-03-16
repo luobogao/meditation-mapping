@@ -1,7 +1,7 @@
 import { dot, getRelativeVector, pca, findSlope, runModel, measureDistance, cosineSimilarity, euclideanDistance, combinedDistance, getRootVector } from "../utils/analysis";
 import { state } from "../index.js"
 import { updateChartWaypoints } from "./3d_charts";
-import { updateClusterGraphs } from "../pages/clusters";
+import { updateClusters } from "../pages/clusters";
 import kmeans from '@jbeuckm/k-means-js'
 import { phamBestK } from '@jbeuckm/k-means-js'
 import { updateAllCharts } from "../pages/map";
@@ -9,19 +9,8 @@ import { waypoints } from "./database";
 import { disableLogging, enableLogging } from "./functions";
 
 const maxWaypoints = 5  // Take top N waypoints sorted by cosine distance to user's data
-export function buildModel(vectors, avg) {
-    // Builds the AI model using a collection of input vectors
-    // These vectors are the raw (but averaged) values for each band/channel
-    // Okay to use a mix of the "standard" vectors plus a few user vectors
-    // Does not return x-y points - for that, need to call "run model" using the parameters set by this function
 
-
-    pca(vectors, avg)
-
-
-
-}
-export function rebuildChart(settings = { autoClusters: true, updateCharts: true }) {
+export function rebuildChart(settings = { autoClusters: true, updateCharts: true, updateGraphs: true }) {
     
     if (waypoints == null || waypoints.length == 0) {
         console.error("No waypoints!")
@@ -47,7 +36,7 @@ export function rebuildChart(settings = { autoClusters: true, updateCharts: true
     
             var label = waypoint.user + " " + waypoint.label
     
-            waypoint["projected_avg" + 60] = { match: waypoint.match, x: xi, y: yi, z: zi, id: entry.id, label: label, coordinates: [xi, yi, zi]}
+            waypoint["projected_avg" + 60] = { match: waypoint.match, x: xi, y: yi, z: zi, id: entry.id, label: waypoint.label, user: waypoint.user, coordinates: [xi, yi, zi]}
             i ++
     
         })
@@ -56,14 +45,14 @@ export function rebuildChart(settings = { autoClusters: true, updateCharts: true
     }
     else {
         state.zoom = 1
-        rebuild(60, settings)
+        rebuild(state.resolution, settings)
         if (settings.updateCharts == true) {
             updateAllCharts()
         }
         if (settings.updateGraphs == true) {
 
         }
-        updateClusterGraphs()
+        updateClusters()
 
     }
 
@@ -226,7 +215,13 @@ function rebuild(avg, settings) {
 
     // Re-build the PCA using only the top-N waypoints
     var topNwaypoint = waypointsAvg.filter(waypoint => waypoint.match == true).map(waypoint => waypoint["relative_vector_avg" + avg])
-    buildModel(topNwaypoint, avg)
+    if (topNwaypoint.length == 0) 
+    {
+        console.error("No waypoints found for PCA! - Using ALL waypoints")
+        topNwaypoint = waypointsAvg.map(waypoint => waypoint["relative_vector_avg" + avg])
+    }
+    
+    pca(topNwaypoint, avg)
 
     // Build x-y points for each waypoint and store them
     let waypointCoordinates = runModel(waypointsAvg.map(e => e["relative_vector_avg" + avg]), avg)
@@ -240,7 +235,7 @@ function rebuild(avg, settings) {
 
         var label = waypoint.user + " " + waypoint.label
 
-        waypoint["projected_avg" + avg] = { match: waypoint.match, x: xi, y: yi, z: zi, fullentry: entry, id: entry.id, label: label, coordinates: [xi, yi, zi] }
+        waypoint["projected_avg" + avg] = { match: waypoint.match, x: xi, y: yi, z: zi, user: waypoint.user, id: entry.id, label: waypoint.label, coordinates: [xi, yi, zi] }
         i ++
 
     })
@@ -282,9 +277,10 @@ function rebuild(avg, settings) {
     var vectors = state.data.relative.map(e => e["relative_vector_avg" + avg]).filter(e => e != null)
     var mapped = runModel(vectors, avg)
     var index = 0
+    var size = mapped.length
     mapped.forEach(entry => {
 
-
+        var percent = index / size
         var moment = state.data.relative[index]
         var xi = entry[0]
         var yi = entry[1]
@@ -292,7 +288,7 @@ function rebuild(avg, settings) {
 
         index++
 
-        moment["projected_avg" + avg] = { x: xi, y: yi, z: zi, cluster: moment["cluster_avg" + avg] }
+        moment["projected_avg" + avg] = { x: xi, y: yi, z: zi, percent: percent, cluster: moment["cluster_avg" + avg] }
 
     })
 

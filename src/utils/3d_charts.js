@@ -190,10 +190,7 @@ export function updateChartWaypoints() {
     // Get min/max only from the selected waypoints
     var standardCoordinates = waypoints.filter(e => e.match == true && e.averaging == state.resolution).map(e => e["projected_avg" + state.resolution]).map(e => e.coordinates)
 
-    console.log('coords:')
-    console.log(waypoints)
-
-
+    
     // Find the minimum and maxiumum range of the model, set the chart size a bit larger than those bounds
     minx = d3.min(standardCoordinates.map(e => e[0]))
     miny = d3.min(standardCoordinates.map(e => e[1]))
@@ -265,6 +262,7 @@ export function updateChartWaypoints() {
 
     waypointCircles = waypoints.filter(waypoint => waypoint["projected_avg" + state.resolution] != null).map(w => w["projected_avg" + state.resolution])
 
+    
     cameraProject(waypointCircles)
 
     addLabels(svg, waypointCircles)
@@ -273,7 +271,7 @@ export function updateChartWaypoints() {
         //adjustLabels()
     }
 
-    //buildLinks(svg, waypointCircles)
+    //adjustLabels(svg, waypointCircles)
     addWaypoints(svg, waypointCircles)
 
 
@@ -339,10 +337,11 @@ function addWaypoints(svg, data) {
             if (mode3d == true) {
                 return waypointOpacity //opacityWaypoint(z(d.z))
             }
-            else return waypointOpacity
+            if (d.match) return waypointOpacity
+            else return 0
 
         })
-
+        
         .attr("fill", function (d) {
             // Option: don't display a waypoint if 'match' is false
             var entry = d3.select(this)
@@ -360,8 +359,8 @@ function addWaypoints(svg, data) {
                 }, 100)
             }
 
-            if (d.match) return waypointColor
-            else return "red"
+            if (state.showAllWaypoints == false && d.match == false) return "none"
+            else return waypointColor
         })
         .on("contextmenu", function (event, d) {
             event.preventDefault()
@@ -568,68 +567,8 @@ function addLabels(svg, data) {
         .text(function (d) { return " - " + d.user })
 }
 
-function buildLinks(svg, waypointData) {
-    svg.selectAll(".userpointsLowRes").style("display", "none")
-    // Use d3-labeler library to move each label so that it doesn't overlap
-
-    function overlap(x1, y1, width1, height1, x2, y2) {
-        if ((x2 > x1 && x2 < (x1 + width1)) && (y2 > y1 && y2 < (y1 + height1))) {
-            return true
-        }
-    }
-
-
-
-    var test_array = []
-    labels.each(function () {
-        var width = parseInt(this.getBBox().width)
-        var height = this.getBBox().height;
-        var element = d3.select(this)
-
-        var entry = {}
-        entry.width = width;
-        entry.height = height;
-        entry.id = element.attr("id")
-        entry.x = parseInt(parseFloat(element.attr("x")))
-        entry.y = parseInt(parseFloat(element.attr("y")))
-        entry.z = parseInt(parseFloat(element.attr("z")))
-        test_array.push(entry)
-
-
-
-
-    })
-
-    var test_overlaps = false
-    if (test_overlaps == true) {
-        // Doesn't work right yet, the overlap boundaries are wrong
-        d3.selectAll('.label').style("opacity", 1)
-        test_array.forEach(label1 => {
-
-            test_array.forEach(label2 => {
-                if (label1.id != label2.id) {
-                    if (overlap(label1.x, label1.y, label1.width, label1.height, label2.x, label2.y)) {
-
-                        if (label1.z > label2.z) {
-                            d3.select("#" + label2.id).style("opacity", 0.2)
-                        }
-                        else {
-
-                            d3.select("#" + label1.id).style("opacity", 0.2)
-                        }
-                    }
-
-                }
-
-
-            })
-
-
-        })
-
-    }
-
-    var use_library = false
+function adjustLabels(svg, waypointData) {
+        var use_library = false
 
     // Testing: using d3-labeller library
     if (use_library == true) {
@@ -663,9 +602,7 @@ export function addUserPoints() {
     clearInterval(rotateOpening)
 
     userCircles = state.data.relative.map(e => e["projected_avg" + state.resolution])
-    console.log("user circles:")
-    console.log(userCircles)
-
+    
     cameraProject(userCircles)
 
     addUserPointsN(userCircles, "userpoints", true)
@@ -798,8 +735,8 @@ function addUserPointsN(data, classname, show) {
 }
 function addClusterWaypoints(svg) {
     var vectors = state["cluster_means_avg" + state.resolution].map(e => e.vector)
-
-    var mapped = runModel(vectors)
+    
+    var mapped = runModel(vectors, state.resolution)
 
     clusterWaypoints = []
 
@@ -1160,8 +1097,5 @@ function readjustAllPoints(duration, allPoints) {
 
 
 }
-
-
-
 
 

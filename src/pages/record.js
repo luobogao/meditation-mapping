@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { clone, getEveryNth} from "../utils/functions";
+import { clone, getEveryNth } from "../utils/functions";
 import { login, eegdata, addMarker, getAllMarkers, auth, buildAuthContainer } from "../utils/database";
 import { ZoomTransform } from "d3";
 const d3 = require("d3");
@@ -229,7 +229,7 @@ var maxBarX = maxBarXdefault
 var barWidth = d3.scaleLinear()
     .domain([0, maxBarX])
     .range([0, 100])
-    
+
 var barY = d3.scaleLinear()
     .domain([0, 20])
     .range([0, 400])
@@ -289,6 +289,7 @@ function pushNotice(message) {
 }
 function startGraphInterval() {
     graphInterval = setInterval(function () {
+
         var lastRecord = eegDataRecord.slice(-1)[0]
         if (lastRecord != null) {
             var lastTime = lastRecord.timestamp
@@ -625,7 +626,7 @@ function updateBarChart(btns) {
             barWidth = d3.scaleLinear()
                 .domain([0, maxBarX])
                 .range([0, 100])
-               
+
 
         }
 
@@ -686,10 +687,9 @@ function modifyEEG(entry, history) {
                 normal[keyStandard] = parseFloat(entry[key].toFixed(4))
 
                 var historyAvgArr = []
-                last10.forEach(entry => 
-                    {                        
-                        historyAvgArr.push(entry[key])
-                    })
+                last10.forEach(entry => {
+                    historyAvgArr.push(entry[key])
+                })
                 var historyAvg = d3.mean(historyAvgArr)
                 if (isNaN(historyAvg)) historyAvg = 1
                 entry[key + "_avg10"] = historyAvg
@@ -700,8 +700,8 @@ function modifyEEG(entry, history) {
     }
 
     eegRecordStandard.push(normal)
-    
-    
+
+
     return entry
 
 }
@@ -870,24 +870,22 @@ function rescaleTimeseries() {
     moveBy("timechart2svg", (60 * 10), "_avg10", 10)
 
 }
-function stopListeners() {
+export function stopListeners() {
 
-    if (recording != false) {
+    clearInterval(gamepadInterval)
+    clearInterval(graphInterval)
+    graphInterval = null
+    recording = false
 
-        clearInterval(gamepadInterval)
-        recording = false
-        console.log("USER TIMEOUT")
-
-        var res = window.confirm("Restart?")
-        if (res == true) {
-            watchGamepad()
-            resetRecord()
-            var d = new Date()
-            lastActivity = d.getTime()
-        }
-
+}
+function start() {
+    if (gamepadInterval == null || graphInterval == null) {
+        watchGamepad()
+        startGraphInterval()
+        resetRecord()
+        var d = new Date()
+        lastActivity = d.getTime()
     }
-
 
 }
 function lostApp() {
@@ -1068,7 +1066,7 @@ function recordEEG() {
 
         }
         else {
-            
+
         }
 
         lastEEGdata = modifyEEG(lastEEGdata, eegDataRecord)
@@ -1105,7 +1103,7 @@ function setupEEGgraph() {
         var svg = d3.select("#" + svgid)
 
         svg.selectAll(".eegline").data(eegLineIds)
-            .enter().append('path').attr("id", function (d) { return d + ex})
+            .enter().append('path').attr("id", function (d) { return d + ex })
             .attr("class", "eegline")
             .attr("fill", "none")
             .attr("stroke", function (d, i) {
@@ -1138,6 +1136,7 @@ function vibrateGamepad() {
 function watchGamepad() {
     clearInterval(gamepadInterval)
     gamepadInterval = setInterval(function () {
+
 
         // ===> Get a fresh GamepadList! <===
 
@@ -1367,7 +1366,7 @@ export function resetRecord() {
     eegDataRecord = []
 
 
-    pushNotice("Resetting...")
+    //pushNotice("Resetting...")
     updateBarChart(null)
     updateTimeSeries(null)
 
@@ -1410,6 +1409,19 @@ function buildIndicators(div) {
 }
 
 function buildPage() {
+
+    document.addEventListener("visibilitychange", function () {
+        if (document.hidden == true) {
+            console.log("Hidden!")
+            stopListeners()
+        }
+        else {
+            console.log("returned!")
+            start()
+        }
+
+    });
+
 
     d3.select("#root").style("height", window.innerHeight + "px")
     var header = d3.select("#header")
@@ -1486,7 +1498,7 @@ function buildPage() {
 
     // TIMESERIES 2
     charts.append("svg")
-    .style("margin-left", "10px")
+        .style("margin-left", "10px")
         .style("border", "1px solid black")
         .attr("width", timeseriesWidth)
         .attr("height", timeseriesHeight)
@@ -1568,28 +1580,6 @@ function buildPage() {
         })
     })
 
-    // Detect when user tabs away
-    document.addEventListener("visibilitychange", function () {
-
-        if (document.hidden) {
-            console.log("HIDDEN")
-            tabVisibile = false
-
-            clearInterval(gamepadInterval)
-        }
-        else {
-            console.log("RETURNED")
-            tabVisibile = true
-
-            watchGamepad()
-
-        }
-    });
-
-
-
-
-
 }
 
 export default function Record() {
@@ -1597,6 +1587,10 @@ export default function Record() {
         buildPage()
 
     }, [])
+    useEffect(() => {
+        start()
+
+    })
 
 
     return (

@@ -11,7 +11,7 @@ import "firebaseui/dist/firebaseui.css"
 import firebase from "firebase/compat/app"
 import { bands, channels } from "../utils/muse"
 import { getRelativeVector } from '../utils/analysis';
-import { buildModel, rebuildChart } from "../utils/runmodel"
+import {  rebuildChart } from "../utils/runmodel"
 import { zoom, updateChartWaypoints, addUserPoints } from "./3d_charts"
 import { getAnalytics } from "firebase/analytics";
 import { state } from "../index"
@@ -228,11 +228,11 @@ export function updateUsername() {
     }
 
 }
-export function downloadCSV(path) {
-    var pathReference = storageRef(storage, "Self-Inquiry - BEST.csv")
+export function getRecordingFromStorage(filename) {
+    var pathReference = storageRef(storage, filename + "csv")
     getBlob(pathReference).then((blob) => {
         blob.text().then((string) => {
-            console.log("---> Downloaded CSV")
+            console.log("-----> Got CSV from storage")
             processCSV(string)
 
         })
@@ -298,7 +298,6 @@ export function updateRecording(recording) {
     delete r.averaged
     delete r.relative
     
-    console.log(recording)
     if (r.id != null) {
 
         var date = new Date()
