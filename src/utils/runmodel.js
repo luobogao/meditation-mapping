@@ -7,11 +7,13 @@ import { phamBestK } from '@jbeuckm/k-means-js'
 import { updateAllCharts } from "../pages/map";
 import { waypoints } from "./database";
 import { disableLogging, enableLogging } from "./functions";
+import { computeRobustMean } from "./vectorMedians";
 
 const maxWaypoints = 5  // Take top N waypoints sorted by cosine distance to user's data
 
+
 export function rebuildChart(settings = { autoClusters: true, updateCharts: true, updateGraphs: true }) {
-    
+
     if (waypoints == null || waypoints.length == 0) {
         console.error("No waypoints!")
         return
@@ -27,18 +29,18 @@ export function rebuildChart(settings = { autoClusters: true, updateCharts: true
         var mapped = runModel(vectors, 60)
         var i = 0
         mapped.forEach(entry => {
-    
+
             var xi = entry[0]
             var yi = entry[1]
             var zi = entry[2]
             var waypoint = waypoints[i]
             waypoint.match = true
-    
+
             var label = waypoint.user + " " + waypoint.label
-    
-            waypoint["projected_avg" + 60] = { match: waypoint.match, x: xi, y: yi, z: zi, id: entry.id, label: waypoint.label, user: waypoint.user, coordinates: [xi, yi, zi]}
-            i ++
-    
+
+            waypoint["projected_avg" + 60] = { match: waypoint.match, x: xi, y: yi, z: zi, id: entry.id, label: waypoint.label, user: waypoint.user, coordinates: [xi, yi, zi] }
+            i++
+
         })
         updateChartWaypoints()
         return
@@ -65,7 +67,7 @@ function rebuild(avg, settings) {
         console.error("No waypoints found with avg: " + avg)
         return
     }
-
+    console.log("a1")
 
     // Find nearby waypoints to user's data - use every 60 seconds
     state.data.relative.forEach(entry => entry["relative_vector_avg" + avg] = getRelativeVector(entry, avg))
@@ -91,6 +93,7 @@ function rebuild(avg, settings) {
         clusters = result.K
 
     }
+    enableLogging()
 
     // Find Clusters
     var kmeansResult = kmeans.cluster(points, clusters)
@@ -111,9 +114,26 @@ function rebuild(avg, settings) {
             id: cluster_i
         }
     })
+    //state["cluster_means_avg" + avg] = means
+
+
+
+    // Cluster means using robust method
+    var means = []
+    console.log("finding medians for " + clusters + " clusters")
+    for (let i = 0; i < clusters; i++) {
+
+        var clusterRows = state.data.relative.filter(row => row["cluster_avg" + avg] == i)
+        var vectors = clusterRows.map(row => row["relative_vector_avg" + avg])
+        var mean = computeRobustMean(vectors)
+        var entry = {
+            vector: mean,
+            id: i
+        }
+        means.push(entry)
+    }
     state["cluster_means_avg" + avg] = means
 
-    enableLogging()
 
     // Find closest row to each mean cluster vector
     // -- Using the mean vectors found for each cluster, loop through each row tagged with that cluster and find the closest row to that mean (using cosine)
@@ -215,12 +235,11 @@ function rebuild(avg, settings) {
 
     // Re-build the PCA using only the top-N waypoints
     var topNwaypoint = waypointsAvg.filter(waypoint => waypoint.match == true).map(waypoint => waypoint["relative_vector_avg" + avg])
-    if (topNwaypoint.length == 0) 
-    {
+    if (topNwaypoint.length == 0) {
         console.error("No waypoints found for PCA! - Using ALL waypoints")
         topNwaypoint = waypointsAvg.map(waypoint => waypoint["relative_vector_avg" + avg])
     }
-    
+
     pca(topNwaypoint, avg)
 
     // Build x-y points for each waypoint and store them
@@ -236,7 +255,7 @@ function rebuild(avg, settings) {
         var label = waypoint.user + " " + waypoint.label
 
         waypoint["projected_avg" + avg] = { match: waypoint.match, x: xi, y: yi, z: zi, user: waypoint.user, id: entry.id, label: waypoint.label, coordinates: [xi, yi, zi] }
-        i ++
+        i++
 
     })
 
