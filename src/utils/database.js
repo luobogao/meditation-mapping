@@ -229,7 +229,7 @@ export function updateUsername() {
 
 }
 export function getRecordingFromStorage(filename) {
-    var pathReference = storageRef(storage, filename + "csv")
+    var pathReference = storageRef(storage, "MeditationRecordings/" + filename + ".csv")
     getBlob(pathReference).then((blob) => {
         blob.text().then((string) => {
             console.log("-----> Got CSV from storage")

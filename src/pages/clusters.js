@@ -193,6 +193,7 @@ export function updateClusterGraphs() {
                 cluster[i].y = cluster[i].yVar
             })
         }
+      
 
 
         // Moouseover the graph - this requires a separate rect to watch for mouse events
@@ -248,15 +249,16 @@ export function updateCommunityGraph() {
 
         // Add indexes to the wapoints so that a click event can get that index
         var i = 0
-        waypoints.forEach(w => {
-            w.id = i
-            w.match = false
+        var waypointsAvg = waypoints.filter(w => w["timeseriesSimilarity_avg" + state.resolution] != null)
+        waypointsAvg.forEach(w => {
+            w.clickid = i
+            w.topmatch = false
             i++
         })
 
         // Build graph data - for each cluster, return a list of time-series matches
         var getNth = state.resolution / 2
-        var data = waypoints.filter(waypoint => waypoint["timeseriesSimilarity_avg" + state.resolution] != null).map(waypoint => {
+        var data = waypointsAvg.map(waypoint => {
             return getEveryNth(waypoint["timeseriesSimilarity_avg" + state.resolution], getNth)
         })
 
@@ -298,10 +300,12 @@ export function updateCommunityGraph() {
             topMatches.push({ i: i, max: d3.max(data[i].map(d => d[matchTypeVariance])) })
         }
         var colori = 0
-        topMatches.sort((a, b) => b.max - a.max).map(e => e.i).slice(0, 4).forEach(i => {
-            var waypoint = waypoints[i]
+        var sortedTopMatches = topMatches.sort((a, b) => b.max - a.max).map(e => e.i).slice(0, 4)
+        var allPositiveMatches = topMatches.filter(e => e.max > 10).map(e => e.i)
+        allPositiveMatches.forEach(i => {
+            var waypoint = waypointsAvg[i]
             waypoint.color = clusterColors[colori]
-            waypoint.match = true
+            waypoint.topmatch = true
             colori++
         })
 
@@ -321,20 +325,20 @@ export function updateCommunityGraph() {
             .on("click", function (event, waypoint) {
 
                 d3.select(this).remove()
-                d3.select("#text-legend-" + waypoint.id).remove()
+                d3.select("#text-legend-" + waypoint.clickid).remove()
             })
             .on('mouseover', function (event, d) {
-                console.log(d)
+
             })
             .attr("stroke", function (d, i) {
-                if (waypoints[i].match == true) {
-                    return waypoints[i].color
+                if (waypointsAvg[i].topmatch == true) {
+                    return waypointsAvg[i].color
                 }
                 else return "lightgray"
 
             })
             .style("opacity", function (d, i) {
-                if (waypoints[i].match == true) {
+                if (waypointsAvg[i].topmatch == true) {
                     return 1
                 }
                 else return 0.2
@@ -355,11 +359,11 @@ export function updateCommunityGraph() {
             var lastEntry = series.slice(-1)[0]
             i++
 
-            var waypoint = waypoints[i]
-            if (waypoint.match == true) {
+            var waypoint = waypointsAvg[i]
+            if (waypoint.topmatch == true) {
                 svg.append("text")
                     .attr("id", "text-legend-" + i)
-                    .text(waypoints[i].user)
+                    .text(waypoint.user)
                     .style("fill", function () { return waypoint.color })
                     .attr("x", x(lastEntry.seconds) + 10)
                     .attr("y", y(lastEntry[matchTypeVariance]))

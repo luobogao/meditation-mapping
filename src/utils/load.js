@@ -134,7 +134,7 @@ function uploadNewCSV(dataJSON) {
             console.log("-----------> Added to IndexDB")
         })
                         
-        validateAfterLoad(dataJSON, recording)
+        validateAfterLoad(dataJSON, null)
         
         return
     }

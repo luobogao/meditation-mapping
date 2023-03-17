@@ -42,7 +42,7 @@ export function rebuildChart(settings = { autoClusters: true, updateCharts: true
     }
     else {
         state.zoom = 1
-        console.log("Rebuilding charts with averaging: " + state.resolution + " seconds")
+        
         rebuild(state.resolution, settings)
         if (waypoints.filter(waypoint => waypoint["relative_vector_avg" + state.resolution] != null).length == 0) {
             console.error("No waypoints with this resolution! Skipping map")
@@ -63,7 +63,7 @@ export function rebuildChart(settings = { autoClusters: true, updateCharts: true
 function rebuild(avg, settings) {
     
     let waypointsAvg = waypoints.filter(waypoint => waypoint["relative_vector_avg" + avg] != null)
-    console.log("Using " + waypointsAvg.length + " waypoints with avg: " + avg )
+    
     
     var ignoreWaypoints = false
     if (waypointsAvg.length == 0) {
@@ -112,7 +112,7 @@ function rebuild(avg, settings) {
 
     // Cluster means using robust method
     var means = []
-    console.log("finding medians for " + clusters + " clusters")
+    
     for (let i = 0; i < clusters; i++) {
 
         var clusterRows = state.data.relative.filter(row => row["cluster_avg" + avg] == i)
@@ -176,6 +176,7 @@ function rebuild(avg, settings) {
         waypointsAvg.forEach(waypoint => {
 
             var id = waypoint.id
+            
             var distance = measureDistance(uservector, waypoint["relative_vector_avg" + avg])
 
 
@@ -214,7 +215,7 @@ function rebuild(avg, settings) {
         // Use ALL waypoints
         filtered_waypoint_ids = waypointsAvg.map(e => e.id)
     }
-
+    
     // Update ALL waypoints with match=true if their ids match
     waypointsAvg.forEach(waypoint => {
 
@@ -226,7 +227,7 @@ function rebuild(avg, settings) {
     })
 
     // Re-build the PCA using only the top-N waypoints
-    var topNwaypoint = waypointsAvg.filter(waypoint => waypoint.match == true).map(waypoint => waypoint["relative_vector_avg" + avg])
+    var topNwaypoint = waypointsAvg.filter(waypoint => waypoint.match == true && waypoint["relative_vector_avg" + avg]).map(waypoint => waypoint["relative_vector_avg" + avg])
     if (topNwaypoint.length == 0) {
         console.error("No waypoints found for PCA! - Using ALL waypoints")
         waypoints.forEach(waypoint => {

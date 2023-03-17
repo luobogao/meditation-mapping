@@ -320,75 +320,77 @@ function clickedGamepadButton(id) {
     else {
         var date = new Date()
         var millis = date.getTime()
-        lastActivity = millis
+        if ((millis - lastActivity) < 500) {
+            lastActivity = millis
 
-        var mode = d3.select("#mode-select").property("value")
-        var code = buttonMap[id]
-        var name = buttonMapOut[mode][code]
-        var color = buttonColors[name]
+            var mode = d3.select("#mode-select").property("value")
+            var code = buttonMap[id]
+            var name = buttonMapOut[mode][code]
+            var color = buttonColors[name]
 
-        if (name == "START") {
-            resetRecord()
-        }
-
-        btn_history.push({ timestamp: millis, id: id, value: id, tag: name, color: color })
-
-
-        if (foundGamepad == false) {
-            foundGamepad = true
-            name = "Start"
-            code = ""
-
-        }
-        else {
-
-        }
-
-        // Add +1 to the total count for this button name
-        if (buttonClickCounts[name] != null) {
-            buttonClickCounts[name] = buttonClickCounts[name] + 1
-        }
-        else {
-            buttonClickCounts[name] = 1
-        }
-
-        // Bar Chart
-        var btns = Object.entries(buttonClickCounts)
-        updateBarChart(btns)
-
-        // Time Series
-
-        // Check if the user has come back to page after a long time - if yes, reset any existing data
-        if (buttonTimeSeries.length > 0) {
-            var lastMillis = buttonTimeSeries.slice(-1)[0].timestamp
-            var timeDiff_btn = millis - lastMillis
-            var timeDiff_start = millis - timestart
-            if (timeDiff_btn > (1000 * 60 * 30) || timeDiff_start > (1000 * 60 * 60 * 4)) {
+            if (name == "START") {
                 resetRecord()
             }
 
-        }
-        // Add a new timeseries entry
-        var adjustedTimestamp = millis - (1000 * tagDelay) // Subtract some seconds for two reasons: 1) Adjust for user reaction, 2) the SVG cuts of last few seconds
-        var newClick = { timestamp: adjustedTimestamp, button: name, color: color }
-        buttonTimeSeries.push(newClick)
+            btn_history.push({ timestamp: millis, id: id, value: id, tag: name, color: color })
 
-        // Update chart
-        updateTimeSeries(buttonTimeSeries)
 
-        var marker = { vector: eegdata, marker: name, user: auth.currentUser.uid }
-        markers.push(marker)
-        if (museConnected == true) {
+            if (foundGamepad == false) {
+                foundGamepad = true
+                name = "Start"
+                code = ""
 
-            if (dataGood == true) {
-                var p = addMarker(eegdata, name)
-                p.then((doc) => {
-                    console.log("Logged marker")
+            }
+            else {
 
-                }
-                )
             }
 
+            // Add +1 to the total count for this button name
+            if (buttonClickCounts[name] != null) {
+                buttonClickCounts[name] = buttonClickCounts[name] + 1
+            }
+            else {
+                buttonClickCounts[name] = 1
+            }
+
+            // Bar Chart
+            var btns = Object.entries(buttonClickCounts)
+            updateBarChart(btns)
+
+            // Time Series
+
+            // Check if the user has come back to page after a long time - if yes, reset any existing data
+            if (buttonTimeSeries.length > 0) {
+                var lastMillis = buttonTimeSeries.slice(-1)[0].timestamp
+                var timeDiff_btn = millis - lastMillis
+                var timeDiff_start = millis - timestart
+                if (timeDiff_btn > (1000 * 60 * 30) || timeDiff_start > (1000 * 60 * 60 * 4)) {
+                    resetRecord()
+                }
+
+            }
+            // Add a new timeseries entry
+            var adjustedTimestamp = millis - (1000 * tagDelay) // Subtract some seconds for two reasons: 1) Adjust for user reaction, 2) the SVG cuts of last few seconds
+            var newClick = { timestamp: adjustedTimestamp, button: name, color: color }
+            buttonTimeSeries.push(newClick)
+
+            // Update chart
+            updateTimeSeries(buttonTimeSeries)
+
+            var marker = { vector: eegdata, marker: name, user: auth.currentUser.uid }
+            markers.push(marker)
+            if (museConnected == true) {
+
+                if (dataGood == true) {
+                    var p = addMarker(eegdata, name)
+                    p.then((doc) => {
+                        console.log("Logged marker")
+
+                    }
+                    )
+                }
+
+            }
         }
 
     }

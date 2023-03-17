@@ -96,9 +96,13 @@ export function showLoadingValidate() {
     notice("Loading...", "loading")
 }
 export function validateAfterLoad(loadedData, newRecording) {
-    recordings.push(newRecording)
-    record = newRecording
-    updateRecordingTable(recordings)
+    if (newRecording != null) {
+        recordings.push(newRecording)
+
+    }
+    record = recordings.filter(r => r.filename == loadedData.filename)[0]
+    console.log("record", record)
+    updateRecordingTable()
     state.data.averaged = loadedData.data
     validate()
 }
@@ -460,7 +464,7 @@ function buildSidebar() {
 
                 }
                 )
-                updateRecordingTable(recordings)
+                updateRecordingTable()
 
 
             })
@@ -470,13 +474,14 @@ function buildSidebar() {
 }
 export function updateRecordingTable() {
 
-    var nonDeletedEntries = recordings.filter(e => e.delete != true)
+    //var nonDeletedEntries = recordings.filter(e => e.delete != true)
+
     var table = d3.select("#recordingTable")
         .style("margin", "10px")
         .style("border-collapse", "separate")
         .style("border-spacing", "0 5px")
 
-    var d = table.selectAll('tr').data(nonDeletedEntries)
+    var d = table.selectAll('tr').data(recordings)
 
     d.style("background", function (d) {
         if (d.id == record.id) return "green"
@@ -490,6 +495,10 @@ export function updateRecordingTable() {
         .attr("id", function (d) { return "row" + d.id })
         .attr("class", "recordrow")
         .style("cursor", "pointer")
+        .style("opacity", function (d) {
+            if (d.delete == true) return 0.5
+            else return 1
+        })
         .style("background", function (d) {
             if (d.filename == record.filename) {
                 return "green"
@@ -497,8 +506,11 @@ export function updateRecordingTable() {
             else return "none"
         })
         .on("click", function (event, d) {
+            
             d3.selectAll(".recordrow").style("background", "none")
-            d3.select("#row" + d.id).style("background", "green")
+            d3.select("#row" + d.id)
+                .style("background", "green")
+                .style("opacity", 1)
             setTimeout(function () { loadRecordData(d) }, 80)
 
 
@@ -545,6 +557,8 @@ export function updateRecordingTable() {
         .text(function (recording) {
             return recording.user
         })
+
+    // Delete Button
     row.append("td")
         .style("border-top-right-radius", "5px")
         .style("border-bottom-right-radius", "5px")
@@ -558,9 +572,9 @@ export function updateRecordingTable() {
         .style("color", "red")
         .on("click", function (event, d) {
             event.stopPropagation()
-            console.log("removing: " + d.id)
+            console.log("removing: " + d.id)            
             var row = d3.select("#row" + d.id)
-            row.remove()
+            row.style("opacity", 0.5)
             deleteRecording(d.filename, function () {
                 console.log("------> Deleted!")
                 deleteRecordingFirebase(d, false).then(() => {
@@ -658,7 +672,7 @@ function buildPage() {
 
 function prepareForNext(update = true) {
     console.log("---- COMPILING RELATIVE DATA ----")
-    
+
 
     // Create a new dataset from the raw dataset which starts at the selected time, and definitely has values for the avg60 values
     var filteredData = clone(state.data.averaged.filter(row => row.seconds >= selectedStartSecond && row.avg60 == true && row.seconds <= selectedEndSecond))
@@ -767,7 +781,7 @@ function setupTimeRange(div, data) {
 
 
     //brush.move(brushg, [selectedStartSecond, selectedEndSecond].map(range_x));
-    
+
     svg.selectAll(".selection")
         .style("stroke", "none")
     svg.selectAll(".handle")
@@ -780,7 +794,7 @@ function setupTimeRange(div, data) {
         .on("mouseout", function (d) {
             d3.select(this).style("cursor", "default");
         })
-    
+
 }
 
 export default function Validate() {
