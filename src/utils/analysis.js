@@ -336,9 +336,10 @@ export function pca(data, avg)
 {
 
     if (data.length == 0) {
-        //console.error("calling PCA with no data!")
+        console.error("calling PCA with no data!")
         return
     }
+    
 
     // Starting matrix
     var matrix = clone(data)

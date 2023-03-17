@@ -14,17 +14,12 @@ const maxWaypoints = 5  // Take top N waypoints sorted by cosine distance to use
 
 export function rebuildChart(settings = { autoClusters: true, updateCharts: true, updateGraphs: true }) {
 
-    if (waypoints == null || waypoints.length == 0) {
-        console.error("No waypoints!")
-        return
-    }
-
     // Tests for data quality
     if (state.data.relative == null) {
         console.log("Plotting only waypoints, no user points yet")
         // Only plot the waypoints - user hasn't loaded data yet
 
-        let vectors = waypoints.map(e => e.relative_vector_avg60)
+        let vectors = waypoints.filter(waypoint => waypoint["relative_vector_avg60"] != null).map(waypoint => waypoint["relative_vector_avg60"])
         pca(vectors, 60)
         var mapped = runModel(vectors, 60)
         var i = 0
@@ -47,13 +42,18 @@ export function rebuildChart(settings = { autoClusters: true, updateCharts: true
     }
     else {
         state.zoom = 1
+        console.log("Rebuilding charts with averaging: " + state.resolution + " seconds")
         rebuild(state.resolution, settings)
-        if (settings.updateCharts == true) {
-            updateAllCharts()
+        if (waypoints.filter(waypoint => waypoint["relative_vector_avg" + state.resolution] != null).length == 0) {
+            console.error("No waypoints with this resolution! Skipping map")
         }
-        if (settings.updateGraphs == true) {
+    
+        else {
+            
+            updateAllCharts()
 
         }
+
         updateClusters()
 
     }
@@ -61,17 +61,21 @@ export function rebuildChart(settings = { autoClusters: true, updateCharts: true
 }
 
 function rebuild(avg, settings) {
-
+    
     let waypointsAvg = waypoints.filter(waypoint => waypoint["relative_vector_avg" + avg] != null)
+    console.log("Using " + waypointsAvg.length + " waypoints with avg: " + avg )
+    
+    var ignoreWaypoints = false
     if (waypointsAvg.length == 0) {
-        console.error("No waypoints found with avg: " + avg)
-        return
+        console.error("No waypoints found with avg: " + avg) 
+        ignoreWaypoints = true
+        waypoints.forEach(waypoint => waypoint["relative_vector_avg" + avg] = waypoint["relative_vector_avg60"])
+        waypointsAvg = waypoints
+        
     }
-    console.log("a1")
 
-    // Find nearby waypoints to user's data - use every 60 seconds
+    // Calculate vector for each moment of user data
     state.data.relative.forEach(entry => entry["relative_vector_avg" + avg] = getRelativeVector(entry, avg))
-
 
     // Find Clusters 
     // -- Uses a k-means library to tag each row with a cluster number, and finds a "mean" vector for each cluster
@@ -103,18 +107,6 @@ function rebuild(avg, settings) {
         var clusterNumber = kmeansResult.assignments[i]
         state.data.relative[i]["cluster_avg" + avg] = clusterNumber
     }
-
-    // Cluster means
-    var means = kmeansResult.means
-    var cluster_i = -1
-    means = means.map(mean => {
-        cluster_i++
-        return {
-            vector: mean.map(v => Math.round(v)),
-            id: cluster_i
-        }
-    })
-    //state["cluster_means_avg" + avg] = means
 
 
 
@@ -237,6 +229,9 @@ function rebuild(avg, settings) {
     var topNwaypoint = waypointsAvg.filter(waypoint => waypoint.match == true).map(waypoint => waypoint["relative_vector_avg" + avg])
     if (topNwaypoint.length == 0) {
         console.error("No waypoints found for PCA! - Using ALL waypoints")
+        waypoints.forEach(waypoint => {
+            waypoint.match = true
+        })
         topNwaypoint = waypointsAvg.map(waypoint => waypoint["relative_vector_avg" + avg])
     }
 
@@ -284,7 +279,7 @@ function rebuild(avg, settings) {
                 }
             }
             )
-            waypoint.timeseriesSimilarity = timeseriesSimilarity.filter(e => e.cosine != undefined)
+            waypoint["timeseriesSimilarity_avg" + state.resolution] = timeseriesSimilarity.filter(e => e.cosine != undefined)
 
         }
 

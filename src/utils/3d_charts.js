@@ -189,8 +189,11 @@ export function updateChartWaypoints() {
 
     // Get min/max only from the selected waypoints
     var standardCoordinates = waypoints.filter(e => e.match == true && e.averaging == state.resolution).map(e => e["projected_avg" + state.resolution]).map(e => e.coordinates)
+    if (standardCoordinates.length == 0) {
+        console.error("Map: No waypoints to display")
+        return
+    }
 
-    
     // Find the minimum and maxiumum range of the model, set the chart size a bit larger than those bounds
     minx = d3.min(standardCoordinates.map(e => e[0]))
     miny = d3.min(standardCoordinates.map(e => e[1]))
@@ -262,7 +265,7 @@ export function updateChartWaypoints() {
 
     waypointCircles = waypoints.filter(waypoint => waypoint["projected_avg" + state.resolution] != null).map(w => w["projected_avg" + state.resolution])
 
-    
+
     cameraProject(waypointCircles)
 
     addLabels(svg, waypointCircles)
@@ -341,7 +344,7 @@ function addWaypoints(svg, data) {
             else return 0
 
         })
-        
+
         .attr("fill", function (d) {
             // Option: don't display a waypoint if 'match' is false
             var entry = d3.select(this)
@@ -568,7 +571,7 @@ function addLabels(svg, data) {
 }
 
 function adjustLabels(svg, waypointData) {
-        var use_library = false
+    var use_library = false
 
     // Testing: using d3-labeller library
     if (use_library == true) {
@@ -602,7 +605,11 @@ export function addUserPoints() {
     clearInterval(rotateOpening)
 
     userCircles = state.data.relative.map(e => e["projected_avg" + state.resolution])
-    
+    if (userCircles.length == 0) {
+        console.error("Map: No user points found!")
+        return
+    }
+
     cameraProject(userCircles)
 
     addUserPointsN(userCircles, "userpoints", true)
@@ -735,7 +742,7 @@ function addUserPointsN(data, classname, show) {
 }
 function addClusterWaypoints(svg) {
     var vectors = state["cluster_means_avg" + state.resolution].map(e => e.vector)
-    
+
     var mapped = runModel(vectors, state.resolution)
 
     clusterWaypoints = []
@@ -917,7 +924,10 @@ function rotate(pitch, yaw, roll) {
     var transform = [[Axx, Axy, Axz], [Ayx, Ayy, Ayz], [Azx, Azy, Azz]]
 
     // Rotate Waypoints
-    rotatethis(waypointCircles)
+    if (waypointCircles.length > 0) {
+        rotatethis(waypointCircles)
+    }
+
 
     // Rotate User Points
     if (userCircles.length > 0) {
@@ -972,11 +982,14 @@ function recenter(node, duration) {
 
     var updates = [userCircles, waypointCircles, clusterWaypoints, userCirclesLowRes]
     updates.forEach(arr => {
-        arr.forEach(entry => {
-            entry.x = entry.x - x
-            entry.y = entry.y - y
-            entry.z = entry.z - z
-        })
+        if (arr.length != 0) {
+            arr.forEach(entry => {
+                entry.x = entry.x - x
+                entry.y = entry.y - y
+                entry.z = entry.z - z
+            })
+
+        }
 
     })
 

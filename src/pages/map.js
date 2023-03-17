@@ -277,8 +277,8 @@ export default function Live() {
         buildPage()
 
         setTimeout(function () {
-            console.log("MAP is re-rending, rebuilding chart")
-            updateAllCharts()
+            console.log("MAP is re-rendering, rebuilding chart")
+            rebuildChart()
         }, 100)
 
 

@@ -1,4 +1,4 @@
-import { updateAllCharts } from "../pages/map";
+
 import { rebuildChart } from "./runmodel";
 import { state } from "../index";
 import { users } from "./database";
@@ -229,7 +229,7 @@ export function buildChartSelectors(div) {
                 d3.selectAll(".chart-checkbox").property("checked", false)
                 d3.select(this).property("checked", true)
                 state.chartType = el.key
-                updateAllCharts(true)
+                console.error("TODO: add a callback")
             })
     })
 
@@ -263,8 +263,8 @@ export function buildResolutionSelectors(container) {
             d3.selectAll(".resolution-checkbox").property("checked", false)
             d3.select(this).property("checked", true)
             state.resolution = 1
-            updateAllCharts()
-            updateClusters()
+            rebuildChart()
+            
         })
     res10box
         .attr("class", "resolution-checkbox")
@@ -272,8 +272,8 @@ export function buildResolutionSelectors(container) {
             d3.selectAll(".resolution-checkbox").property("checked", false)
             d3.select(this).property("checked", true)
             state.resolution = 10
-            updateAllCharts()
-            updateClusters()
+            rebuildChart()
+            
         })
     res60box
         .attr("class", "resolution-checkbox")
@@ -281,9 +281,8 @@ export function buildResolutionSelectors(container) {
             d3.selectAll(".resolution-checkbox").property("checked", false)
             d3.select(this).property("checked", true)
             state.resolution = 60
-
-            updateAllCharts()
-            updateClusters()
+            rebuildChart()
+            
         })
 
 }

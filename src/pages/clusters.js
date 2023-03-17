@@ -106,7 +106,7 @@ function updateClusterTable() {
 
 export function updateClusterGraphs() {
 
-    if (state != null && state["cluster_means_avg60"] != null) {
+    if (state != null && state["cluster_means_avg" + state.resolution] != null) {
 
         var svg = d3.select("#cosinesvg")
         svg.selectAll("*").remove()
@@ -255,9 +255,9 @@ export function updateCommunityGraph() {
         })
 
         // Build graph data - for each cluster, return a list of time-series matches
-        var getNth = 60
-        var data = waypoints.map(waypoint => {
-            return getEveryNth(waypoint.timeseriesSimilarity, getNth)
+        var getNth = state.resolution / 2
+        var data = waypoints.filter(waypoint => waypoint["timeseriesSimilarity_avg" + state.resolution] != null).map(waypoint => {
+            return getEveryNth(waypoint["timeseriesSimilarity_avg" + state.resolution], getNth)
         })
 
 

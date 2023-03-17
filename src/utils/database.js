@@ -22,7 +22,7 @@ import { bootLast } from '../pages/validate';
 
 const d3 = require("d3");
 
-export var waypoints
+export var waypoints = []
 export var users;
 export var userDataLoaded = false
 
@@ -536,20 +536,21 @@ export function downloadWaypoints() {
                     bands.forEach(band => {
                         channels.forEach(channel => {
                             var key = band + "_" + channel
-                            newVector[key + "_avg60"] = waypoint.vector[key]
+                            newVector[key + "_avg" + waypoint.averaging] = waypoint.vector[key]
                         })
                     })
-                    waypoint.relative_vector_avg1 = getRelativeVector(newVector, 1)
-                    waypoint.relative_vector_avg10 = getRelativeVector(newVector, 10)
-                    waypoint.relative_vector_avg60 = getRelativeVector(newVector, 60)
 
+                    
+                    waypoint["relative_vector_avg" + waypoint.averaging] = getRelativeVector(newVector, waypoint.averaging)                    
                     waypoints.push(waypoint)
+                    
                     users.push(waypoint.user)
                 }
                 
 
             })
-            
+            console.log("waypoints:")
+            console.log(waypoints)
 
             var d = new Date()
             var millis = d.getTime()
