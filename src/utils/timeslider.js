@@ -1,6 +1,7 @@
 import { parsePx } from "./functions"
 import { state } from "../index";
 import { sliderBottom } from 'd3-simple-slider';
+import { userOpacity, userSize } from "./3d_charts";
 const d3 = require("d3");
 
 export function buildTimeslider() {
@@ -35,6 +36,14 @@ export function buildTimeslider() {
                 var percent = second / totalSeconds
 
                 let userPoints = d3.selectAll(".userpoints")
+
+                // Reset points
+                if (percent < 0.01 || second < 5)
+                {
+                    userPoints.style("opacity", userOpacity)
+                    userPoints.attr("r", userSize + "px")
+                    return
+                }
 
                 userPoints
                     .style("opacity", function (d, i) {

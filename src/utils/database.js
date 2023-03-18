@@ -1,6 +1,6 @@
 import { getFirestore, collection, getDocs, setDoc, doc, deleteDoc, updateDoc, query, where, addDoc } from 'firebase/firestore/lite';
 import { processCSV } from "./load"
-import { getStorage, ref as storageRef, getBlob, uploadString, getDownloadURL, updateMetadata } from "firebase/storage"
+import { getStorage, deleteObject, ref as storageRef, getBlob, uploadString, getDownloadURL, updateMetadata } from "firebase/storage"
 import { arraysEqual, clone, unique } from './functions';
 import { getDatabase, ref as dbref, onValue, off, get } from "firebase/database"
 import { resetRecord, startRecording } from '../pages/record';
@@ -364,6 +364,17 @@ export function updateWaypoint(waypoint) {
         var promise = updateDoc(doc(db, "waypoints", waypoint.id), { notes: waypoint.notes, label: waypoint.label, updateTime: millis, updatedBy: auth.currentUser.uid, user: waypoint.user, file: waypoint.file })
         return promise
     }
+
+}
+export function deleteFromStorage(filename)
+{
+    const fullpath = "MeditationRecordings" + "/" + filename + ".csv"
+    const fileRef = storageRef(storage, fullpath)
+    deleteObject(fileRef).then(() => {
+        console.log("Deleted file: " + fullpath)
+    }).catch((error) => {
+        console.log("Error deleting file: " + fullpath)
+    })
 
 }
 export function uploadCSV(csvString, folder, filename, metadata) {

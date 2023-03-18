@@ -242,7 +242,7 @@ function averageRows(rows, roundN) {
 
             newRow["avg" + roundN] = true  // used to filter later based on avgN
 
-            var valueAvgArr = [] // Array used to later measure the variance of all band powers at this moment (used later to find a good 'starting point')
+            var bandVarianceArr = []
             // Average each band + channel
             bands.forEach(band => {
                 channels.forEach(channel => {
@@ -267,7 +267,7 @@ function averageRows(rows, roundN) {
                             let max = round(d3.quantile(avgArray, 0.95))
                             let min = round(d3.quantile(avgArray, 0.05))
                             newRow[key] = avg
-                            valueAvgArr.push(avg)
+                            bandVarianceArr.push(avg)
                             newRow[key + "_min"] = min
                             newRow[key + "_max"] = max
 
@@ -287,8 +287,30 @@ function averageRows(rows, roundN) {
 
                 })
             })
-            newRow["momentVariance"] = d3.variance(valueAvgArr)
+            // "Moment Variance" is the variance of the averaged bands - used to find a good place to start relative
+            newRow["momentVariance"] = d3.variance(bandVarianceArr)
 
+            // Calculate variance from each channel
+            channels.forEach(channel => {
+                var key = "RAW_" + channel
+
+                var keyNew = channel + "_variance_avg" + roundN
+                var avgArray = []
+                for (let a = i - roundN_half; a < i + roundN_half; a++) {
+                    var row = rows[a]
+
+                    let val = row[key]
+                    if (!isNaN(val)) {
+                        avgArray.push(val)
+                    }
+
+                }
+                if (avgArray.length > roundN_half) 
+                    {
+                        let variance = d3.variance(avgArray)
+                        newRow[keyNew] = variance
+                    }
+            })
             newRow["vector_avg" + roundN] = getRootVector(newRow) // Compute the averaged vector
         }
     }

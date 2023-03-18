@@ -45,9 +45,9 @@ var linkSize = 1
 var labelSize = "14px"
 var nameSize = "10px"
 var labelColor = "black"
-var userSize = 4
+export var userSize = 4
 var waypointSize = 10    // Size of waypoint circles
-var userOpacity = 0.1
+export var userOpacity = 0.2
 var userLowResOpacity = 1
 var waypointOpacity = 0.9
 var userPointColor = "grey"
@@ -616,7 +616,9 @@ export function addUserPoints() {
 
     // Low Res
 
-    userCirclesLowRes = clone(getEveryNth(userCircles, 10))
+    var nth = 10
+    if (userCircles < 300) nth = 3
+    userCirclesLowRes = clone(getEveryNth(userCircles, nth))
 
     cameraProject(userCirclesLowRes)
     addUserPointsN(userCirclesLowRes, "userpointsLowRes", true)
@@ -742,6 +744,7 @@ function addUserPointsN(data, classname, show) {
 }
 function addClusterWaypoints(svg) {
     var vectors = state["cluster_means_avg" + state.resolution].map(e => e.vector)
+    
 
     var mapped = runModel(vectors, state.resolution)
 

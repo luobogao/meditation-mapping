@@ -127,6 +127,7 @@ function uploadNewCSV(dataJSON) {
     if (recordings.map(recording => recording.filename).includes(filename)) {
         console.log("------------------> File was already uploaded!")
         dataJSON.id = filename
+        dataJSON.filename = filename
         var recording = recordings.filter(r => r.filename == filename)[0]
         recording.delete = false // un-delete it if necessary
 
@@ -171,7 +172,9 @@ function uploadNewCSV(dataJSON) {
 
                         dataJSON.recordid = doc.id
                         dataJSON.id = filename
+                        dataJSON.filename = filename
                         newRecord.id = doc.id
+                        newRecord.filename = filename
                         addOrReplaceSession(dataJSON, function () {
                             console.log("-----------> Added to IndexDB")
                         })

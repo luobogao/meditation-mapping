@@ -1,20 +1,12 @@
 import React, { useState, useEffect } from "react";
-import { getEveryNth } from "../utils/functions";
-import { Link } from "react-router-dom";
 import { buildTimeslider } from "../utils/timeslider";
 import "firebaseui/dist/firebaseui.css"
 import { addCheckbox, buildChartSelectors, buildClusterCounts, buildResolutionSelectors, buildUserSelectors } from "../utils/ui";
 import { state, userDataLoaded } from "../index"
 import { rebuildChart } from "../utils/runmodel";
-import { firstLoad } from "../utils/database";
-
-import { updateTimeseries, buildSimilarityChart, updateSimilarityChart } from "../utils/minicharts";
-import { waypoints } from "../utils/database";
+import { firstLoad, waypoints, user } from "../utils/database";
 import { zoom, updateChartWaypoints, addUserPoints } from "../utils/3d_charts"
-
 import { buildBrowseFile } from "../utils/load";
-import { datastate } from "../utils/load";
-import { cleanedData } from "./validate";
 import { bands, channels } from "../utils/muse"
 import NavBarCustom from "../utils/navbar";
 import { navHeight } from "../utils/ui"
@@ -38,19 +30,8 @@ export const chartWidth = window.innerWidth - sidebarWidth
 export const chartHeight = window.innerHeight - navHeight - 2
 export var mode3d = true
 const backgroundColor = "#d9d9d9"
-
-export var user;  // Firebase user
-
-
-
-
+ 
 export const miniChartSize = 200
-const miniChartMargin = 10
-
-
-
-
-var email = null
 
 export function updateAllCharts() {
     if (waypoints != null && state.data.relative != null) {
@@ -207,7 +188,7 @@ function buildRightSidebar() {
         else {
             state.showAllWaypoints = false
         }
-        updateAllCharts()
+        rebuildChart()
     })
 
     // Checkbox: Limit to N waypoints
@@ -278,14 +259,20 @@ export default function Live() {
 
         setTimeout(function () {
             console.log("MAP is re-rendering, rebuilding chart")
-            rebuildChart()
+            if (state.data.relative != null)
+            {
+                updateAllCharts()
+            }
+            else 
+            {
+                rebuildChart()
+            }
+            
         }, 100)
 
 
     }, [])
-    useEffect(() => {
-
-    })
+  
 
     return (
 

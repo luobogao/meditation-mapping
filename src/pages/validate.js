@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
+import { saveCSV } from "../utils/functions";
 import { Link } from "react-router-dom";
-import { notice } from "../utils/ui";
+import { loadingSpinner, notice } from "../utils/ui";
 import { buildBrowseFile } from "../utils/load";
 import { sliderBottom } from 'd3-simple-slider';
 import { state } from "../index"
-import { getAllRecordings, addRecording, currentRecording, deleteRecordingFirebase, setCurrentRecording, updateRecording, waypoints, getRecordingFromStorage } from "../utils/database";
+import { getAllRecordings, addRecording, currentRecording, deleteRecordingFirebase, setCurrentRecording, updateRecording, waypoints, getRecordingFromStorage, deleteFromStorage } from "../utils/database";
 import { datastate } from "../utils/load";
 import { round, clone, formatDate, getEveryNth } from '../utils/functions';
 import { bands, channels } from "../utils/muse"
@@ -93,17 +94,23 @@ const sliderHeight = 50
 export var cleanedData = null
 
 export function showLoadingValidate() {
-    notice("Loading...", "loading")
+    notice("Loading...", "loading", true)
 }
 export function validateAfterLoad(loadedData, newRecording) {
     if (newRecording != null) {
+        console.log("-> Adding new recording to recordings")
+        console.log(newRecording)
         recordings.push(newRecording)
 
     }
+    console.log("Looking for recording filename: " + loadedData.filename + " in recordings")
     record = recordings.filter(r => r.filename == loadedData.filename)[0]
-    console.log("record", record)
+    if (record == null) {
+        console.error("Recording not found in recordings!")
+    }
     updateRecordingTable()
     state.data.averaged = loadedData.data
+    workingData = null
     validate()
 }
 export function validate() {
@@ -111,12 +118,16 @@ export function validate() {
     if (state.data.averaged != null) {
         selectedStartSecond = record.startSecond
         selectedEndSecond = record.endSecond
-        workingData = getEveryNth(state.data.averaged.filter(e => e.avg60 == true), 10) // Remove the first few rows
+
+        if (workingData == null) {
+            workingData = getEveryNth(state.data.averaged.filter(e => e.avg60 == true), 10) // Remove the first few rows
+        }
+
 
         d3.selectAll(".loading").remove()
         buildValidationChart()
         buildRatioCharts()
-        prepareForNext(false)
+
         updateRelative(selectedStartSecond, selectedEndSecond)
         updateRecordingTable(recordings)
         d3.select("#acceptBtn").style("display", "flex")
@@ -125,6 +136,9 @@ export function validate() {
 
         // Hide any loading bars in the history table
         d3.select("#loading" + record.id).style("display", "none")
+        setTimeout(function () { prepareForNext(false) }, 200)
+
+        buildVarianceChart()
 
     }
 
@@ -133,7 +147,10 @@ export function validate() {
 }
 export function bootLast() {
     // Downloads all recordings (should be for this user!), select the last viewed, and plot
+    console.log("-> Downloading recordings from Firebase")
+    loadingSpinner("loadingRecordings")
     getAllRecordings().then((snapshot) => {
+        d3.select("#loadingRecordings").style("display", "none")
         recordings = []
         if (snapshot.length == 0) {
             console.error("No recordings in Firebase!")
@@ -151,7 +168,7 @@ export function bootLast() {
             else {
                 // Sort recordings by view time
                 recordings = recordings.sort((a, b) => b.updatedTime - a.updatedTime)
-
+                console.log("-----> Found " + recordings.length + " recordings")
                 // Get last viewed and load it
                 var sortedByView = recordings.filter(a => a.delete != true).sort((a, b) => b.updatedTime - a.updatedTime)
                 if (sortedByView.length > 0) {
@@ -177,6 +194,7 @@ function loadRecordData(selectedRecord) {
     selectedStartSecond = selectedRecord.endSecond
     if (selectedRecord.averaged != null) {
         state.data.averaged = selectedRecord.averaged
+        workingData = null
         validate()
     }
     else {
@@ -188,6 +206,7 @@ function loadRecordData(selectedRecord) {
             else {
                 state.data.averaged = savedData.data
                 record.averaged = savedData.data
+                workingData = null
                 validate()
             }
 
@@ -403,15 +422,53 @@ function buildMomentVarianceChart(div) {
 
 
 }
+function buildVarianceChart() {
+
+    var yVar = d3.scaleLinear()
+        .domain([-1000, 3000])
+        .range([height - margin, margin])
+
+    var lineVar = d3.line()
+        .x(function (d, i) { return x(d.seconds); })
+        .y(function (d, i) { return yVar(d.variance) })
+        .defined(((d, i) => !isNaN(d.variance)))
+        .curve(d3.curveMonotoneX) // apply smoothing to the line
+
+    var svg = d3.select("#variance_svg")
+    svg.selectAll("*").remove()
+
+    console.log(state.data.averaged[10])
+    var data = channels.map(channel => {
+        return state.data.averaged.map(d => {
+            return { seconds: d.seconds, variance: d[channel + "_variance_avg" + 10] }
+        })
+    })
+    console.log("variance data")
+    console.log(data)
+
+    svg.append("rect")
+        .attr("width", (width - (2 * margin)) + "px")
+        .attr("height", (height - (2 * margin)) + "px")
+        .attr("fill", chartBackground);
+
+
+    svg.selectAll(".line").data(data)
+        .enter()
+        .append("path")
+        .attr("class", "line")
+        .attr("fill", "none")
+        .attr("stroke", "black")
+        .attr("stroke-width", 2)
+        .style("opacity", 0.5)
+        .attr("d", function (d) { return lineVar(d) })
+
+
+}
+
 function buildRatioCharts() {
     // Graph SVG
-    var div = d3.select("#ratios")
-    div.selectAll("*").remove()
-    svgR = div.append("svg")
-        .attr("id", "ratioSVG")
-        .attr("width", (width - (2 * margin)) + "px")
-        .style("margin", margin + "px")
-        .attr("height", (height - (2 * margin)) + "px")
+
+    svgR = d3.select("#ratio_graph")
 
     svgR.append("rect")
         .attr("fill", chartBackground)
@@ -447,8 +504,9 @@ function buildSidebar() {
     buildBrowseFile(btndiv, "UPLOAD", 80, "grey", "black", "t1")
 
     // Saved Recordings
-    topDiv.append("div").append("table").attr("id", "recordingTable")
-
+    var recordingsDiv = topDiv.append("div")
+    recordingsDiv.append("div").style("display", "none").attr("id", "loadingRecordings")
+    recordingsDiv.append("table").attr("id", "recordingTable")
 
     div
         .append("div").style("margin", "10px")
@@ -462,8 +520,28 @@ function buildSidebar() {
                         updateRecording(r)
                     }
 
+
                 }
                 )
+                updateRecordingTable()
+
+
+            })
+        })
+    div
+        .append("div").style("margin", "10px")
+        .append("button").text("Delete All (PERMANENT)")
+        .on("click", function () {
+            deleteAllrecordings().then(() => {
+                console.log("DELETED ALL RECORDS")
+                recordings.forEach(r => {
+
+                    deleteRecordingFirebase(r, true)
+                    deleteFromStorage(r.filename)
+
+                }
+                )
+                recordings = []
                 updateRecordingTable()
 
 
@@ -489,6 +567,11 @@ export function updateRecordingTable() {
     })
 
     d.exit().remove()
+    // Update style of existing rows
+    d.style("opacity", function (d) {
+        if (d.delete == true) return 0.5
+        else return 1
+    })
     var row = d.enter()
         .append("tr")
         .style("font-size", "16px")
@@ -506,7 +589,7 @@ export function updateRecordingTable() {
             else return "none"
         })
         .on("click", function (event, d) {
-            
+
             d3.selectAll(".recordrow").style("background", "none")
             d3.select("#row" + d.id)
                 .style("background", "green")
@@ -572,7 +655,7 @@ export function updateRecordingTable() {
         .style("color", "red")
         .on("click", function (event, d) {
             event.stopPropagation()
-            console.log("removing: " + d.id)            
+            console.log("removing: " + d.id)
             var row = d3.select("#row" + d.id)
             row.style("opacity", 0.5)
             deleteRecording(d.filename, function () {
@@ -593,7 +676,8 @@ export function updateRecordingTable() {
 
 }
 function updateRatioGraphs() {
-    var svg = d3.select("#ratioSVG")
+
+    var svg = d3.select("#ratio_graph")
 
     // Create a new dataset where each band value (like Gamma_TP10) has been converted into a % of the first value, then take ratios
 
@@ -629,7 +713,6 @@ function updateRatioGraphs() {
             return lineR(d)
         })
 }
-
 function buildPage() {
     d3.select("#nav").style("margin", "5px")
     d3.select("body").style("background", "grey")
@@ -646,6 +729,10 @@ function buildPage() {
 
     d3.select("#bodydiv")
         .style("display", "flex")
+        .style("flex-direction", "column")
+
+    d3.select("#charts")
+        .style("display", "flex")
         .style("flex-direction", "row")
 
     d3.select("#relative").style("border", "1px solid black")
@@ -658,10 +745,25 @@ function buildPage() {
         .style("width", width + "px")
         .style("height", (height * 2) + "px")
 
-    d3.select("#ratios")
+    var ratios = d3.select("#ratios")
         .style("margin", margin + "px")
         .style("width", width + "px")
         .style("height", (height * 2) + "px")
+
+    ratios.append("svg").attr("id", "ratio_graph")
+        .attr("width", (width - (2 * margin)) + "px")
+        .style("margin", margin + "px")
+        .attr("height", (height - (2 * margin)) + "px")
+
+    ratios.append("svg").attr("id", "variance_svg")
+        .attr("width", (width - (2 * margin)) + "px")
+        .style("margin", margin + "px")
+        .attr("height", (height - (2 * margin)) + "px")
+
+
+
+    // Options
+    buildOptions()
 
 
 
@@ -669,7 +771,45 @@ function buildPage() {
 
 
 }
+function buildOptions() {
+    var div = d3.select("#options")
 
+    div
+        .style("display", "flex")
+        .style("flex-direction", "row")
+        .style("margin", margin + "px")
+
+    div.append("button")
+        .text("Save CSV")
+        .style("margin", "5px")
+        .on("click", function () {
+            var avgS = prompt("Average?")
+            var avg = parseInt(avgS)
+            var parts = getEveryNth(state.data.relative_short, avg / 2)
+
+            var simpleParts = []
+            parts.forEach(part => {
+                var simplePart = {}
+                simplePart.seconds = part.seconds
+                channels.forEach(channel => {
+                    bands.forEach(band => {
+
+                        var key = band + "_" + channel + "_avg" + avg
+                        simplePart[key] = part[key]
+
+                    })
+
+                })
+                simpleParts.push(simplePart)
+            })
+            saveCSV(simpleParts)
+
+
+
+        })
+
+
+}
 function prepareForNext(update = true) {
     console.log("---- COMPILING RELATIVE DATA ----")
 
@@ -683,16 +823,19 @@ function prepareForNext(update = true) {
     updateRecording(record)
 
     // Convert all band powers to percentages of the first value
+    var validated = []
     for (let i = 0; i < filteredData.length; i++) {
-        var row = filteredData[i]
+        var fullrow = filteredData[i]
+        var row = (({ seconds, timestamp }) => ({ seconds, timestamp }))(fullrow)
+
         channels.forEach(channel => {
             bands.forEach(band => {
                 var avgs = [1, 10, 60]
                 avgs.forEach(avg => {
                     var key = band + "_" + channel + "_avg" + avg
 
-                    if (row[key] != null) {
-                        var newVal = Math.round(1000 * row[key] / firstRow[key]) / 1000
+                    if (fullrow[key] != null) {
+                        var newVal = Math.round(1000 * fullrow[key] / firstRow[key]) / 1000
                         row[key] = newVal
                     }
 
@@ -700,15 +843,16 @@ function prepareForNext(update = true) {
 
             })
         })
+
+        validated.push(row)
     }
-    state.data.relative = filteredData
+    state.data.relative_short = clone(validated)
+    state.data.relative = validated
 
     rebuildChart()
 
 
 }
-
-
 function brushed() {
 
     var range = d3.brushSelection(this)
@@ -799,20 +943,9 @@ function setupTimeRange(div, data) {
 
 export default function Validate() {
 
-
     useEffect(() => {
         buildPage()
-        setTimeout(function () {
-            if (firstBoot != true) {
-
-
-
-            }
-
-        }, 400)
-
-    }, [])
-    useEffect(() => {
+        console.log("calling validate")
         setTimeout(function () {
             if (record != null && workingData != null) {
                 validate()
@@ -830,14 +963,15 @@ export default function Validate() {
             <div id="subcontainer">
                 <div id="rightsidebar"> </div>
                 <div id="bodydiv">
-                    <div id="relative">
+                    <div id="charts">
+                        <div id="relative"></div>
+                        <div id="ratios"></div></div>
+                    <div id="options"></div>
 
-                    </div>
-                    <div id="ratios"></div>
                 </div>
 
             </div>
         </div>
 
     );
-};
+}

@@ -8,11 +8,12 @@ import { updateAllCharts } from "../pages/map";
 import { waypoints } from "./database";
 import { disableLogging, enableLogging } from "./functions";
 import { computeRobustMean } from "./vectorMedians";
+const d3 = require("d3");
 
 const maxWaypoints = 5  // Take top N waypoints sorted by cosine distance to user's data
 
 
-export function rebuildChart(settings = { autoClusters: true, updateCharts: true, updateGraphs: true }) {
+export function rebuildChart(autoClusters = true) {
 
     // Tests for data quality
     if (state.data.relative == null) {
@@ -42,14 +43,14 @@ export function rebuildChart(settings = { autoClusters: true, updateCharts: true
     }
     else {
         state.zoom = 1
-        
-        rebuild(state.resolution, settings)
+
+        rebuild(state.resolution, autoClusters)
         if (waypoints.filter(waypoint => waypoint["relative_vector_avg" + state.resolution] != null).length == 0) {
             console.error("No waypoints with this resolution! Skipping map")
         }
-    
+
         else {
-            
+
             updateAllCharts()
 
         }
@@ -60,22 +61,32 @@ export function rebuildChart(settings = { autoClusters: true, updateCharts: true
 
 }
 
-function rebuild(avg, settings) {
-    
-    let waypointsAvg = waypoints.filter(waypoint => waypoint["relative_vector_avg" + avg] != null)
-    
-    
-    var ignoreWaypoints = false
-    if (waypointsAvg.length == 0) {
-        console.error("No waypoints found with avg: " + avg) 
-        ignoreWaypoints = true
-        waypoints.forEach(waypoint => waypoint["relative_vector_avg" + avg] = waypoint["relative_vector_avg60"])
-        waypointsAvg = waypoints
-        
-    }
-
+function rebuild(avg, autoClusters) {
     // Calculate vector for each moment of user data
     state.data.relative.forEach(entry => entry["relative_vector_avg" + avg] = getRelativeVector(entry, avg))
+    console.log('first:')
+    console.log(state.data.relative[10])
+
+
+    // Reset the projections for each waypoint
+    waypoints.forEach(waypoint => {
+        waypoint.projected_avg1 = null
+        waypoint.projected_avg10 = null
+        waypoint.projected_avg60 = null
+    })
+
+    // Filter out any waypoints that don't have a vector for this resolution    
+    let waypointsAvg = waypoints.filter(waypoint => waypoint["relative_vector_avg" + avg] != null)
+
+
+    // If no waypoints have a vector for this resolution, use the 60-second resolution
+    if (waypointsAvg.length == 0) {
+        console.error("No waypoints found with avg: " + avg)
+        waypoints.forEach(waypoint => waypoint["relative_vector_avg" + avg] = waypoint["relative_vector_avg60"])
+        waypointsAvg = waypoints
+
+    }
+
 
     // Find Clusters 
     // -- Uses a k-means library to tag each row with a cluster number, and finds a "mean" vector for each cluster
@@ -89,7 +100,7 @@ function rebuild(avg, settings) {
 
 
     var clusters = state.clusters
-    if (settings.autoClusters == true) {
+    if (autoClusters == true) {
         // Find best number of clusters
         var maxKToTest = 10;
         var result = phamBestK.findBestK(points, maxKToTest);
@@ -98,6 +109,11 @@ function rebuild(avg, settings) {
 
     }
     enableLogging()
+
+    // Automatically update the checkboxes for "clusters" to the auto-generated number
+    d3.selectAll(".clusters-checkbox").property("checked", false)
+    d3.select("#cluster" + clusters).property("checked", true)
+
 
     // Find Clusters
     var kmeansResult = kmeans.cluster(points, clusters)
@@ -110,9 +126,8 @@ function rebuild(avg, settings) {
 
 
 
-    // Cluster means using robust method
+    // Find mean vectors for each cluster using a robust method which excludes outliers
     var means = []
-    
     for (let i = 0; i < clusters; i++) {
 
         var clusterRows = state.data.relative.filter(row => row["cluster_avg" + avg] == i)
@@ -124,6 +139,7 @@ function rebuild(avg, settings) {
         }
         means.push(entry)
     }
+
     state["cluster_means_avg" + avg] = means
 
 
@@ -169,15 +185,15 @@ function rebuild(avg, settings) {
 
     })
 
-    var userVectors = state.data.relative.map(e => e["relative_vector_avg" + avg]).filter(e => e != null)
+    // Find the best matches from existing waypoints, using these new means    
     var distanceIds = {}
-    userVectors.forEach(uservector => {
+    means.forEach(mean => {
 
         waypointsAvg.forEach(waypoint => {
 
             var id = waypoint.id
-            
-            var distance = measureDistance(uservector, waypoint["relative_vector_avg" + avg])
+
+            var distance = measureDistance(mean.vector, waypoint["relative_vector_avg" + avg])
 
 
             if (id in distanceIds) {
@@ -215,7 +231,7 @@ function rebuild(avg, settings) {
         // Use ALL waypoints
         filtered_waypoint_ids = waypointsAvg.map(e => e.id)
     }
-    
+
     // Update ALL waypoints with match=true if their ids match
     waypointsAvg.forEach(waypoint => {
 
@@ -247,8 +263,6 @@ function rebuild(avg, settings) {
         var yi = entry[1]
         var zi = entry[2]
         var waypoint = waypointsAvg[i]
-
-        var label = waypoint.user + " " + waypoint.label
 
         waypoint["projected_avg" + avg] = { match: waypoint.match, x: xi, y: yi, z: zi, user: waypoint.user, id: entry.id, label: waypoint.label, coordinates: [xi, yi, zi] }
         i++

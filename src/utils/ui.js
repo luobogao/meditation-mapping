@@ -31,7 +31,7 @@ export function popUp(event, html) {
 
 }
 
-export function notice(message, id) {
+export function notice(message, id, spinnerP = false) {
     // Blanks out background then adds a foreground div
 
     d3.selectAll(".notice").remove()
@@ -71,12 +71,18 @@ export function notice(message, id) {
         .style("font-size", "30px")
         .text(message)
 
+    if (spinnerP) {
+            div.append("div").attr("id", "loadingFileSpinner")
+            loadingSpinner("loadingFileSpinner")
+    }
+
+
     return div
 }
 
 export function addCheckbox(div, name, checked, id, textSize, type = "checkbox") {
     var checkboxDiv = div.append("div")
-        .style("font-size", "30px")
+        .style("font-size", "20px")
         .style("margin", "8px")
         .style("display", "flex")
         .style("align-items", "center")
@@ -93,6 +99,7 @@ export function addCheckbox(div, name, checked, id, textSize, type = "checkbox")
 
 
     checkboxDiv.append("label")
+        .style("margin-left", "5px")
         .style("font-size", textSize)
         .text(name)
 
@@ -211,9 +218,9 @@ export function buildChartSelectors(div) {
             break;
 
     }
-    var chart1box = addCheckbox(div, "3-D", chart1, "a", "12px", "radio")
-    var chart2box = addCheckbox(div, "Cosine", chart2, "b", "12px", "radio")
-    var chart3box = addCheckbox(div, "Euclidean", chart3, "c", "12px", "radio")
+    var chart1box = addCheckbox(div, "3-D", chart1, "a", "20px", "radio")
+    var chart2box = addCheckbox(div, "Cosine", chart2, "b", "20px", "radio")
+    var chart3box = addCheckbox(div, "Euclidean", chart3, "c", "20px", "radio")
 
     var els = [
         { chart: chart1box, key: "pca" },
@@ -238,6 +245,7 @@ export function buildResolutionSelectors(container) {
 
     container.style("margin", "5px")
     container.append("text").text("Resolution:")
+        .style("font-size", "20px")
     var div = container.append("div").style("display", "flex").style("flex-direction", "row")
 
     var res1, res10, res60 = false
@@ -253,9 +261,9 @@ export function buildResolutionSelectors(container) {
             break
 
     }
-    var res1box = addCheckbox(div, "1 Sec", res1, "res1", "12px", "radio")
-    var res10box = addCheckbox(div, "10 Sec", res10, "res10", "12px", "radio")
-    var res60box = addCheckbox(div, "60 Sec", res60, "res60", "12px", "radio")
+    var res1box = addCheckbox(div, "1", res1, "res1", "20px", "radio")
+    var res10box = addCheckbox(div, "10", res10, "res10", "20px", "radio")
+    var res60box = addCheckbox(div, "60", res60, "res60", "20px", "radio")
 
     res1box
         .attr("class", "resolution-checkbox")
@@ -263,8 +271,8 @@ export function buildResolutionSelectors(container) {
             d3.selectAll(".resolution-checkbox").property("checked", false)
             d3.select(this).property("checked", true)
             state.resolution = 1
-            rebuildChart()
-            
+            rebuildChart(false)
+
         })
     res10box
         .attr("class", "resolution-checkbox")
@@ -272,8 +280,8 @@ export function buildResolutionSelectors(container) {
             d3.selectAll(".resolution-checkbox").property("checked", false)
             d3.select(this).property("checked", true)
             state.resolution = 10
-            rebuildChart()
-            
+            rebuildChart(false)
+
         })
     res60box
         .attr("class", "resolution-checkbox")
@@ -281,8 +289,8 @@ export function buildResolutionSelectors(container) {
             d3.selectAll(".resolution-checkbox").property("checked", false)
             d3.select(this).property("checked", true)
             state.resolution = 60
-            rebuildChart()
-            
+            rebuildChart(false)
+
         })
 
 }
@@ -290,6 +298,7 @@ export function buildResolutionSelectors(container) {
 export function buildClusterCounts(container, page) {
     container.style("margin", "5px")
     container.append("text").text("Clusters:")
+        .style("font-size", "20px")
     var div = container.append("div").style("display", "flex").style("flex-direction", "row")
     var cluster1, cluster2, cluster3, cluster4 = false
     switch (state.clusters) {
@@ -307,12 +316,12 @@ export function buildClusterCounts(container, page) {
             break
 
     }
-    var c1box = addCheckbox(div, "1", cluster1, "cluster1", "12px", "radio")
-    var c2box = addCheckbox(div, "2", cluster2, "cluster2", "12px", "radio")
-    var c3box = addCheckbox(div, "3", cluster3, "cluster3", "12px", "radio")
-    var c4box = addCheckbox(div, "4", cluster4, "cluster4", "12px", "radio")
-
-    var settings = { autoClusters: false, updateCharts: true, source: "clusterSelector" }
+    var c1box = addCheckbox(div, "1", cluster1, "cluster1", "20px", "radio")
+    var c2box = addCheckbox(div, "2", cluster2, "cluster2", "20px", "radio")
+    var c3box = addCheckbox(div, "3", cluster3, "cluster3", "20px", "radio")
+    var c4box = addCheckbox(div, "4", cluster4, "cluster4", "20px", "radio")
+    .append("table").attr("id", "recordingTable")
+    var settings = false
     if (page == "graphs") {
         settings = { autoClusters: false, updateGraphs: true }
     }
@@ -393,4 +402,37 @@ export function buildSimilaritySelectors(container) {
 
 
 
+}
+export function loadingSpinner(spinnerContainerId) {
+    // Create an SVG container
+    var spinnerContainer = d3.select("#" + spinnerContainerId)
+    spinnerContainer.style("display", "flex")    
+    .style("justify-content", "center")
+    spinnerContainer.selectAll("*").remove()
+    const svg = spinnerContainer.append("svg")
+        .attr("width", 50)
+        .attr("height", 50);
+
+    // Append a circle to the SVG container
+    const circle = svg.append("circle")
+        .attr("cx", 25)
+        .attr("cy", 25)
+        .attr("r", 20)
+        .attr("stroke", "black")
+        .attr("stroke-width", 3)
+        .attr("stroke-dasharray", "35,5")
+        .attr("fill", "none");
+
+    // Animate the circle
+    function animateSpinner() {
+        circle.transition()
+            .duration(2000)
+            .ease(d3.easeLinear)
+            .attrTween("transform", () => {
+                return d3.interpolateString("rotate(0, 25, 25)", "rotate(360, 25, 25)");
+            })
+            .on("end", animateSpinner);
+    }
+
+    animateSpinner();
 }

@@ -312,7 +312,7 @@ export function updateCommunityGraph() {
 
         y = d3.scalePow()
             .exponent(1)
-            .domain([minY, maxY])
+            .domain([-50, maxY])
             .range([communityHeight - margin, margin])
 
         svg.selectAll(".matchesLine")
