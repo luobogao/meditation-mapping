@@ -389,20 +389,62 @@ export function buildSimilaritySelectors(container) {
             d3.selectAll(".similaritySelector").property("checked", false)
             d3.select(this).property("checked", true)
             state.similarityType = "cosine"
-            updateCommunityGraph()
+            updateClusters()
         })
     euclidean
         .attr("class", "similaritySelector")
         .on("click", function () {
             d3.selectAll(".similaritySelector").property("checked", false)
             d3.select(this).property("checked", true)
-            state.similarityType = "euclidean"
-            updateCommunityGraph()
+            state.similarityType = "combined"
+            updateClusters()
         })
 
 
 
 }
+
+// Build two radio selectors which toggle between a state value "vectorType" with the values "relative" and "slow-feature"
+
+export function buildVectorTypeSelectors(container) {
+    container.style("margin", "5px")
+    container.append("text").text("Vector Type:")
+    var div = container.append("div").style("display", "flex").style("flex-direction", "row")
+
+    var d1 = false
+    var d2 = false
+    switch (state.vectorType) {
+        case "relative":
+            d1 = true
+            break;
+        case "slow-feature":
+            d2 = true
+            break;
+    }
+    var relative = addCheckbox(div, "Relative", d1, "relativeType", "12px", "radio")
+    var slowFeature = addCheckbox(div, "Slow Feature", d2, "slowFeatureType", "12px", "radio")
+
+    relative
+        .attr("class", "vectorTypeSelector")
+        .on("click", function () {
+            d3.selectAll(".vectorTypeSelector").property("checked", false)
+            d3.select(this).property("checked", true)
+            state.vectorType = "relative"
+            rebuildChart(true)
+        })
+    slowFeature
+        .attr("class", "vectorTypeSelector")
+        .on("click", function () {
+            d3.selectAll(".vectorTypeSelector").property("checked", false)
+            d3.select(this).property("checked", true)
+            state.vectorType = "slow-feature"
+            rebuildChart(true)
+        })
+
+}
+
+
+
 export function loadingSpinner(spinnerContainerId) {
     // Create an SVG container
     var spinnerContainer = d3.select("#" + spinnerContainerId)

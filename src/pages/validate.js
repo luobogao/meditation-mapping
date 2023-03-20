@@ -436,16 +436,13 @@ function buildVarianceChart() {
 
     var svg = d3.select("#variance_svg")
     svg.selectAll("*").remove()
-
-    console.log(state.data.averaged[10])
+    
     var data = channels.map(channel => {
         return state.data.averaged.map(d => {
             return { seconds: d.seconds, variance: d[channel + "_variance_avg" + 10] }
         })
     })
-    console.log("variance data")
-    console.log(data)
-
+    
     svg.append("rect")
         .attr("width", (width - (2 * margin)) + "px")
         .attr("height", (height - (2 * margin)) + "px")
@@ -785,7 +782,7 @@ function buildOptions() {
         .on("click", function () {
             var avgS = prompt("Average?")
             var avg = parseInt(avgS)
-            var parts = getEveryNth(state.data.relative_short, avg / 2)
+            var parts = getEveryNth(state.data.validated_short, avg / 2)
 
             var simpleParts = []
             parts.forEach(part => {
@@ -824,19 +821,28 @@ function prepareForNext(update = true) {
 
     // Convert all band powers to percentages of the first value
     var validated = []
-    for (let i = 0; i < filteredData.length; i++) {
+    for (let i = 1; i < filteredData.length; i++) {
         var fullrow = filteredData[i]
-        var row = (({ seconds, timestamp }) => ({ seconds, timestamp }))(fullrow)
-
+        var row = (({ seconds, timestamp }) => ({ seconds, timestamp }))(fullrow)        
         channels.forEach(channel => {
             bands.forEach(band => {
-                var avgs = [1, 10, 60]
+                var avgs = [10, 60]
                 avgs.forEach(avg => {
                     var key = band + "_" + channel + "_avg" + avg
-
+                    var change_x = avg
                     if (fullrow[key] != null) {
-                        var newVal = Math.round(1000 * fullrow[key] / firstRow[key]) / 1000
-                        row[key] = newVal
+                        
+                        var absolute = fullrow[key]
+                        var relative = Math.round(1000 * fullrow[key] / firstRow[key]) / 1000
+                        var change = null
+                        if (i - avg > 0) {
+                            change = Math.round(1000 * fullrow[key] / filteredData[i - avg][key]) / 1000
+                            }                 
+                        row[key + "_absolute"] = absolute
+                        row[key + "_relative"] = relative
+                        row[key + "_change"] = change
+                        row["changeSeconds"] = change_x
+                        row["startSecond"] = record.startSecond
                     }
 
                 })
@@ -846,8 +852,8 @@ function prepareForNext(update = true) {
 
         validated.push(row)
     }
-    state.data.relative_short = clone(validated)
-    state.data.relative = validated
+    state.data.validated_short = clone(validated)
+    state.data.validated = clone(validated)
 
     rebuildChart()
 

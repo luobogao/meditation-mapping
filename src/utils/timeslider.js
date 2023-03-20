@@ -7,13 +7,13 @@ const d3 = require("d3");
 export function buildTimeslider() {
     var svg = d3.select("#timeslider")
         
-    if (svg.node() != null && state.data.relative != null) {
+    if (svg.node() != null && state.data.validated != null) {
         
         svg.selectAll("*").remove()
 
 
         var width = parsePx(svg.attr("width"))
-        var data = state.data.relative
+        var data = state.data.validated
         var minSeconds = data[0].seconds
         var maxSeconds = data.slice(-1)[0].seconds
         var totalSeconds = maxSeconds - minSeconds
@@ -51,13 +51,13 @@ export function buildTimeslider() {
                         var decay = 2
                         switch (state.resolution) {
                             case 1:
-                                decay = 3;
+                                decay = 5;
                                 break;
                             case 10:
-                                decay = 6;
+                                decay = 4;
                                 break;
                             case 60:
-                                decay = 1;
+                                decay = 3;
                                 break;
                         }
 
@@ -72,20 +72,20 @@ export function buildTimeslider() {
                         var decay = 2
                         switch (state.resolution) {
                             case 1:
-                                decay = 3;
+                                decay = 5;
                                 break;
                             case 10:
-                                decay = 6;
+                                decay = 4;
                                 break;
                             case 60:
-                                decay = 1;
+                                decay = 3;
                                 break;
                         }
                         decay = 5
                         var diff = Math.abs(d.percent - percent)
                         var inverse = 100 - Math.pow(diff * 100, decay)
                         if (inverse < 0) inverse = 0
-                        return (inverse / 20) + "px"
+                        return (userSize * (inverse / 100)) + "px"
                     })
 
 

@@ -34,7 +34,7 @@ const backgroundColor = "#d9d9d9"
 export const miniChartSize = 200
 
 export function updateAllCharts() {
-    if (waypoints != null && state.data.relative != null) {
+    if (waypoints != null && state.data.validated != null) {
         buildTimeslider()
         updateChartWaypoints()
         addUserPoints()
@@ -259,7 +259,7 @@ export default function Live() {
 
         setTimeout(function () {
             console.log("MAP is re-rendering, rebuilding chart")
-            if (state.data.relative != null)
+            if (state.data.validated != null)
             {
                 updateAllCharts()
             }

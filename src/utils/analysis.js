@@ -97,13 +97,15 @@ export function euclideanDistance(vector1, vector2) {
     return 100 - (150 * distance / Math.sqrt(vector1.length));
 }
 
-export function getRootVector(row, avg) {
+export function getVectorKeys(row, avg, type) {
 
     var data = {}
-    vector_columns_muse.forEach(key => {
-        data[key] = row[key + "_avg" + avg]
-    })
 
+    // Depending on the type of data, we need to use different columns    
+    vector_columns_muse.forEach(key => {
+        data[key] = row[key + "_avg" + avg + "_" + type]
+    })
+    
     return data
 }
 export function getRootVectorMindLink(row) {
@@ -114,38 +116,47 @@ export function getRootVectorMindLink(row) {
     return data
 }
 
-export function getRelativeVector(rawVector, avg) {
+export function buildVector(entry, avg, type) {
 
+    
     var vector
+
+    if (type == "slow-feature") standardizeType = "raw" // Slow features are already standardized
+    else standardizeType = "ratio"
     switch (standardizeType) {
         case "raw":
-            vector = vectorRaw(rawVector, avg) // don't standardize at all - use raw values for each band+channel
+            vector = vectorRaw(entry, avg, type) // don't standardize at all - use raw values for each band+channel
             break;
         case "ratio":
-            vector = vectorRatio(rawVector, avg) // standardize by dividing each band by tp10/tp9 and af7/af8, etc
+            vector = vectorRatio(entry, avg, type) // standardize by dividing each band by tp10/tp9 and af7/af8, etc
             break;
         case "normal":
-            vector = vectorNormalRatio(rawVector, avg) // Normalize by taking the % of total channel power for each band, then divide just like ratio type
+            vector = vectorNormalRatio(entry, avg, type) // Normalize by taking the % of total channel power for each band, then divide just like ratio type
             break;
 
     }
-
-    return vector
+    
+    if (vector == null || vector.some(e => e == null)) {
+        
+        return null
+        
+    }
+    else return vector
 
 }
-export function vectorRaw(row, avg) {
+export function vectorRaw(row, avg, type) {
 
     var vector = []
-
+    
+    
     channels.forEach(channel => {
         bands.forEach(band => {
-            // Divide each value by the theta value in this channel
-            // this is my method to avoid magnitude differences
-            var key = band + "_" + channel + "_avg" + avg
-            var value = Math.round(Math.log(row[key]) * 1000)
+            var key = band + "_" + channel + "_avg" + avg + "_" + type
+            var value = row[key]            
             vector.push(value)
         })
     })
+    
     if (vector.some(e => isNaN(e))) {
         return null
     }
@@ -169,17 +180,18 @@ function vectorNormalRatio(row, avg) {
     var ratio = vectorRatio(normal)
     return ratio
 }
-export function vectorRatio(row, avg) {
+export function vectorRatio(row, avg,type) {
     var vector = []
 
     function ratioMuse() {
 
         var ratios = state.modelRatios
         var bands = state.modelBands
+        
         bands.forEach(band => {
             ratios.forEach(ratio_keys => {
-                var key = band + "_" + ratio_keys[0] + "_avg" + avg
-                var key2 = band + "_" + ratio_keys[1] + "_avg" + avg
+                var key = band + "_" + ratio_keys[0] + "_avg" + avg + "_" + type
+                var key2 = band + "_" + ratio_keys[1] + "_avg" + avg + "_" + type
                 var value = Math.log(row[key] / row[key2])
 
                 vector.push(value)
@@ -371,7 +383,9 @@ export function pca(data, avg)
     const dimensions = 3
     var top = d3.sum(eigen_values.slice(-1 * dimensions))
     var percent_match = Math.round(100 * top / total_values)
-    console.log("--> Top " + dimensions + " vector match " + percent_match + "% of variance")
+    
+    //console.log("--> Top " + dimensions + " vector match " + percent_match + "% of variance")
+    state.model.percentMatch = percent_match
 
     // Take only the two largest vectors (this involves taking the last two COLUMNS of EACH vector)
     var take_N = eigen_vectors.map(e => [e[e.length - 1], e[e.length - 2], e[e.length - 3]])

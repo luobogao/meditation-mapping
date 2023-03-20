@@ -10,13 +10,14 @@ import * as firebaseui from "firebaseui"
 import "firebaseui/dist/firebaseui.css"
 import firebase from "firebase/compat/app"
 import { bands, channels } from "../utils/muse"
-import { getRelativeVector } from '../utils/analysis';
-import {  rebuildChart } from "../utils/runmodel"
+import { buildVector } from '../utils/analysis';
+import { rebuildChart } from "../utils/runmodel"
 import { zoom, updateChartWaypoints, addUserPoints } from "./3d_charts"
 import { getAnalytics } from "firebase/analytics";
 import { state } from "../index"
 import { buildUserSelectors } from "../utils/ui";
 import { bootLast } from '../pages/validate';
+import { filter } from 'mathjs';
 
 
 
@@ -252,9 +253,14 @@ export function addWaypoint(waypoint) {
         if (waypoint.notes == undefined) waypoint.notes = null
         var entry = {
             version: waypoint.version,
-            user: waypoint.user, addedBy: userid, label: waypoint.label, vector: waypoint.vector,
+            type: waypoint.type,
+            user: waypoint.user, addedBy: userid, label: waypoint.label,
             notes: waypoint.notes, averaging: waypoint.averaging, delete: false, addedTime: millis, resolution: waypoint.resolution,
-            sourceFilename: waypoint.sourceFilename, recordID: waypoint.recordID
+            sourceFilename: waypoint.sourceFilename, recordID: waypoint.recordID,
+            powersAbsolute: waypoint.powersAbsolute,
+            powersRelative: waypoint.powersRelative,
+            powersChange: waypoint.powersChange,
+
 
         }
         var filteredObj = Object.keys(entry)
@@ -294,10 +300,10 @@ export function updateRecording(recording) {
 
 
     var r = clone(recording)
-    
+
     delete r.averaged
     delete r.relative
-    
+
     if (r.id != null) {
 
         var date = new Date()
@@ -366,8 +372,7 @@ export function updateWaypoint(waypoint) {
     }
 
 }
-export function deleteFromStorage(filename)
-{
+export function deleteFromStorage(filename) {
     const fullpath = "MeditationRecordings" + "/" + filename + ".csv"
     const fileRef = storageRef(storage, fullpath)
     deleteObject(fileRef).then(() => {
@@ -433,7 +438,7 @@ function signOut() {
 onAuthStateChanged(auth, (fbuser) => {
     // Called anything the authentication state changes: login, log out, anonymous login
     listenLiveUsers()
-    
+
 
     if (fbuser && fbuser.email == null) {
         anonymous = true
@@ -485,7 +490,7 @@ onAuthStateChanged(auth, (fbuser) => {
                 })
             d3.select("#loginElement").style("display", "flex")
 
-            
+
 
             // Download all waypoints
             var text = d3.select("#welcome-auth")
@@ -535,50 +540,60 @@ export function downloadWaypoints() {
     users = []
     getAllWaypoints().then((snapshot) => {
 
-        
-            snapshot.forEach((doc) => {
-                var waypoint = doc.data()
-                waypoint.id = doc.id
 
-                if (waypoint.id != undefined && waypoint.vector != undefined && waypoint.label != undefined && waypoint.user != undefined) {
+        snapshot.forEach((doc) => {
+            var waypoint = doc.data()
+            waypoint.id = doc.id
 
-                    // Migration method - adds a "_avg60" to the end of each vector
-                    var newVector = {}
-                    bands.forEach(band => {
-                        channels.forEach(channel => {
-                            var key = band + "_" + channel
-                            newVector[key + "_avg" + waypoint.averaging] = waypoint.vector[key]
-                        })
-                    })
-
-                    
-                    waypoint["relative_vector_avg" + waypoint.averaging] = getRelativeVector(newVector, waypoint.averaging)                    
-                    waypoints.push(waypoint)
-                    
-                    users.push(waypoint.user)
-                }
-                
-
-            })
-            console.log("waypoints:")
-            console.log(waypoints)
-
-            var d = new Date()
-            var millis = d.getTime()
-            
-            if (waypoints.length == 0 || users.length == 0) {
-                alert("No waypoints found on server!")
-                return
+            var newVector
+            switch (waypoint.type) {
+                case "relative":
+                    newVector = waypoint.powersRelative
+                    break
+                case "absolute":
+                    newVector = waypoint.powersAbsolute
+                    break
+                case "change":
+                    newVector = waypoint.powersChange
+                    break
             }
-            users = unique(users).sort()
-            state.selected_users = users
+            bands.forEach(band => 
+                {
+                    channels.forEach(channel =>
+                        {
+                            var key = band + "_" + channel
+                            newVector[key + "_avg" + waypoint.averaging + "_" + waypoint.type] = newVector[key]
+                        })
+                })
 
-            buildUserSelectors()
-            rebuildChart() // Plot the waypoints without user points, first
-            bootLast()
+
+            var vector = buildVector(newVector, waypoint.averaging, waypoint.type)
+            console.log(newVector)
+            waypoint["relative_vector_avg" + waypoint.averaging] = vector
+            waypoints.push(waypoint)
+            users.push(waypoint.user)
+
+
 
         })
-       
+        console.log("---> Found " + waypoints.length + " waypoints on server")
+
+        var d = new Date()
+        var millis = d.getTime()
+
+        if (waypoints.length == 0 || users.length == 0) {
+            console.error("No waypoints found on server!")
+
+        }
+        users = unique(users).sort()
+        state.selected_users = users
+
+        buildUserSelectors()
+        rebuildChart() // Plot the waypoints without user points, first
+        bootLast()
+
+    })
+
 
 }
 

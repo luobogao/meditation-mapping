@@ -1,6 +1,6 @@
 import { chartWidth, rebuildCharts, chartHeight, mode3d, updateAllCharts } from "../pages/map"
 import { popUp, popUpremove, addMenu, menuRemove, moveMenu } from "./ui";
-import { getRelativeVector, runModel } from "./analysis";
+import { runModel } from "./analysis";
 import { addWaypoint, user, deleteWaypoint, updateWaypoint, anonymous } from "./database"
 import { getEveryNth } from "./functions";
 import { rebuildChart } from "./runmodel";
@@ -45,7 +45,7 @@ var linkSize = 1
 var labelSize = "14px"
 var nameSize = "10px"
 var labelColor = "black"
-export var userSize = 4
+export var userSize = 3
 var waypointSize = 10    // Size of waypoint circles
 export var userOpacity = 0.2
 var userLowResOpacity = 1
@@ -187,20 +187,30 @@ export function updateChartWaypoints() {
 
     }
 
+    var theseWaypoints = waypoints.filter(e => e.match == true && e.averaging == state.resolution && e.type == state.vectorType).map(e => e["projected_avg" + state.resolution])
     // Get min/max only from the selected waypoints
-    var standardCoordinates = waypoints.filter(e => e.match == true && e.averaging == state.resolution).map(e => e["projected_avg" + state.resolution]).map(e => e.coordinates)
+    var standardCoordinates = theseWaypoints.map(e => e.coordinates)
     if (standardCoordinates.length == 0) {
         console.error("Map: No waypoints to display")
-        return
+        var square = 1
+        minx = -1 * square
+        maxx = square
+        miny = -1 * square
+        maxy = square
+        minz = -1 * square
+        maxz = square
+    }
+    else {
+        // Find the minimum and maxiumum range of the model, set the chart size a bit larger than those bounds
+        minx = d3.min(standardCoordinates.map(e => e[0]))
+        miny = d3.min(standardCoordinates.map(e => e[1]))
+        maxx = d3.max(standardCoordinates.map(e => e[0]))
+        maxy = d3.max(standardCoordinates.map(e => e[1]))
+        minz = d3.min(standardCoordinates.map(e => e[2]))
+        maxz = d3.max(standardCoordinates.map(e => e[2]))
+
     }
 
-    // Find the minimum and maxiumum range of the model, set the chart size a bit larger than those bounds
-    minx = d3.min(standardCoordinates.map(e => e[0]))
-    miny = d3.min(standardCoordinates.map(e => e[1]))
-    maxx = d3.max(standardCoordinates.map(e => e[0]))
-    maxy = d3.max(standardCoordinates.map(e => e[1]))
-    minz = d3.min(standardCoordinates.map(e => e[2]))
-    maxz = d3.max(standardCoordinates.map(e => e[2]))
 
     cube = [
         { x: minx, y: miny, z: minz },
@@ -262,20 +272,16 @@ export function updateChartWaypoints() {
         .range([0.4, 1])
 
 
+    if (theseWaypoints.length > 0) {
+        waypointCircles = theseWaypoints
+        console.log(waypointCircles)
 
-    waypointCircles = waypoints.filter(waypoint => waypoint["projected_avg" + state.resolution] != null).map(w => w["projected_avg" + state.resolution])
+        cameraProject(waypointCircles)
+        addLabels(svg, waypointCircles)
+        addWaypoints(svg, waypointCircles)
 
-
-    cameraProject(waypointCircles)
-
-    addLabels(svg, waypointCircles)
-
-    if (mode3d != true) {
-        //adjustLabels()
-    }
-
-    //adjustLabels(svg, waypointCircles)
-    addWaypoints(svg, waypointCircles)
+    } 
+    
 
 
 
@@ -604,7 +610,7 @@ function adjustLabels(svg, waypointData) {
 export function addUserPoints() {
     clearInterval(rotateOpening)
 
-    userCircles = state.data.relative.map(e => e["projected_avg" + state.resolution])
+    userCircles = state.data.mapped.map(e => e["projected_avg" + state.resolution])
     if (userCircles.length == 0) {
         console.error("Map: No user points found!")
         return
@@ -744,7 +750,7 @@ function addUserPointsN(data, classname, show) {
 }
 function addClusterWaypoints(svg) {
     var vectors = state["cluster_means_avg" + state.resolution].map(e => e.vector)
-    
+
 
     var mapped = runModel(vectors, state.resolution)
 
