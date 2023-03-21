@@ -230,7 +230,7 @@ export function updateUsername() {
 
 }
 export function getRecordingFromStorage(filename) {
-    var pathReference = storageRef(storage, "MeditationRecordings/" + filename + ".csv")
+    var pathReference = storageRef(storage, user.uid + "/" + filename + ".csv")
     getBlob(pathReference).then((blob) => {
         blob.text().then((string) => {
             console.log("-----> Got CSV from storage")
@@ -373,7 +373,7 @@ export function updateWaypoint(waypoint) {
 
 }
 export function deleteFromStorage(filename) {
-    const fullpath = "MeditationRecordings" + "/" + filename + ".csv"
+    const fullpath = user.uid + "/" + filename + ".csv"
     const fileRef = storageRef(storage, fullpath)
     deleteObject(fileRef).then(() => {
         console.log("Deleted file: " + fullpath)
@@ -382,8 +382,8 @@ export function deleteFromStorage(filename) {
     })
 
 }
-export function uploadCSV(csvString, folder, filename, metadata) {
-    const fullpath = folder + "/" + filename + ".csv"
+export function uploadCSV(csvString, filename, metadata) {
+    const fullpath = user.uid + "/" + filename + ".csv"
     const fileRef = storageRef(storage, fullpath)
 
     var standardMetadata = {}
@@ -568,7 +568,7 @@ export function downloadWaypoints() {
 
 
             var vector = buildVector(newVector, waypoint.averaging, waypoint.type)
-            console.log(newVector)
+            
             waypoint["relative_vector_avg" + waypoint.averaging] = vector
             waypoints.push(waypoint)
             users.push(waypoint.user)

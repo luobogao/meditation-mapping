@@ -214,7 +214,7 @@ function processDataMuse(rows) {
 
     returnObj.data = standardRows
     returnObj.startTime = first_timestamp
-    
+
     postMessage(JSON.stringify(returnObj))
 
 
@@ -279,8 +279,7 @@ function averageRows(rows, roundN) {
 
                     }
                     // Averaging is 1 - just use the row's current value
-                    else 
-                    {
+                    else {
                         newRow[key] = newRow[key1]
                     }
 
@@ -305,13 +304,14 @@ function averageRows(rows, roundN) {
                     }
 
                 }
-                if (avgArray.length > roundN_half) 
-                    {
-                        let variance = d3.variance(avgArray)
-                        newRow[keyNew] = variance
-                    }
+                if (avgArray.length > roundN_half) {
+                    let variance = d3.variance(avgArray)
+                    newRow[keyNew] = variance
+                }
             })
             newRow["vector_avg" + roundN] = getRootVector(newRow) // Compute the averaged vector
+
+
         }
     }
 

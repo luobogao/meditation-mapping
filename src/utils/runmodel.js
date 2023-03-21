@@ -78,6 +78,13 @@ function rebuild(avg, autoClusters) {
     state.data.validated.forEach(entry => entry["relative_vector_avg" + avg] = buildVector(entry, avg, state.vectorType))
     
     var userPoints = state.data.validated.filter(entry => entry["relative_vector_avg" + avg] != null)
+    //console.log("userPoints:")
+    //console.log(userPoints)
+
+    if (userPoints.length == 0) {
+        console.error("No user points found with avg: " + avg + " and type: " + state.vectorType)
+        return
+    }
     
     // Reset the projections for each waypoint
     waypoints.forEach(waypoint => {
@@ -86,10 +93,7 @@ function rebuild(avg, autoClusters) {
 
     // Filter out any waypoints that don't have a vector for this resolution    
     let waypointsAvg = waypoints.filter(waypoint => waypoint["relative_vector_avg" + avg] != null && waypoint.type == state.vectorType)
-    console.log("waypoints:")
-    console.log(waypoints)
-
-
+    
     // If no waypoints have a vector for this resolution, use the 60-second resolution
     var skipWaypoints = false
     if (waypointsAvg.length == 0) {
@@ -150,8 +154,8 @@ function rebuild(avg, autoClusters) {
         }
         else 
         {
-            console.log("found rows")
-            console.log(clusterRows[0])
+            //console.log("found rows")
+            //console.log(clusterRows[0])
         }
         var vectors = clusterRows.map(row => row["relative_vector_avg" + avg])        
         var mean = computeRobustMean(vectors)                
@@ -182,10 +186,9 @@ function rebuild(avg, autoClusters) {
     const clusterOrder = Array.from(new Set(fullClusterOrder)).filter((num, index, array) => {
         return array.indexOf(num) === index;
     });
-    console.log("means:")
-    console.log(means)
+    
     clusterOrder.forEach((cluster, index) => {
-        console.log("cluster: " + cluster + " index: " + index)
+        
         means[cluster].order = index
     })
     means.sort((a, b) => (a.order > b.order) ? 1 : -1)
@@ -197,7 +200,7 @@ function rebuild(avg, autoClusters) {
                 var dist = euclideanDistance(waypoint["relative_vector_avg" + state.resolution], cluster.vector)
                 return { dist: dist, waypoint: waypoint }
             }).sort((a, b) => b.dist - a.dist)[0]
-            console.log("best match: " + bestWaypointMatch.dist)
+            
 
             if (bestWaypointMatch.dist > 50) {
                 cluster.alreadyAdded = true

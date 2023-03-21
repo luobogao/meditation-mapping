@@ -247,7 +247,7 @@ export function updateCommunityGraph() {
         svg.selectAll('*').remove()
 
         var waypointsAvg = waypoints.filter(w => w["timeseriesSimilarity_avg" + state.resolution] != null)
-        //.filter(w => w.user != record.user)
+        .filter(w => w.user != record.user)
 
         if (waypointsAvg.length > 0) {
             var matchType = state.similarityType
@@ -590,16 +590,12 @@ export function updateClusters() {
 }
 
 export default function Clusters() {
+
     useEffect(() => {
+        console.log("----> Clustering")
         buildPage()
-        if (cleanedData != null && state != null) {
-            updateClusters()
-        }
-
-
-    }, [])
-    useEffect(() => {
-        if (cleanedData != null) {
+        if (state.data.validated != null) {
+            
             updateClusters()
         }
     })

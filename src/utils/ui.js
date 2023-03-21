@@ -437,7 +437,7 @@ export function buildVectorTypeSelectors(container) {
         .on("click", function () {
             d3.selectAll(".vectorTypeSelector").property("checked", false)
             d3.select(this).property("checked", true)
-            state.vectorType = "slow-feature"
+            state.vectorType = "change"
             rebuildChart(true)
         })
 

@@ -121,8 +121,6 @@ export function buildVector(entry, avg, type) {
     
     var vector
 
-    if (type == "slow-feature") standardizeType = "raw" // Slow features are already standardized
-    else standardizeType = "ratio"
     switch (standardizeType) {
         case "raw":
             vector = vectorRaw(entry, avg, type) // don't standardize at all - use raw values for each band+channel
@@ -152,7 +150,7 @@ export function vectorRaw(row, avg, type) {
     channels.forEach(channel => {
         bands.forEach(band => {
             var key = band + "_" + channel + "_avg" + avg + "_" + type
-            var value = row[key]            
+            var value = Math.log(row[key])
             vector.push(value)
         })
     })
@@ -414,4 +412,6 @@ export function runModel(rows, avg)
     var mappedCoordinates = math.transpose(math.multiply(state.models["principals_avg" + avg], d))
     return mappedCoordinates
 }
+
+
 

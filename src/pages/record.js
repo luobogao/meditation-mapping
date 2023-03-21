@@ -862,7 +862,7 @@ function rescaleTimeseries() {
             svg.select("#" + key)
                 .transition()
                 .attr("d", function (d) { return eegLine(data) })
-                .ease(d3.easeLinear)
+                //.ease(d3.easeLinear)
                 .duration(thisInterval)
 
         }

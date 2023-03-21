@@ -61,9 +61,12 @@ var chartBackground = "lightgrey"
 var selectedStartSecond = 0
 var selectedEndSecond = 100000
 const margin = 10
-var sidebarWidth = 280
+var sidebarWidth = 320
+const sliderHeight = 50
 var width = ((window.innerWidth - sidebarWidth) / 2) - (margin * 4)
-var height = (width / 2)
+
+var height = (window.innerHeight - sliderHeight - 63 - 100 - (margin * 2)) / 2
+var chartContainerHeight = (height * 2) + sliderHeight + (margin * 2)
 
 // Moment Variance chart
 var yV, lineV, momentVarSVG;
@@ -89,7 +92,7 @@ var yR = d3.scaleLinear()
 
 
 
-const sliderHeight = 50
+
 
 export var cleanedData = null
 
@@ -105,6 +108,7 @@ export function validateAfterLoad(loadedData, newRecording) {
     }
     console.log("Looking for recording filename: " + loadedData.filename + " in recordings")
     record = recordings.filter(r => r.filename == loadedData.filename)[0]
+    record.delete = false
     if (record == null) {
         console.error("Recording not found in recordings!")
     }
@@ -436,13 +440,13 @@ function buildVarianceChart() {
 
     var svg = d3.select("#variance_svg")
     svg.selectAll("*").remove()
-    
+
     var data = channels.map(channel => {
         return state.data.averaged.map(d => {
             return { seconds: d.seconds, variance: d[channel + "_variance_avg" + 10] }
         })
     })
-    
+
     svg.append("rect")
         .attr("width", (width - (2 * margin)) + "px")
         .attr("height", (height - (2 * margin)) + "px")
@@ -569,12 +573,22 @@ export function updateRecordingTable() {
         if (d.delete == true) return 0.5
         else return 1
     })
+        .style("display", function (d) {
+            if (d.delete == true) return "none"
+            else return "table-row"
+        })
     var row = d.enter()
         .append("tr")
         .style("font-size", "16px")
+        .style("max-height", "20px")
+        .style("overflow", "hidden")
         .attr("id", function (d) { return "row" + d.id })
         .attr("class", "recordrow")
         .style("cursor", "pointer")
+        .style("display", function (d) {
+            if (d.delete == true) return "none"
+            else return "table-row"
+        })
         .style("opacity", function (d) {
             if (d.delete == true) return 0.5
             else return 1
@@ -625,6 +639,7 @@ export function updateRecordingTable() {
             return formatDate(recording.timestamp)
         })
 
+        // User
     row
         .append("td")
         .style("border-left-style", "none")
@@ -636,6 +651,28 @@ export function updateRecordingTable() {
         .style("color", textColor)
         .text(function (recording) {
             return recording.user
+        })
+
+    // Label
+    row
+        .append("td")
+        .style("border-left-style", "none")
+        .style("margin", "5px")
+        .style("border", "1px solid " + textColor)
+        .append("div")
+        .style("margin-left", "5px")
+        .style("margin-right", "5px")
+        .style("color", textColor)
+        .text(function (recording) {
+            if (recording.label.length < 16)
+            {
+                return recording.label
+            }
+            else
+            {
+                return recording.label.substring(0, 14) + "..."
+            }
+                        
         })
 
     // Delete Button
@@ -654,6 +691,7 @@ export function updateRecordingTable() {
             event.stopPropagation()
             console.log("removing: " + d.id)
             var row = d3.select("#row" + d.id)
+            row.style("display", "none")
             row.style("opacity", 0.5)
             deleteRecording(d.filename, function () {
                 console.log("------> Deleted!")
@@ -740,22 +778,22 @@ function buildPage() {
     d3.select("#relative")
         .style("margin", margin + "px")
         .style("width", width + "px")
-        .style("height", (height * 2) + "px")
+        .style("height", chartContainerHeight + "px")
 
     var ratios = d3.select("#ratios")
         .style("margin", margin + "px")
         .style("width", width + "px")
-        .style("height", (height * 2) + "px")
+        .style("height", chartContainerHeight + "px")
 
     ratios.append("svg").attr("id", "ratio_graph")
         .attr("width", (width - (2 * margin)) + "px")
         .style("margin", margin + "px")
-        .attr("height", (height - (2 * margin)) + "px")
+        .attr("height", height + "px")
 
     ratios.append("svg").attr("id", "variance_svg")
         .attr("width", (width - (2 * margin)) + "px")
         .style("margin", margin + "px")
-        .attr("height", (height - (2 * margin)) + "px")
+        .attr("height", height + "px")
 
 
 
@@ -783,6 +821,8 @@ function buildOptions() {
             var avgS = prompt("Average?")
             var avg = parseInt(avgS)
             var parts = getEveryNth(state.data.validated_short, avg / 2)
+            console.log("parts:")
+            console.log(parts)
 
             var simpleParts = []
             parts.forEach(part => {
@@ -791,12 +831,13 @@ function buildOptions() {
                 channels.forEach(channel => {
                     bands.forEach(band => {
 
-                        var key = band + "_" + channel + "_avg" + avg
+                        var key = band + "_" + channel + "_avg" + avg + "_absolute"
                         simplePart[key] = part[key]
 
                     })
 
                 })
+                
                 simpleParts.push(simplePart)
             })
             saveCSV(simpleParts)
@@ -823,21 +864,23 @@ function prepareForNext(update = true) {
     var validated = []
     for (let i = 1; i < filteredData.length; i++) {
         var fullrow = filteredData[i]
-        var row = (({ seconds, timestamp }) => ({ seconds, timestamp }))(fullrow)        
+        var row = (({ seconds, timestamp }) => ({ seconds, timestamp }))(fullrow)
+        var avgs = [10, 60]
+ 
         channels.forEach(channel => {
             bands.forEach(band => {
-                var avgs = [10, 60]
+                
                 avgs.forEach(avg => {
                     var key = band + "_" + channel + "_avg" + avg
                     var change_x = avg
                     if (fullrow[key] != null) {
-                        
+
                         var absolute = fullrow[key]
                         var relative = Math.round(1000 * fullrow[key] / firstRow[key]) / 1000
                         var change = null
                         if (i - avg > 0) {
-                            change = Math.round(1000 * fullrow[key] / filteredData[i - avg][key]) / 1000
-                            }                 
+                            change = Math.round(1000 * (fullrow[key] - filteredData[i - avg][key])) / 1000
+                        }
                         row[key + "_absolute"] = absolute
                         row[key + "_relative"] = relative
                         row[key + "_change"] = change
@@ -917,7 +960,7 @@ function setupTimeRange(div, data) {
 
     let rangeSVG = svg.append("g")
         .attr("id", "range-svg-id")
-        .attr("transform", "translate(10,0)")
+        .attr("transform", "translate(" + margin + ",0)")
 
     rangeSVG
         .call(d3.axisBottom()
