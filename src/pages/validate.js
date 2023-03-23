@@ -131,6 +131,7 @@ export function validate() {
         d3.selectAll(".loading").remove()
         buildValidationChart()
         buildRatioCharts()
+        buildVarianceChart()
         setupTimeRange()
 
 
@@ -138,13 +139,13 @@ export function validate() {
         updateRecordingTable(recordings)
         d3.select("#acceptBtn").style("display", "flex")
 
-        brush.move(brushg, [selectedStartSecond, selectedEndSecond].map(range_x));
+        
 
         // Hide any loading bars in the history table
         d3.select("#loading" + record.id).style("display", "none")
         setTimeout(function () { prepareForNext(false) }, 200)
 
-        buildVarianceChart()
+
 
     }
 
@@ -196,6 +197,7 @@ function loadRecordData(selectedRecord) {
     d3.select("#loading" + selectedRecord.id).style("display", "flex")
     record = selectedRecord
     console.log("Loading record: " + record.filename)
+    console.log(record.startSecond)
     selectedStartSecond = selectedRecord.startSecond
     selectedStartSecond = selectedRecord.endSecond
     if (selectedRecord.averaged != null) {
@@ -230,7 +232,9 @@ function buildValidationChart() {
     var end = workingData.slice(-1)[0].seconds
 
     var div = d3.select("#relative")
-    
+
+    div.selectAll("*").remove()
+
     x = d3.scaleLinear()
         .domain([start, end])
         .range([margin, width - (2 * margin)])
@@ -462,6 +466,19 @@ function buildVarianceChart() {
 }
 function buildRatioCharts() {
     // Graph SVG
+    var ratios = d3.select("#ratios")
+    ratios.selectAll("*").remove()
+    ratios.append("svg").attr("id", "ratio_graph")
+        .attr("width", (width - (2 * margin)) + "px")
+        .style("margin", margin + "px")
+        .attr("height", (height - (2 * margin)) + "px")
+        
+
+    ratios.append("svg").attr("id", "variance_svg")
+        .attr("width", (width - (2 * margin)) + "px")
+        .style("margin", margin + "px")
+        .attr("height", (height - (2 * margin)) + "px")
+        
 
     svgR = d3.select("#ratio_graph")
 
@@ -776,15 +793,6 @@ function buildPage() {
         .style("width", width + "px")
         .style("height", chartContainerHeight + "px")
 
-    ratios.append("svg").attr("id", "ratio_graph")
-        .attr("width", (width - (2 * margin)) + "px")
-        .style("margin", margin + "px")
-        .attr("height", height + "px")
-
-    ratios.append("svg").attr("id", "variance_svg")
-        .attr("width", (width - (2 * margin)) + "px")
-        .style("margin", margin + "px")
-        .attr("height", height + "px")
 
 
 
@@ -843,6 +851,7 @@ function prepareForNext(update = true) {
     var filteredData = clone(state.data.averaged.filter(row => row.seconds >= selectedStartSecond && row.avg60 == true && row.seconds <= selectedEndSecond))
     var firstRow = filteredData[0]
 
+    console.log(selectedStartSecond)
     record.startSecond = selectedStartSecond
     record.endSecond = selectedEndSecond
     updateRecording(record)
@@ -903,6 +912,7 @@ function brushed() {
     state["timestamp_low"] = low
     state["timestamp_high"] = high
 
+    console.log("Brush started: " + low)
     record.startSecond = low
     record.endSecond = high
     updateRelative(low, high)
@@ -918,7 +928,108 @@ function brushend() {
         prepareForNext(false)
     }
 }
+function setupTimeRangeFancy() {
 
+    var div = d3.select("#relative")
+    var data = workingData
+    var margin = { top: 5, right: 20, bottom: 20, left: 20 };
+    var range_width = width - margin.left - margin.right;
+    var range_height = 50 - margin.top - margin.bottom;
+
+    var min = data[0].seconds;
+    var max = data[data.length - 1].seconds;
+
+    state["timestamp_low"] = min;
+    state["timestamp_high"] = max;
+
+    var svgContainer = div.append("svg")
+        .attr("width", width)
+        .attr("height", 50);
+
+    var svg = svgContainer.append("g")
+        .attr("width", range_width)
+        .attr("height", range_height)
+        .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+    range_x = d3.scaleLinear()
+        .domain([min, max])
+        .range([0, range_width]);
+
+    brush = d3.brushX()
+        .handleSize(20)
+        .extent([[0, 0], [range_width, range_height]])
+        .on("brush", brushed)
+        .on("end", brushend);
+
+    console.log("-> Building brush with range: " + selectedStartSecond + " to " + selectedEndSecond)
+    brushg = svg.append("g")
+        .attr("class", "brush")
+        .call(brush)
+        .call(brush.move, [selectedStartSecond, selectedEndSecond])
+        
+
+    let rangeSVG = svg.append("g")
+        .attr("id", "range-svg-id")
+        .attr("transform", "translate(0," + (range_height - margin.bottom) + ")");
+
+    rangeSVG
+        .call(d3.axisBottom()
+            .tickFormat(function (d) {
+                if (d == 0) return "";
+                else return parseInt(d / 60);
+            })
+            .scale(range_x)
+            .ticks(5))
+        .selectAll("text")
+        .style("pointer-events", "none")
+        .style("font-size", "12px");
+
+    rangeSVG
+        .selectAll(".tick line")
+        .style("stroke", "#aaa")
+        
+
+    svg.selectAll(".selection")
+        .style("fill", "#1f77b4")
+        .style("opacity", 0.7)
+        .style("stroke", "#08519c")
+        .style("stroke-width", 1);
+
+    svg.selectAll(".handle")
+        .style("fill", "url(#gradient)")
+        .style("stroke", "#000")
+        .style("stroke-width", 1)
+        .on("mouseover", function (d) {
+            d3.select(this).style("cursor", "ew-resize");
+        })
+        .on("mouseout", function (d) {
+            d3.select(this).style("cursor", "default");
+        });
+
+    // Add gradient for handles
+    var gradient = svgContainer.append("defs")
+        .append("linearGradient")
+        .attr("id", "gradient")
+        .attr("x1", "0%")
+        .attr("y1", "0%")
+        .attr("x2", "0%")
+        .attr("y2", "100%");
+        gradient.append("stop")
+        .attr("offset", "0%")
+        .attr("stop-color", "#4a4a4a")
+        .attr("stop-opacity", 1);
+
+    gradient.append("stop")
+        .attr("offset", "50%")
+        .attr("stop-color", "#2c2c2c")
+        .attr("stop-opacity", 1);
+
+    gradient.append("stop")
+        .attr("offset", "100%")
+        .attr("stop-color", "#4a4a4a")
+        .attr("stop-opacity", 1);
+
+}
 function setupTimeRange() {
 
     var div = d3.select("#relative")
@@ -933,7 +1044,7 @@ function setupTimeRange() {
     state["timestamp_low"] = min;
     state["timestamp_high"] = max;
 
-    
+
     var svgContainer = div.append("svg")
         .style("opacity", 0.7)
         .attr("width", width)
@@ -957,7 +1068,7 @@ function setupTimeRange() {
     brushg = svg.append("g")
         .attr("class", "brush")
         .call(brush)
-        .call(brush.move, [range_x(min), range_x(max)]);
+        .call(brush.move, [range_x(selectedStartSecond), range_x(selectedEndSecond)]);
 
     let rangeSVG = svg.append("g")
         .attr("id", "range-svg-id")

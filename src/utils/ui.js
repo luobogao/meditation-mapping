@@ -72,8 +72,8 @@ export function notice(message, id, spinnerP = false) {
         .text(message)
 
     if (spinnerP) {
-            div.append("div").attr("id", "loadingFileSpinner")
-            loadingSpinner("loadingFileSpinner")
+        div.append("div").attr("id", "loadingFileSpinner")
+        loadingSpinner("loadingFileSpinner")
     }
 
 
@@ -164,6 +164,58 @@ export function menuRemove() {
         .duration(100)
         .selectAll("*").remove()
 }
+
+
+function buildRadioGroup(container, title, options, groupName, fontSize, type, callback) {
+    container.style("margin", "5px");
+    container.append("text").text(title)
+        .style("font-size", fontSize);
+
+    var div = container.append("div")
+        .style("display", "flex")
+        .style("flex-direction", "row");
+
+    options.forEach(function (option) {
+        var isChecked = state[groupName] === option.value;
+        var radioButton = addCheckbox(div, option.label, isChecked, option.id, fontSize, type);
+
+        radioButton
+            .attr("class", groupName + "-radio")
+            .on("click", function () {
+                d3.selectAll("." + groupName + "-radio").property("checked", false);
+                d3.select(this).property("checked", true);
+                state[groupName] = option.value;
+                callback(option.value);
+            });
+    });
+}
+export function buildClusterCounts(container, page) {
+    const clusterOptions = [
+        { label: "1", value: 1, id: "cluster1" },
+        { label: "2", value: 2, id: "cluster2" },
+        { label: "3", value: 3, id: "cluster3" },
+        { label: "4", value: 4, id: "cluster4" },
+    ];
+
+    const settings = (page === "graphs") ? { autoClusters: false, updateGraphs: true } : false;
+
+    buildRadioGroup(container, "Clusters:", clusterOptions, "clusters", "12px", "radio", function (value) {
+        rebuildChart(settings);
+    });
+}
+
+export function buildSimilaritySelectors(container) {
+    const similarityOptions = [
+        { label: "Cosine", value: "cosine", id: "cosineType" },
+        { label: "Euclidean", value: "euclidean", id: "euclideanType" },
+    ];
+
+    buildRadioGroup(container, "Similarity Method:", similarityOptions, "similarityType", "12px", "radio", function (value) {
+        updateClusters();
+    });
+}
+
+
 export function buildUserSelectors() {
     // Build the checkboxes for the users
     var userDiv = d3.select('#user-selectors')
@@ -199,258 +251,49 @@ export function buildUserSelectors() {
     })
 }
 
-export function buildChartSelectors(div) {
-    var chart1, chart2, chart3, chart4, chart5 = false
-    switch (state.chartType) {
-        case "pca":
-            chart1 = true
-            break;
-        case "cosine":
-            chart2 = true
-            break;
-        case "euclidean":
-            chart3 = true
-            break
-        case "cosine*euclidean":
-            chart4 = true
-            break;
-        case "bands":
-            chart5 = true
-            break;
+export function buildChartSelectors(container) {
+    const chartOptions = [
+        { label: "3-D", value: "pca", id: "a" },
+        { label: "Cosine", value: "cosine", id: "b" },
+        { label: "Euclidean", value: "euclidean", id: "c" },
+    ];
 
-    }
-    var chart1box = addCheckbox(div, "3-D", chart1, "a", "20px", "radio")
-    var chart2box = addCheckbox(div, "Cosine", chart2, "b", "20px", "radio")
-    var chart3box = addCheckbox(div, "Euclidean", chart3, "c", "20px", "radio")
-
-    var els = [
-        { chart: chart1box, key: "pca" },
-        { chart: chart2box, key: "cosine" },
-        { chart: chart3box, key: "euclidean" }
-
-    ]
-    els.forEach(el => {
-
-        el.chart
-            .attr("class", "chart-checkbox")
-            .on("click", function () {
-                d3.selectAll(".chart-checkbox").property("checked", false)
-                d3.select(this).property("checked", true)
-                state.chartType = el.key
-                console.error("TODO: add a callback")
-            })
-    })
-
+    buildRadioGroup(container, "Chart Type:", chartOptions, "chartType", "12px", "radio", function (value) {
+        console.error("TODO: add a callback");
+    });
 }
+
 export function buildResolutionSelectors(container) {
+    const resolutionOptions = [
+        { label: "1", value: 1, id: "res1" },
+        { label: "10", value: 10, id: "res10" },
+        { label: "60", value: 60, id: "res60" },
+    ];
 
-    container.style("margin", "5px")
-    container.append("text").text("Resolution:")
-        .style("font-size", "20px")
-    var div = container.append("div").style("display", "flex").style("flex-direction", "row")
-
-    var res1, res10, res60 = false
-    switch (state.resolution) {
-        case 1:
-            res1 = true
-            break;
-        case 10:
-            res10 = true
-            break;
-        case 60:
-            res60 = true
-            break
-
-    }
-    var res1box = addCheckbox(div, "1", res1, "res1", "20px", "radio")
-    var res10box = addCheckbox(div, "10", res10, "res10", "20px", "radio")
-    var res60box = addCheckbox(div, "60", res60, "res60", "20px", "radio")
-
-    res1box
-        .attr("class", "resolution-checkbox")
-        .on("click", function () {
-            d3.selectAll(".resolution-checkbox").property("checked", false)
-            d3.select(this).property("checked", true)
-            state.resolution = 1
-            rebuildChart(false)
-
-        })
-    res10box
-        .attr("class", "resolution-checkbox")
-        .on("click", function () {
-            d3.selectAll(".resolution-checkbox").property("checked", false)
-            d3.select(this).property("checked", true)
-            state.resolution = 10
-            rebuildChart(false)
-
-        })
-    res60box
-        .attr("class", "resolution-checkbox")
-        .on("click", function () {
-            d3.selectAll(".resolution-checkbox").property("checked", false)
-            d3.select(this).property("checked", true)
-            state.resolution = 60
-            rebuildChart(false)
-
-        })
-
+    buildRadioGroup(container, "Resolution:", resolutionOptions, "resolution", "12px", "radio", function (value) {
+        rebuildChart(false);
+    });
 }
-
-export function buildClusterCounts(container, page) {
-    container.style("margin", "5px")
-    container.append("text").text("Clusters:")
-        .style("font-size", "20px")
-    var div = container.append("div").style("display", "flex").style("flex-direction", "row")
-    var cluster1, cluster2, cluster3, cluster4 = false
-    switch (state.clusters) {
-        case 1:
-            cluster1 = true
-            break;
-        case 2:
-            cluster2 = true
-            break;
-        case 3:
-            cluster3 = true
-            break
-        case 4:
-            cluster4 = true
-            break
-
-    }
-    var c1box = addCheckbox(div, "1", cluster1, "cluster1", "20px", "radio")
-    var c2box = addCheckbox(div, "2", cluster2, "cluster2", "20px", "radio")
-    var c3box = addCheckbox(div, "3", cluster3, "cluster3", "20px", "radio")
-    var c4box = addCheckbox(div, "4", cluster4, "cluster4", "20px", "radio")
-    .append("table").attr("id", "recordingTable")
-    var settings = false
-    if (page == "graphs") {
-        settings = { autoClusters: false, updateGraphs: true }
-    }
-
-    c1box
-        .attr("class", "clusters-checkbox")
-        .on("click", function () {
-            d3.selectAll(".clusters-checkbox").property("checked", false)
-            d3.select(this).property("checked", true)
-            state.clusters = 1
-            rebuildChart(settings)
-        })
-    c2box
-        .attr("class", "clusters-checkbox")
-        .on("click", function () {
-            d3.selectAll(".clusters-checkbox").property("checked", false)
-            d3.select(this).property("checked", true)
-            state.clusters = 2
-            rebuildChart(settings)
-
-        })
-    c3box
-        .attr("class", "clusters-checkbox")
-        .on("click", function () {
-            d3.selectAll(".clusters-checkbox").property("checked", false)
-            d3.select(this).property("checked", true)
-            state.clusters = 3
-            rebuildChart(settings)
-
-
-        })
-    c4box
-        .attr("class", "clusters-checkbox")
-        .on("click", function () {
-            d3.selectAll(".clusters-checkbox").property("checked", false)
-            d3.select(this).property("checked", true)
-            state.clusters = 4
-            rebuildChart(settings)
-
-
-        })
-
-}
-export function buildSimilaritySelectors(container) {
-    container.style("margin", "5px")
-    container.append("text").text("Similarity Method:")
-    var div = container.append("div").style("display", "flex").style("flex-direction", "row")
-
-    var d1 = false
-    var d2 = false
-    switch (state.similarityType) {
-        case "cosine":
-            d1 = true
-            break;
-        case "euclidean":
-            d2 = true
-            break;
-    }
-    var cosine = addCheckbox(div, "Cosine", d1, "cosineType", "12px", "radio")
-    var euclidean = addCheckbox(div, "Euclidean", d2, "euclideanType", "12px", "radio")
-
-    cosine
-        .attr("class", "similaritySelector")
-        .on("click", function () {
-            d3.selectAll(".similaritySelector").property("checked", false)
-            d3.select(this).property("checked", true)
-            state.similarityType = "cosine"
-            updateClusters()
-        })
-    euclidean
-        .attr("class", "similaritySelector")
-        .on("click", function () {
-            d3.selectAll(".similaritySelector").property("checked", false)
-            d3.select(this).property("checked", true)
-            state.similarityType = "combined"
-            updateClusters()
-        })
-
-
-
-}
-
-// Build two radio selectors which toggle between a state value "vectorType" with the values "relative" and "change"
 
 export function buildVectorTypeSelectors(container) {
-    container.style("margin", "5px")
-    container.append("text").text("Vector Type:")
-    var div = container.append("div").style("display", "flex").style("flex-direction", "row")
+    const vectorTypeOptions = [
+        { label: "Relative", value: "relative", id: "relativeType" },
+        { label: "Change", value: "change", id: "changeType" },
+    ];
 
-    var d1 = false
-    var d2 = false
-    switch (state.vectorType) {
-        case "relative":
-            d1 = true
-            break;
-        case "change":
-            d2 = true
-            break;
-    }
-    var relative = addCheckbox(div, "Relative", d1, "relativeType", "12px", "radio")
-    var change = addCheckbox(div, "Change", d2, "changeType", "12px", "radio")
-
-    relative
-        .attr("class", "vectorTypeSelector")
-        .on("click", function () {
-            d3.selectAll(".vectorTypeSelector").property("checked", false)
-            d3.select(this).property("checked", true)
-            state.vectorType = "relative"
-            rebuildChart(true)
-        })
-    change
-        .attr("class", "vectorTypeSelector")
-        .on("click", function () {
-            d3.selectAll(".vectorTypeSelector").property("checked", false)
-            d3.select(this).property("checked", true)
-            state.vectorType = "change"
-            rebuildChart(true)
-        })
-
+    buildRadioGroup(container, "Vector Type:", vectorTypeOptions, "vectorType", "12px", "radio", function (value) {
+        rebuildChart(true);
+    });
 }
+
 
 
 
 export function loadingSpinner(spinnerContainerId) {
     // Create an SVG container
     var spinnerContainer = d3.select("#" + spinnerContainerId)
-    spinnerContainer.style("display", "flex")    
-    .style("justify-content", "center")
+    spinnerContainer.style("display", "flex")
+        .style("justify-content", "center")
     spinnerContainer.selectAll("*").remove()
     const svg = spinnerContainer.append("svg")
         .attr("width", 50)
