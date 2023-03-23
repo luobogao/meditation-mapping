@@ -230,7 +230,7 @@ export function updateUsername() {
 
 }
 export function getRecordingFromStorage(filename) {
-    var pathReference = storageRef(storage, meditationFolder + "/" + filename + ".csv")
+    var pathReference = storageRef(storage, user.uid + "/" + filename + ".csv")
     getBlob(pathReference).then((blob) => {
         blob.text().then((string) => {
             console.log("-----> Got CSV from storage")
@@ -357,7 +357,7 @@ export function getAllWaypoints() {
     return promise
 }
 export function getAllRecordings() {
-    var q = query(collection(db, "recordings"))
+    var q = query(collection(db, "recordings"), where("addedBy", "==", auth.currentUser.uid))
     var promise = getDocs(q)
     return promise
 }
@@ -373,7 +373,7 @@ export function updateWaypoint(waypoint) {
 
 }
 export function deleteFromStorage(filename) {
-    const fullpath = meditationFolder + "/" + filename + ".csv"
+    const fullpath = user.uid + "/" + filename + ".csv"
     const fileRef = storageRef(storage, fullpath)
     deleteObject(fileRef).then(() => {
         console.log("Deleted file: " + fullpath)
@@ -383,7 +383,7 @@ export function deleteFromStorage(filename) {
 
 }
 export function uploadCSV(csvString, filename, metadata) {
-    const fullpath = meditationFolder + "/" + filename + ".csv"
+    const fullpath = user.uid + "/" + filename + ".csv"
     const fileRef = storageRef(storage, fullpath)
 
     var standardMetadata = {}

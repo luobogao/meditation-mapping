@@ -131,6 +131,8 @@ export function validate() {
         d3.selectAll(".loading").remove()
         buildValidationChart()
         buildRatioCharts()
+        setupTimeRange()
+
 
         updateRelative(selectedStartSecond, selectedEndSecond)
         updateRecordingTable(recordings)
@@ -228,12 +230,10 @@ function buildValidationChart() {
     var end = workingData.slice(-1)[0].seconds
 
     var div = d3.select("#relative")
-    div.selectAll("*").remove()
-
-
+    
     x = d3.scaleLinear()
         .domain([start, end])
-        .range([margin, width - margin])
+        .range([margin, width - (2 * margin)])
 
 
     line = d3.line()
@@ -319,11 +319,6 @@ function buildValidationChart() {
         .attr("stroke-width", 3)
 
     updateValidChart(dataLines)
-
-    var sliderdiv = div.append("div").style("width", "400px")
-    setupTimeRange(sliderdiv, workingData)
-
-
 
 
 
@@ -465,7 +460,6 @@ function buildVarianceChart() {
 
 
 }
-
 function buildRatioCharts() {
     // Graph SVG
 
@@ -639,7 +633,7 @@ export function updateRecordingTable() {
             return formatDate(recording.timestamp)
         })
 
-        // User
+    // User
     row
         .append("td")
         .style("border-left-style", "none")
@@ -664,15 +658,13 @@ export function updateRecordingTable() {
         .style("margin-right", "5px")
         .style("color", textColor)
         .text(function (recording) {
-            if (recording.label.length < 16)
-            {
+            if (recording.label.length < 16) {
                 return recording.label
             }
-            else
-            {
+            else {
                 return recording.label.substring(0, 14) + "..."
             }
-                        
+
         })
 
     // Delete Button
@@ -742,7 +734,6 @@ function updateRatioGraphs() {
         .attr("stroke", function (d, i) { return ratioColors[i] })
         .attr("stroke-width", 3)
         .attr("d", function (d) { return lineR(d) })
-    d
         .attr("d", function (d) {
 
             return lineR(d)
@@ -801,10 +792,6 @@ function buildPage() {
     buildOptions()
 
 
-
-
-
-
 }
 function buildOptions() {
     var div = d3.select("#options")
@@ -837,10 +824,10 @@ function buildOptions() {
                     })
 
                 })
-                
+
                 simpleParts.push(simplePart)
             })
-            saveCSV(simpleParts, record.filename )
+            saveCSV(simpleParts, record.filename)
 
 
 
@@ -866,10 +853,10 @@ function prepareForNext(update = true) {
         var fullrow = filteredData[i]
         var row = (({ seconds, timestamp }) => ({ seconds, timestamp }))(fullrow)
         var avgs = [10, 60]
- 
+
         channels.forEach(channel => {
             bands.forEach(band => {
-                
+
                 avgs.forEach(avg => {
                     var key = band + "_" + channel + "_avg" + avg
                     var change_x = avg
@@ -909,6 +896,10 @@ function brushed() {
 
     var low = round(range[0])
     var high = round(range[1])
+    if (low < 0) {
+        low = 0
+        range[0] = 0
+    }
     state["timestamp_low"] = low
     state["timestamp_high"] = high
 
@@ -920,6 +911,7 @@ function brushed() {
 
 function brushend() {
     // Called when user stops moving the timeslider
+    console.log(record.startSecond)
     if (record.startSecond != lastStartSecond || record.endSecond != lastEndSecond) {
         lastStartSecond = record.startSecond
         lastEndSecond = record.endSecond
@@ -927,68 +919,77 @@ function brushend() {
     }
 }
 
-function setupTimeRange(div, data) {
-    range_width = width
-    var min = data[0].seconds
-    var max = data[data.length - 1].seconds
-    let margin = 10
-    state["timestamp_low"] = min
-    state["timestamp_high"] = max
+function setupTimeRange() {
 
-    div.selectAll("*").remove()
-    var svg = div.append("svg")
+    var div = d3.select("#relative")
+    var data = workingData
+    var margin = { top: 5, right: 20, bottom: 20, left: 20 };
+    var range_width = width - margin.left - margin.right;
+    var range_height = 50 - margin.top - margin.bottom;
+
+    var min = data[0].seconds;
+    var max = data[data.length - 1].seconds;
+
+    state["timestamp_low"] = min;
+    state["timestamp_high"] = max;
+
+    
+    var svgContainer = div.append("svg")
         .style("opacity", 0.7)
-        .style("height", "25px")
-        .style("margin-left", margin + "px")
-        .style("width", (width - (2 * margin)) + "px")
+        .attr("width", width)
+        .attr("height", 50);
 
+    var svg = svgContainer.append("g")
+        .attr("width", range_width)
+        .attr("height", range_height)
+        .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
     range_x = d3.scaleLinear()
         .domain([min, max])
-        .range([margin, range_width - (2 * margin)]);
+        .range([0, range_width]);
 
     brush = d3.brushX()
         .handleSize(20)
-        .extent([[0, 0], [range_width - (2 * margin) - 10, 20]])
+        .extent([[0, 0], [range_width, range_height]])
         .on("brush", brushed)
-        .on("end", brushend)
+        .on("end", brushend);
 
     brushg = svg.append("g")
         .attr("class", "brush")
         .call(brush)
-
+        .call(brush.move, [range_x(min), range_x(max)]);
 
     let rangeSVG = svg.append("g")
         .attr("id", "range-svg-id")
-        .attr("transform", "translate(" + margin + ",0)")
+        .attr("transform", "translate(0," + (range_height - margin.bottom) + ")");
 
     rangeSVG
         .call(d3.axisBottom()
             .tickFormat(function (d) {
-                if (d == 0) return ""
-                else return parseInt(d / 60)
+                if (d == 0) return "";
+                else return parseInt(d / 60);
             })
-
             .scale(range_x)
             .ticks(5));
 
-
-    //brush.move(brushg, [selectedStartSecond, selectedEndSecond].map(range_x));
+    rangeSVG
+        .selectAll("text")
+        .style("pointer-events", "none");
 
     svg.selectAll(".selection")
-        .style("stroke", "none")
+        .style("stroke", "none");
     svg.selectAll(".handle")
         .style("fill", "black")
         .style("opacity", 0.3)
         .on("mouseover", function (d) {
             d3.select(this).style("cursor", "ew-resize");
         })
-
         .on("mouseout", function (d) {
             d3.select(this).style("cursor", "default");
-        })
+        });
 
 }
+
 
 export default function Validate() {
 
