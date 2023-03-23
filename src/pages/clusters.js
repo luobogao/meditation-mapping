@@ -10,21 +10,25 @@ import Sidebar from "../utils/sidebar";
 import { addWaypoint } from "../utils/database";
 import { record } from "../pages/validate"
 import { euclideanDistance } from "../utils/analysis";
+import { text } from "d3";
 
 const d3 = require("d3");
 
 var x, y, line, start, end, line
 var cluster = { id: -1 } // currently selected cluster
-const margin = 10
-const labelMargin = 120 // margin to show the names beside each cosine line
+const margin = 15
+const labelMargin = 180 // margin to show the names beside each cosine line
 const navHeight = 63
-const width = window.innerWidth * 0.8
+const yAxisWidth = 30
+var sidebarWidth = 300
+const width = window.innerWidth - sidebarWidth - 2 * margin - labelMargin
 const availableHeight = window.innerHeight - navHeight - 4 * margin
 const userHeight = availableHeight * 0.382  // golden ratio
 const communityHeight = availableHeight - userHeight
 const height = (window.innerHeight - navHeight) * 0.4
 var textColor = "white"
-var sidebarWidth = 300
+const opacityDeactive = 0.2
+
 const backgroundColor = "#d9d9d9"
 
 var cleanedData;
@@ -242,23 +246,31 @@ export function updateClusterGraphs() {
 
 }
 export function updateCommunityGraph() {
-    var svg = d3.select("#communitysvg")
+    var svgParent = d3.select("#communitysvg")
+    svgParent.selectAll("*").remove()
+
+    var thisWidth = width - (2 * margin) - yAxisWidth
+    var svg = svgParent.append("g")
+        .attr("width", thisWidth + "px")
+        .attr("height", (communityHeight - (2 * margin)) + "px")
+        .attr("transform", "translate(" + (margin + yAxisWidth) + "," + margin + ")")
+
     if (svg.node() != null) {
         svg.selectAll('*').remove()
 
         var waypointsAvg = waypoints.filter(w => w["timeseriesSimilarity_avg" + state.resolution] != null)
-        .filter(w => w.user != record.user)
+            .filter(w => w.user != record.user)
 
         if (waypointsAvg.length > 0) {
             var matchType = state.similarityType
-            var matchTypeVariance = state.similarityType + "_var"
+            var matchTypeKey = state.similarityType
 
 
 
             line = d3.line()
                 .x(function (d, i) { return x(d.seconds); })
-                .y(function (d, i) { return y(d[matchTypeVariance]) })
-                .defined(((d, i) => !isNaN(d[matchTypeVariance])))
+                .y(function (d, i) { return y(d[matchTypeKey]) })
+                .defined(((d, i) => !isNaN(d[matchTypeKey])))
                 .curve(d3.curveMonotoneX) // apply smoothing to the line
 
 
@@ -279,7 +291,7 @@ export function updateCommunityGraph() {
             })
 
 
-            // Find the median of each time-series, make a new key "_var" showing variance from median
+            // Build the three kinds of metrics to graph: absolute, median-variance, and relative-to-start
             for (let i = 0; i < data[0].length; i++) {
                 var medianAvgArr = []
                 for (let j = 0; j < data.length; j++) {
@@ -288,35 +300,47 @@ export function updateCommunityGraph() {
                 var median = d3.median(medianAvgArr)
                 data.forEach(cluster => {
                     cluster[i].median = median
-                    cluster[i][matchTypeVariance] = cluster[i][matchType] - median
+                    cluster[i][matchTypeKey + "_var"] = cluster[i][matchType] - median
+                    cluster[i][matchTypeKey] = cluster[i][matchType]
+
 
                 })
             }
 
-            // Find min/max of all time-series
+            var graphType = "absolute"
+
             var minY = 0
             var maxY = 0
-            if (matchType == "euclidean") {
-                minY = -30
-            }
-            data.forEach(line => {
-                line.forEach(row => {
-                    if (row[matchTypeVariance] < minY) {
-                        minY = row[matchTypeVariance]
-                    }
-                    if (row[matchTypeVariance] > maxY) {
-                        maxY = row[matchTypeVariance]
-                    }
+
+            if (graphType == "median") {
+                // Find min/max of all time-series
+                data.forEach(line => {
+                    line.forEach(row => {
+                        if (row[matchTypeKey] < minY) {
+                            minY = row[matchTypeKey]
+                        }
+                        if (row[matchTypeKey] > maxY) {
+                            maxY = row[matchTypeKey]
+                        }
+                    })
                 })
-            })
+
+            }
+            else if (graphType == "absolute") {
+                minY = 70
+                maxY = 105
+            }
+
+
 
             // Find the top 4 waypoint matches
             var topMatches = []
             for (let i = 0; i < data.length; i++) {
-                topMatches.push({ i: i, max: d3.max(data[i].map(d => d[matchTypeVariance])) })
+                topMatches.push({ i: i, max: d3.max(data[i].map(d => d[matchTypeKey])) })
             }
             var colori = 0
-            var sortedTopMatches = topMatches.sort((a, b) => b.max - a.max).map(e => e.i).slice(0, 4)
+
+            var sortedTopMatches = topMatches.sort((a, b) => b.max - a.max).map(e => e.i).slice(0, 5)
             //var allPositiveMatches = topMatches.filter(e => e.max > 20).map(e => e.i)
             sortedTopMatches.forEach(i => {
                 var waypoint = waypointsAvg[i]
@@ -329,10 +353,27 @@ export function updateCommunityGraph() {
             y = d3.scalePow()
                 .exponent(1)
                 .domain([-80, maxY])
-                .range([communityHeight - margin, margin])
+                .range([communityHeight - (2 * margin), (2 * margin)])
+
+            // Add Y-axis - this requires a separe 'g' so that the text-alignment doesn't affect legend text
+            var yAxis = d3.axisLeft(y)
+                .tickFormat(function (d) {
+                    return (d * 1)
+                })
+
+
+            var yaxisSVG = svg.append("g")
+                .style("color", textColor)
+                .style("font-size", "16px")
+            yaxisSVG.call(yAxis)
+            yaxisSVG.selectAll(".domain").remove();
+            yaxisSVG.selectAll(".tick line").remove();
+
+
+
 
             svg.selectAll(".matchesLine")
-                .data(data)
+                .data(waypointsAvg)
                 .enter()
                 .append("path")
                 .attr("id", function (d, i) { return "matchesLine" + i })
@@ -340,14 +381,14 @@ export function updateCommunityGraph() {
                 .attr("fill", "none")
                 .on("click", function (event, waypoint) {
 
-                    d3.select(this).remove()
+                    d3.select(this).attr("stroke", "lightgrey").style("opacity", opacityDeactive)
                     d3.select("#text-legend-" + waypoint.clickid).remove()
                 })
                 .on('mouseover', function (event, d) {
 
                 })
-                .attr("stroke", function (d, i) {
-                    if (waypointsAvg[i].topmatch == true) {
+                .attr("stroke", function (waypoint, i) {
+                    if (waypoint.topmatch == true) {
                         return waypointsAvg[i].color
                     }
                     else return "lightgray"
@@ -357,15 +398,13 @@ export function updateCommunityGraph() {
                     if (waypointsAvg[i].topmatch == true) {
                         return 1
                     }
-                    else return 0.2
+                    else return opacityDeactive
 
                 })
                 .attr("stroke-width", 3)
-                .attr("d", function (d) {
-                    var getNth = d.averaging / 2  // Every waypoint has it's own 'averaging' value (1,10,60)
-                    if (getNth < 1) getNth = 1
-
-                    return line(d)
+                .attr("d", function (waypoint) {
+                    var data = getEveryNth(waypoint["timeseriesSimilarity_avg" + state.resolution], getNth)
+                    return line(data)
                 })
 
             // Add a legend
@@ -378,16 +417,19 @@ export function updateCommunityGraph() {
                 var waypoint = waypointsAvg[i]
                 if (waypoint.topmatch == true) {
                     svg.append("text")
-                        .attr("id", "text-legend-" + i)
-                        .text(waypoint.user)
+                        .attr("class", "legend")
+                        .attr("id", "text-legend-" + waypoint.clickid)
+                        .text(waypoint.user + " - " + waypoint.label)
                         .style("fill", function () { return waypoint.color })
                         .attr("x", x(lastEntry.seconds) + 10)
-                        .attr("y", y(lastEntry[matchTypeVariance]))
-                    legend.push({ y: y(lastEntry[matchTypeVariance]), id: i })
+                        .attr("y", y(lastEntry[matchTypeKey]))
+                    legend.push({ y: y(lastEntry[matchTypeKey]), id: i })
                 }
 
             })
             addLegend(svg, legend)
+
+
         }
     }
 
@@ -396,7 +438,7 @@ export function updateCommunityGraph() {
 function addLegend(svg, legends) {
     // Sorts legends in an SVG
     // "legends" is a list with 'id' and 'y'
-    const labelMinMargin = 20
+    const labelMinMargin = 15
     function compare(a, b) {
         if (a.y < b.y) {
             return 1;
@@ -421,6 +463,7 @@ function addLegend(svg, legends) {
     while (move > 0) {
         move = 0
         iterations++
+
         if (iterations > 100) {
             move = 0
         }
@@ -440,6 +483,7 @@ function addLegend(svg, legends) {
                         if (diff < labelMinMargin) {
                             var direction = 1
                             if (y1 < y2) direction = -1
+                            console.log(direction)
                             move = 1
                             let newY = parseInt(y1) + (1 * direction)
                             y1 = newY
@@ -453,6 +497,7 @@ function addLegend(svg, legends) {
         }
     }
 }
+
 function newWaypoint(cluster) {
 
     console.log("cluster:")
@@ -581,7 +626,7 @@ export function updateClusters() {
 
     x = d3.scaleLinear()
         .domain([start, end])
-        .range([margin, width - margin - labelMargin])
+        .range([margin * 2, width - (margin * 2) - labelMargin])
 
 
     updateClusterGraphs()
@@ -595,7 +640,7 @@ export default function Clusters() {
         console.log("----> Clustering")
         buildPage()
         if (state.data.validated != null) {
-            
+
             updateClusters()
         }
     })

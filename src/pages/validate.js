@@ -624,7 +624,7 @@ export function updateRecordingTable() {
             d3.select(this).style("background", newcolor).style("color", "black")
         })
 
-
+    // Date
     row
         .append("td")
         .style("border-top-left-radius", "5px")
@@ -831,7 +831,7 @@ function buildOptions() {
                 channels.forEach(channel => {
                     bands.forEach(band => {
 
-                        var key = band + "_" + channel + "_avg" + avg + "_absolute"
+                        var key = band + "_" + channel + "_avg" + avg + "_relative"
                         simplePart[key] = part[key]
 
                     })
@@ -840,7 +840,7 @@ function buildOptions() {
                 
                 simpleParts.push(simplePart)
             })
-            saveCSV(simpleParts)
+            saveCSV(simpleParts, record.filename )
 
 
 

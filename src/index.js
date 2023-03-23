@@ -26,7 +26,7 @@ export var state =
   "showAllWaypoints": false, // Shows all waypoints (as red) even when not matching
   "chartType": "pca", // PCA, Cosine, or Euclidean
   "limitMatches": true,  // Only use top-N waypoints to show the PCA of user vectors
-  "vectorType": "relative",  // "relative" (each vector divided by FIRST vector), "slow-feature" (each vector divided by the previous vector)
+  "vectorType": "relative",  // "relative" (each vector divided by FIRST vector), "change" (each vector divided by the previous vector)
   "model":
   {
     "mapped": null, // Mapped x-y coordinates of each standard vector

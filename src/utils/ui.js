@@ -133,6 +133,7 @@ export function addMenu(event, type) {
 
     return div
 }
+
 export function moveMenu() {
     // Checks if menu is still entirely within window
     // Timeout necessary to give DOM chance to display
@@ -404,7 +405,7 @@ export function buildSimilaritySelectors(container) {
 
 }
 
-// Build two radio selectors which toggle between a state value "vectorType" with the values "relative" and "slow-feature"
+// Build two radio selectors which toggle between a state value "vectorType" with the values "relative" and "change"
 
 export function buildVectorTypeSelectors(container) {
     container.style("margin", "5px")
@@ -417,12 +418,12 @@ export function buildVectorTypeSelectors(container) {
         case "relative":
             d1 = true
             break;
-        case "slow-feature":
+        case "change":
             d2 = true
             break;
     }
     var relative = addCheckbox(div, "Relative", d1, "relativeType", "12px", "radio")
-    var slowFeature = addCheckbox(div, "Slow Feature", d2, "slowFeatureType", "12px", "radio")
+    var change = addCheckbox(div, "Change", d2, "changeType", "12px", "radio")
 
     relative
         .attr("class", "vectorTypeSelector")
@@ -432,7 +433,7 @@ export function buildVectorTypeSelectors(container) {
             state.vectorType = "relative"
             rebuildChart(true)
         })
-    slowFeature
+    change
         .attr("class", "vectorTypeSelector")
         .on("click", function () {
             d3.selectAll(".vectorTypeSelector").property("checked", false)

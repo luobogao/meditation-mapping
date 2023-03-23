@@ -19,7 +19,7 @@ import { buildUserSelectors } from "../utils/ui";
 import { bootLast } from '../pages/validate';
 import { filter } from 'mathjs';
 
-
+const meditationFolder = "MeditationRecordings"
 
 const d3 = require("d3");
 
@@ -230,7 +230,7 @@ export function updateUsername() {
 
 }
 export function getRecordingFromStorage(filename) {
-    var pathReference = storageRef(storage, user.uid + "/" + filename + ".csv")
+    var pathReference = storageRef(storage, meditationFolder + "/" + filename + ".csv")
     getBlob(pathReference).then((blob) => {
         blob.text().then((string) => {
             console.log("-----> Got CSV from storage")
@@ -373,7 +373,7 @@ export function updateWaypoint(waypoint) {
 
 }
 export function deleteFromStorage(filename) {
-    const fullpath = user.uid + "/" + filename + ".csv"
+    const fullpath = meditationFolder + "/" + filename + ".csv"
     const fileRef = storageRef(storage, fullpath)
     deleteObject(fileRef).then(() => {
         console.log("Deleted file: " + fullpath)
@@ -383,7 +383,7 @@ export function deleteFromStorage(filename) {
 
 }
 export function uploadCSV(csvString, filename, metadata) {
-    const fullpath = user.uid + "/" + filename + ".csv"
+    const fullpath = meditationFolder + "/" + filename + ".csv"
     const fileRef = storageRef(storage, fullpath)
 
     var standardMetadata = {}

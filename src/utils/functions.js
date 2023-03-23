@@ -161,25 +161,42 @@ export function enableLogging() {
     console.log = originalConsoleLog
 }
 
-export function saveCSV(rows) {
+export function saveCSV(rows, filename) {
 
-    var stringOut = "data:text/csv;charset=utf-8,"
-    // EEG + Tags
+    var stringOut = ""
+    if (typeof rows == "string") {
+        stringOut = rows
+    }
+    else {
+        var keys = Object.keys(rows[0])
 
-    var keys = Object.keys(rows[0])
-
-    keys.forEach(key => {
-        stringOut += key + ","
-    })
-    stringOut += "\r\n"
-
-    rows.forEach(row => {
         keys.forEach(key => {
-            stringOut += row[key] + ","
+            stringOut += key + ","
         })
         stringOut += "\r\n"
-    })
-    var encodeduri = encodeURI(stringOut)
-    window.open(encodeduri)
+
+        rows.forEach(row => {
+            keys.forEach(key => {
+                stringOut += row[key] + ","
+            })
+            stringOut += "\r\n"
+        })
+
+
+
+    }
+    // create a Blob object from the string
+    const blob = new Blob([stringOut], { type: "text/csv;charset=utf-8;" });
+
+    // create a URL for the Blob object
+    const url = URL.createObjectURL(blob);
+
+    // create a link element to trigger the download
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", filename + ".csv");
+
+    // trigger the download
+    link.click();
 
 }

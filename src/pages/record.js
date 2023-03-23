@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from "react";
-import { clone, getEveryNth } from "../utils/functions";
+import React, { useState, useEffect } from "react"
+import { formatDate } from "../utils/functions";
+import { clone, getEveryNth, saveCSV } from "../utils/functions";
 import { login, eegdata, addMarker, getAllMarkers, auth, buildAuthContainer } from "../utils/database";
 import { ZoomTransform } from "d3";
 const d3 = require("d3");
@@ -13,6 +14,8 @@ const eegInterval = 500 // Milliseconds to wait before querying next eeg data (s
 var recording = true
 var d = new Date()
 var lastActivity = d.getTime() // If user doesn't engage with page for a while, data is stopped
+var lastClicked = d.getTime()
+var startTime = d.getTime()
 
 const userTimeout = 1000 * 60 * 60
 
@@ -43,6 +46,8 @@ var backgroundDark = "#3F3F3F"
 
 // Gamepad
 var gp;
+var gamepadMode = null
+var defaultGamepadMode = "INSIGHT"
 var minTimeClick = 1000 // Minimum time between clicks
 var vibratingTime = 0
 var tagChartWidth = 300
@@ -195,6 +200,20 @@ var buttonMapOut =
         14: "RELAXED",
         15: "LIGHT",
         16: "COUNT"
+    },
+    "JHANAS":
+    {
+        12: "1st Jhana",
+        15: "2nd Jhana",
+        13: "3rd Jhana",
+        14: "4th Jhana",
+        3: "5th Jhana",
+        1: "6th Jhana",
+        0: "7th Jhana",
+        2: "8th Jhana",
+        6: "Marker 1",
+        7: "Bad Data"
+
     }
 }
 var buttonColors =
@@ -215,7 +234,25 @@ var buttonColors =
     "EXPANDED": "purple",
     "BEGINNING PHENOMENON": "green",
     "END PHENOMENON": "red",
-    "NEUTRAL": "blue"
+    "NEUTRAL": "blue",
+    "1st Jhana": "blue",
+    "2nd Jhana": "green",
+    "3rd Jhana": "red",
+    "4th Jhana": "purple",
+    "5th Jhana": "orange",
+    "6th Jhana": "yellow",
+    "7th Jhana": "pink",
+    "8th Jhana": "black"
+}
+var buttonIndex = {
+    "1st Jhana": 1,
+    "2nd Jhana": 2,
+    "3rd Jhana": 3,
+    "4th Jhana": 4,
+    "5th Jhana": 5,
+    "6th Jhana": 6,
+    "7th Jhana": 7,
+    "8th Jhana": 8
 }
 var museModels =
     [
@@ -243,6 +280,11 @@ var timeend = timestart + (1000 * initialDuration)
 var circleX = d3.scaleLinear()
     .domain([timestart, timeend])
     .range([50, timeseriesWidth])
+var circleX_long = d3.scaleLinear()
+    .domain([0, 100])
+    .range([50, timeseriesWidth])
+
+
 
 // EEG data
 var eegY = d3.scaleLog()
@@ -310,87 +352,113 @@ function startGraphInterval() {
 }
 function clickedGamepadButton(id) {
 
-    if (graphInterval == null) {
-        startGraphInterval()
-    }
-    var disableLog = false
-    if (museConnected == true && dataGood == false && disableLog) {
-        console.error("Can't log - Bad Data")
+
+    if (id == undefined) {
+        console.error("undefined button")
+        return
+
     }
     else {
-        var date = new Date()
-        var millis = date.getTime()
-        if ((millis - lastActivity) < 500) {
-            lastActivity = millis
+        if (graphInterval == null) {
+            startGraphInterval()
+        }
+        var disableLog = false
+        if (museConnected == true && dataGood == false && disableLog) {
+            console.error("Can't log - Bad Data")
+        }
+        else {
+            var date = new Date()
+            var millis = date.getTime()
+            if ((millis - lastClicked) > 990) {
+                lastClicked = millis
 
-            var mode = d3.select("#mode-select").property("value")
-            var code = buttonMap[id]
-            var name = buttonMapOut[mode][code]
-            var color = buttonColors[name]
-
-            if (name == "START") {
-                resetRecord()
-            }
-
-            btn_history.push({ timestamp: millis, id: id, value: id, tag: name, color: color })
-
-
-            if (foundGamepad == false) {
-                foundGamepad = true
-                name = "Start"
-                code = ""
-
-            }
-            else {
-
-            }
-
-            // Add +1 to the total count for this button name
-            if (buttonClickCounts[name] != null) {
-                buttonClickCounts[name] = buttonClickCounts[name] + 1
-            }
-            else {
-                buttonClickCounts[name] = 1
-            }
-
-            // Bar Chart
-            var btns = Object.entries(buttonClickCounts)
-            updateBarChart(btns)
-
-            // Time Series
-
-            // Check if the user has come back to page after a long time - if yes, reset any existing data
-            if (buttonTimeSeries.length > 0) {
-                var lastMillis = buttonTimeSeries.slice(-1)[0].timestamp
-                var timeDiff_btn = millis - lastMillis
-                var timeDiff_start = millis - timestart
-                if (timeDiff_btn > (1000 * 60 * 30) || timeDiff_start > (1000 * 60 * 60 * 4)) {
-                    resetRecord()
+                var mode = d3.select("#mode-select").property("value")
+                var code = buttonMap[id]
+                console.log("MODE: " + mode)
+                console.log("CODE:" + code)
+                var name = buttonMapOut[mode][code]
+                console.log("clicked: " + name)
+                if (name == undefined) {
+                    return
                 }
+                else {
+                    var color = buttonColors[name]
 
-            }
-            // Add a new timeseries entry
-            var adjustedTimestamp = millis - (1000 * tagDelay) // Subtract some seconds for two reasons: 1) Adjust for user reaction, 2) the SVG cuts of last few seconds
-            var newClick = { timestamp: adjustedTimestamp, button: name, color: color }
-            buttonTimeSeries.push(newClick)
+                    if (name == "START") {
+                        resetRecord()
+                    }
 
-            // Update chart
-            updateTimeSeries(buttonTimeSeries)
+                    btn_history.push({ timestamp: millis, id: id, value: id, tag: name, color: color })
 
-            var marker = { vector: eegdata, marker: name, user: auth.currentUser.uid }
-            markers.push(marker)
-            if (museConnected == true) {
 
-                if (dataGood == true) {
-                    var p = addMarker(eegdata, name)
-                    p.then((doc) => {
-                        console.log("Logged marker")
+                    if (foundGamepad == false) {
+                        foundGamepad = true
+
 
                     }
-                    )
+                    else {
+
+                    }
+
+                    // Add +1 to the total count for this button name
+                    if (buttonClickCounts[name] != null) {
+                        buttonClickCounts[name] = buttonClickCounts[name] + 1
+                    }
+                    else {
+                        buttonClickCounts[name] = 1
+                    }
+
+                    // Bar Chart
+                    var btns = Object.entries(buttonClickCounts)
+                    updateBarChart(btns)
+
+                    // Time Series
+
+                    // Check if the user has come back to page after a long time - if yes, reset any existing data
+                    if (buttonTimeSeries.length > 0) {
+                        var lastMillis = buttonTimeSeries.slice(-1)[0].timestamp
+                        var timeDiff_btn = millis - lastMillis
+                        var timeDiff_start = millis - timestart
+                        if (timeDiff_btn > (1000 * 60 * 30) || timeDiff_start > (1000 * 60 * 60 * 4)) {
+                            resetRecord()
+                        }
+
+                    }
+                    // Add a new timeseries entry
+                    var adjustedTimestamp = millis - (1000 * tagDelay) // Subtract some seconds for two reasons: 1) Adjust for user reaction, 2) the SVG cuts of last few seconds
+                    var customIndex = buttonIndex[name]
+                    if (customIndex == null) customIndex = 10
+                    else {
+                        customIndex = customIndex * 20
+                    }
+
+                    var newClick = { timestamp: adjustedTimestamp, button: name, color: color, y: customIndex }
+                    buttonTimeSeries.push(newClick)
+
+                    // Update chart
+                    updateTimeSeries(buttonTimeSeries)
+
+                    var marker = { vector: eegdata, marker: name, user: auth.currentUser.uid }
+                    markers.push(marker)
+                    if (museConnected == true) {
+
+                        if (dataGood == true) {
+                            var p = addMarker(eegdata, name)
+                            p.then((doc) => {
+                                console.log("Logged marker")
+
+                            }
+                            )
+                        }
+
+                    }
                 }
 
             }
+            else {
+                console.error("Clicked too fast")
+            }
+
         }
 
     }
@@ -448,9 +516,12 @@ function updateTimeSeries(timeseries) {
         d.enter().append("circle")
             .attr("class", "circle tag")
             .attr("cx", function (d, i) { return circleX(d.timestamp) })
-            .attr("cy", tagOffset)
+            .attr("cy", function (d) {
+                return d.y
+            })
             .attr("r", "10")
             .attr("fill", function (d) { return d.color })
+
 
         d.enter().append("text")
             .attr("class", "text tag")
@@ -459,19 +530,19 @@ function updateTimeSeries(timeseries) {
             .attr("x", 0)
             .attr("y", 0)
             .attr("transform", function (d, i) {
-                return "translate(" + circleX(d.timestamp) + ", " + (tagOffset + tagTextOffset) + "), rotate(-45)"
+                return "translate(" + circleX(d.timestamp) + ", " + (d.y + tagTextOffset) + "),rotate(-45)"
             })
             .style("text-anchor", "end")
     }
 
 }
-function saveCSV() {
+function preparesaveCSV() {
 
     var stringOut = ""
     // EEG + Tags
     if (eegDataRecord.length > 30) {
         console.log("Saving EEG + Tags")
-        stringOut = "data:text/csv;charset=utf-8,timestamp,af7_alpha,af7_beta,af7_delta,af7_gamma,af7_theta,af8_alpha,af8_beta,af8_delta,af8_gamma,af8_theta,tp10_alpha,tp10_beta,tp10_delta,tp10_gamma,tp10_theta,tp9_alpha,tp9_beta,tp9_delta,tp9_gamma,tp9_theta,af7_variance,af8_variance,tp9_variance,tp10_variance,tag\r\n"
+        stringOut = "timestamp,af7_alpha,af7_beta,af7_delta,af7_gamma,af7_theta,af8_alpha,af8_beta,af8_delta,af8_gamma,af8_theta,tp10_alpha,tp10_beta,tp10_delta,tp10_gamma,tp10_theta,tp9_alpha,tp9_beta,tp9_delta,tp9_gamma,tp9_theta,af7_variance,af8_variance,tp9_variance,tp10_variance,tag\r\n"
 
         var keys = [
             "timestamp",
@@ -592,7 +663,7 @@ function saveCSV() {
     }
     else if (buttonTimeSeries.length > 0) {
         console.log("Saving Tags only")
-        stringOut = "data:text/csv;charset=utf-8,timestamp,button,color\r\n"
+        stringOut = "timestamp,button,color\r\n"
         buttonTimeSeries.forEach(row => {
             stringOut += row.timestamp + "," + row.button + "," + row.color + "\r\n"
         })
@@ -601,8 +672,9 @@ function saveCSV() {
         window.alert("No Data!")
     }
     if (stringOut.length > 10) {
-        var encodeduri = encodeURI(stringOut)
-        window.open(encodeduri)
+        var millis = new Date().getTime()
+        var niceTime = formatDate(millis)
+        saveCSV(stringOut, "Tags - " + niceTime)
     }
 
 
@@ -850,7 +922,7 @@ function rescaleTimeseries() {
         svg.selectAll(".text")
             .transition()
             .attr("transform", function (d, i) {
-                return "translate(" + circleX(d.timestamp) + ", " + (tagOffset + tagTextOffset) + "), rotate(-45)"
+                return "translate(" + circleX(d.timestamp) + ", " + (d.y + tagTextOffset) + "), rotate(-45)"
             })
             .ease(d3.easeLinear)
             .duration(thisInterval)
@@ -870,6 +942,7 @@ function rescaleTimeseries() {
     }
     moveBy("timechartsvg", 60, "", 1)
     moveBy("timechart2svg", (60 * 10), "_avg10", 10)
+
 
 }
 export function stopListeners() {
@@ -908,6 +981,7 @@ function lostApp() {
 
 }
 function foundApp() {
+    d3.select("#museRow").style("display", "table-row")
     if (androidStatus == false) {
         androidStatus = true
         d3.select("#muse_status_android").style("fill", "green")
@@ -1244,8 +1318,12 @@ function buildModeSelector(div) {
         .style("background", "#f0f0f0")
         .style("padding", "0px")
 
+
+
     var data = [
+
         { label: "Insight", key: "INSIGHT" },
+        { label: "Jhanas", key: "JHANAS" },
         { label: "Concentration", key: "CONCENTRATION" },
         { label: "Body", key: "BODY" }]
 
@@ -1262,13 +1340,98 @@ function buildModeSelector(div) {
 
     select.on("change", function (d) {
         var opt = d3.select(this).property("value")
-
+        gamepadMode = opt
+        localStorage.setItem("gamepadMode", opt);
 
 
     })
+    if (gamepadMode != null) {
+        select.property("value", gamepadMode)
+    }
+
+    div.append("button")
+        .attr("id", "keysButton")
+        .text("Show Keys")
+        .attr("class", "button")
+        .style("font-size", textSize + "px")
+        .style("margin-left", "10px")
+        .style("margin-right", "10px")
+        .on("click", function () {
+            showKeys()
+        })
+
+
+
+
+
+}
+function preLoadImages() {
+    var images = ["insight_keys.png", "jhana_keys.png", "concentration_keys.png", "body_keys.png"]
+    for (var i = 0; i < images.length; i++) {
+        var img = new Image()
+        img.src = images[i]
+    }
+}
+function showKeys() {
+    console.log("Shwoing keys for: " + gamepadMode)
+    var filename = ""
+    switch (gamepadMode) {
+        case "INSIGHT":
+            filename = "insight_keys.png"
+            break;
+        case "JHANAS":
+            filename = "jhana_keys.png"
+            break;
+        case "CONCENTRATION":
+            filename = "concentration_keys.png"
+            break;
+        case "BODY":
+            filename = "body_keys.png"
+            break;
+
+
+    }
+
+    var div =
+        d3.select("body").append("div")
+            .attr("id", "keysDiv")
+            .style("width", "fit-content")
+            .style("height", "fit-content")
+            .style("background", "white")
+            .style("border", "2px solid black")
+            .style("border-radius", "5px")
+            .style("position", "absolute")
+            .style("display", "flex")
+            .style("flex-direction", "column")
+            .style("align-items", "center")
+            .style("justify-content", "center")
+            .style("left", 0)
+            .style("top", 0)
+            .style("bottom", 0)
+            .style("right", 0)
+            .style("margin", "auto auto auto auto")
+    div
+        .append("div")
+        .style("display", "flex")
+        .style("flex-direction", "row")
+        .append("button")
+        .style("margin", "5px")
+        .style("position", "absolute")
+        .style("right", "0px")
+        .text("✖")
+        .style("font-size", "30px")
+        .on("click", function () {
+            div.remove()
+        })
+
+    div
+        .append("div").style("margin", "5px")
+        .append("img")
+        .attr("src", filename)
 
 }
 function buildMuseStatus(museRow) {
+    museRow.style("display", "none").attr("id", "museRow")
     museRow.append("td").append("img")
         .attr('width', iconSize)
         .attr("id", "eegicon")
@@ -1366,7 +1529,10 @@ export function resetRecord() {
     buttonTimeSeries = []
     buttonClickCounts = {}
     eegDataRecord = []
+    // get now in milliseconds
+    var now = new Date().getTime()
 
+    startTime = now
 
     //pushNotice("Resetting...")
     updateBarChart(null)
@@ -1409,6 +1575,18 @@ function buildIndicators(div) {
     buildMuseStatus(museRow)
     buildLiveUsersRow(liveUsersRow)
 }
+function checkStoredMode() {
+    let value = localStorage.getItem("gamepadMode");
+    if (value === null) {
+        value = defaultGamepadMode
+        localStorage.setItem("gamepadMode", value);
+        gamepadMode = value
+    }
+    else {
+        gamepadMode = value
+    }
+
+}
 
 function buildPage() {
 
@@ -1423,7 +1601,8 @@ function buildPage() {
         }
 
     });
-
+    checkStoredMode()
+    preLoadImages()
 
     d3.select("#root").style("height", window.innerHeight + "px")
     var header = d3.select("#header")
@@ -1516,7 +1695,7 @@ function buildPage() {
         .text("Save CSV")
         .style("font-size", textSize + "px")
         .on("click", function () {
-            saveCSV()
+            preparesaveCSV()
         })
 
 
